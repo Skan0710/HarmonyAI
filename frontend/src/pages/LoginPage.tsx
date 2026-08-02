@@ -1,27 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/useAuthStore';
+import { useAuth } from '../hooks/useAuth';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const { login, isAuthenticated, isLoading, error, clearError } = useAuthStore();
+  const { login, isAuthenticated, isLoading, isInitializing, error, clearError } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!isInitializing && isAuthenticated) {
       navigate('/', { replace: true });
     }
     return () => clearError();
-  }, [isAuthenticated, navigate, clearError]);
+  }, [isAuthenticated, isInitializing, navigate, clearError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
 
-    // Validation
     if (!email.trim()) {
       setValidationError('Email is required.');
       return;
@@ -48,13 +47,17 @@ export const LoginPage: React.FC = () => {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-2xl">
         <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-600/20 text-indigo-400 font-bold text-xl mb-3 border border-indigo-500/30">
+            H
+          </div>
           <h1 className="text-2xl font-bold text-white tracking-wide">HarmonyAI</h1>
           <p className="text-sm text-slate-400 mt-1">Sign in to your account</p>
         </div>
 
         {(validationError || error) && (
-          <div className="mb-4 p-3 bg-red-950/60 border border-red-800/80 text-red-300 text-sm rounded-lg">
-            {validationError || error}
+          <div className="mb-4 p-3.5 bg-red-950/60 border border-red-800/80 text-red-300 text-sm rounded-lg flex items-center gap-2">
+            <span className="font-bold">Error:</span>
+            <span>{validationError || error}</span>
           </div>
         )}
 
@@ -90,9 +93,16 @@ export const LoginPage: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50"
+            className="w-full py-2.5 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <span>Sign In</span>
+            )}
           </button>
         </form>
 

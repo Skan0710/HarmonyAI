@@ -1,4 +1,5 @@
 import { API_CONFIG } from '../config/api';
+import { getToken } from '../utils/token';
 
 export interface ApiResponse<T = unknown> {
   data?: T;
@@ -12,7 +13,7 @@ export const apiClient = async <T = unknown>(
 ): Promise<ApiResponse<T>> => {
   const url = `${API_CONFIG.baseURL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  const token = localStorage.getItem('harmonyai_token');
+  const token = getToken();
   const authHeaders: Record<string, string> = token
     ? { Authorization: `Bearer ${token}` }
     : {};
@@ -30,8 +31,17 @@ export const apiClient = async <T = unknown>(
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
+      let errorMessage = data?.message || `Request failed with status ${response.status}`;
+      if (response.status === 401) {
+        errorMessage = data?.message || 'Authentication session expired. Please sign in again.';
+      } else if (response.status === 403) {
+        errorMessage = 'You do not have permission to access this resource.';
+      } else if (response.status === 500) {
+        errorMessage = 'Internal server error. Please try again later.';
+      }
+
       return {
-        error: data?.message || `HTTP Error ${response.status}`,
+        error: errorMessage,
         status: response.status,
       };
     }
@@ -42,7 +52,7 @@ export const apiClient = async <T = unknown>(
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Network error',
+      error: error instanceof Error ? error.message : 'Network connection error. Please check your backend server.',
       status: 500,
     };
   }
