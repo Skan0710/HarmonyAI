@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { apiClient } from '../services/api';
+import { getToken, setToken, removeToken } from '../utils/token';
 
 export interface User {
   id: string;
@@ -9,18 +10,17 @@ export interface User {
   createdAt: string;
 }
 
-interface AuthResponse {
-  success: boolean;
-  message?: string;
-  data?: {
-    user: User;
-    token: string;
-  };
+interface AuthResponseData {
+  user: User;
+  token: string;
 }
 
-interface UserProfileResponse {
-  success: boolean;
-  data?: User;
+interface UserProfileResponseData {
+  id: string;
+  name: string;
+  email: string;
+  profilePicture?: string;
+  createdAt: string;
 }
 
 interface AuthState {
@@ -28,6 +28,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isInitializing: boolean;
   error: string | null;
   login: (credentials: { email: string; password?: string }) => Promise<boolean>;
   register: (userData: { name: string; email: string; password?: string }) => Promise<boolean>;
@@ -36,16 +37,17 @@ interface AuthState {
   clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: localStorage.getItem('harmonyai_token'),
-  isAuthenticated: !!localStorage.getItem('harmonyai_token'),
-  isLoading: true,
+  token: getToken(),
+  isAuthenticated: !!getToken(),
+  isLoading: false,
+  isInitializing: true,
   error: null,
 
   login: async (credentials) => {
     set({ isLoading: true, error: null });
-    const response = await apiClient<AuthResponse['data']>('/auth/login', {
+    const response = await apiClient<AuthResponseData>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
@@ -53,19 +55,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (response.error || !response.data) {
       set({
         isLoading: false,
-        error: response.error || 'Failed to login',
+        error: response.error || 'Failed to authenticate.',
         isAuthenticated: false,
       });
       return false;
     }
 
     const { user, token } = response.data;
-    localStorage.setItem('harmonyai_token', token);
+    setToken(token);
+
     set({
       user,
       token,
       isAuthenticated: true,
       isLoading: false,
+      isInitializing: false,
       error: null,
     });
     return true;
@@ -73,7 +77,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   register: async (userData) => {
     set({ isLoading: true, error: null });
-    const response = await apiClient<AuthResponse['data']>('/auth/register', {
+    const response = await apiClient<AuthResponseData>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
@@ -81,59 +85,70 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (response.error || !response.data) {
       set({
         isLoading: false,
-        error: response.error || 'Failed to register',
+        error: response.error || 'Failed to create account.',
         isAuthenticated: false,
       });
       return false;
     }
 
     const { user, token } = response.data;
-    localStorage.setItem('harmonyai_token', token);
+    setToken(token);
+
     set({
       user,
       token,
       isAuthenticated: true,
       isLoading: false,
+      isInitializing: false,
       error: null,
     });
     return true;
   },
 
   logout: () => {
-    localStorage.removeItem('harmonyai_token');
+    removeToken();
     set({
       user: null,
       token: null,
       isAuthenticated: false,
       isLoading: false,
+      isInitializing: false,
       error: null,
     });
   },
 
   fetchCurrentUser: async () => {
-    const token = get().token;
+    const token = getToken();
     if (!token) {
-      set({ isLoading: false, isAuthenticated: false, user: null });
-      return;
-    }
-
-    set({ isLoading: true });
-    const response = await apiClient<UserProfileResponse['data']>('/users/me');
-
-    if (response.error || !response.data) {
-      // Token invalid or expired
-      localStorage.removeItem('harmonyai_token');
       set({
         user: null,
         token: null,
         isAuthenticated: false,
         isLoading: false,
+        isInitializing: false,
+      });
+      return;
+    }
+
+    set({ isLoading: true });
+    const response = await apiClient<UserProfileResponseData>('/users/me');
+
+    if (response.error || !response.data) {
+      // Invalid/expired token -> clear auth state
+      removeToken();
+      set({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+        isInitializing: false,
       });
     } else {
       set({
         user: response.data,
         isAuthenticated: true,
         isLoading: false,
+        isInitializing: false,
       });
     }
   },
