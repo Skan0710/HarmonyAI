@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { connectDB } from './config/db.js';
 
 dotenv.config();
 
@@ -18,6 +19,11 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'HarmonyAI Backend API is running' });
 });
 
-app.listen(PORT, () => {
-  console.log(`[HarmonyAI Backend] Server is running on port ${PORT}`);
-});
+const startServer = async (): Promise<void> => {
+  await connectDB();
+  app.listen(PORT, () => {
+    console.log(`[HarmonyAI Backend] Server is running on port ${PORT}`);
+  });
+};
+
+startServer();
