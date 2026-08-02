@@ -2,9 +2,14 @@
   "name": "harmonyai-root",
   "private": true,
   "scripts": {
+    "dev": "concurrently -k -n \"BACKEND,FRONTEND\" -c \"blue.bold,cyan.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",
+    "build": "npm run build:backend && npm run build:frontend",
     "build:frontend": "npm run build --prefix frontend",
     "build:backend": "npm run build --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }
