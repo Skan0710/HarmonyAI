@@ -12,11 +12,17 @@ export const apiClient = async <T = unknown>(
 ): Promise<ApiResponse<T>> => {
   const url = `${API_CONFIG.baseURL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
+  const token = localStorage.getItem('harmonyai_token');
+  const authHeaders: Record<string, string> = token
+    ? { Authorization: `Bearer ${token}` }
+    : {};
+
   try {
     const response = await fetch(url, {
       ...options,
       headers: {
         ...API_CONFIG.headers,
+        ...authHeaders,
         ...options.headers,
       },
     });
