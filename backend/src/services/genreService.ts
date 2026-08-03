@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { Genre, IGenre } from '../models/Genre.js';
 
 export interface CreateGenreInput {
@@ -39,14 +40,16 @@ export class GenreService {
   }
 
   static async getGenreById(genreId: string): Promise<IGenre | null> {
+    if (!Types.ObjectId.isValid(genreId)) return null;
     return Genre.findById(genreId).populate('parentGenre', 'name slug');
   }
 
   static async getGenreBySlug(slug: string): Promise<IGenre | null> {
-    return Genre.findOne({ slug }).populate('parentGenre', 'name slug');
+    return Genre.findOne({ slug: slug.toLowerCase() }).populate('parentGenre', 'name slug');
   }
 
   static async updateGenre(genreId: string, data: UpdateGenreInput): Promise<IGenre | null> {
+    if (!Types.ObjectId.isValid(genreId)) return null;
     return Genre.findByIdAndUpdate(genreId, { $set: data }, { new: true, runValidators: true }).populate(
       'parentGenre',
       'name slug'
@@ -54,6 +57,7 @@ export class GenreService {
   }
 
   static async deleteGenre(genreId: string): Promise<IGenre | null> {
+    if (!Types.ObjectId.isValid(genreId)) return null;
     return Genre.findByIdAndDelete(genreId);
   }
 }

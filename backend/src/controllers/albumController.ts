@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import { AlbumService } from '../services/albumService.js';
+import { Artist } from '../models/Artist.js';
 import { AlbumType } from '../models/Album.js';
 
 export const createAlbum = async (req: Request, res: Response): Promise<void> => {
@@ -17,13 +19,31 @@ export const createAlbum = async (req: Request, res: Response): Promise<void> =>
       tags,
     } = req.body;
 
-    if (!title || !artist) {
-      res.status(400).json({ success: false, message: 'Album title and primary artist are required' });
+    // Validation
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      res.status(400).json({ success: false, message: 'Album title is required and must be a non-empty string' });
+      return;
+    }
+
+    if (!artist || typeof artist !== 'string' || !Types.ObjectId.isValid(artist)) {
+      res.status(400).json({ success: false, message: 'Valid primary artist ID is required' });
+      return;
+    }
+
+    // Check if artist exists
+    const existingArtist = await Artist.findById(artist);
+    if (!existingArtist) {
+      res.status(404).json({ success: false, message: 'Referenced artist does not exist' });
+      return;
+    }
+
+    if (releaseYear !== undefined && (typeof releaseYear !== 'number' || releaseYear < 1800 || releaseYear > 2100)) {
+      res.status(400).json({ success: false, message: 'Release year must be a valid year between 1800 and 2100' });
       return;
     }
 
     const album = await AlbumService.createAlbum({
-      title,
+      title: title.trim(),
       artist,
       featuredArtists,
       genre,
@@ -41,6 +61,10 @@ export const createAlbum = async (req: Request, res: Response): Promise<void> =>
       data: album,
     });
   } catch (error: any) {
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      res.status(400).json({ success: false, message: error.message || 'Invalid input data' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to create album',
@@ -51,8 +75,8 @@ export const createAlbum = async (req: Request, res: Response): Promise<void> =>
 export const getAlbums = async (req: Request, res: Response): Promise<void> => {
   try {
     const search = req.query.search ? String(req.query.search) : undefined;
-    const artistId = req.query.artistId ? String(req.query.artistId) : undefined;
-    const genreId = req.query.genreId ? String(req.query.genreId) : undefined;
+    const artistId = (req.query.artistId || req.query.artist) ? String(req.query.artistId || req.query.artist) : undefined;
+    const genreId = (req.query.genreId || req.query.genre) ? String(req.query.genreId || req.query.genre) : undefined;
     const albumType = req.query.albumType ? (String(req.query.albumType) as AlbumType) : undefined;
     const releaseYear = req.query.releaseYear ? parseInt(String(req.query.releaseYear), 10) : undefined;
     const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
@@ -101,6 +125,10 @@ export const getAlbumById = async (req: Request, res: Response): Promise<void> =
       data: album,
     });
   } catch (error: any) {
+    if (error.name === 'CastError') {
+      res.status(400).json({ success: false, message: 'Invalid album ID format' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch album',
@@ -111,6 +139,23 @@ export const getAlbumById = async (req: Request, res: Response): Promise<void> =
 export const updateAlbum = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const { title, artist, releaseYear } = req.body;
+
+    if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
+      res.status(400).json({ success: false, message: 'Album title must be a non-empty string' });
+      return;
+    }
+
+    if (artist !== undefined && (!Types.ObjectId.isValid(artist))) {
+      res.status(400).json({ success: false, message: 'Valid primary artist ID is required' });
+      return;
+    }
+
+    if (releaseYear !== undefined && (typeof releaseYear !== 'number' || releaseYear < 1800 || releaseYear > 2100)) {
+      res.status(400).json({ success: false, message: 'Release year must be a valid year between 1800 and 2100' });
+      return;
+    }
+
     const updatedAlbum = await AlbumService.updateAlbum(id, req.body);
 
     if (!updatedAlbum) {
@@ -124,6 +169,10 @@ export const updateAlbum = async (req: Request, res: Response): Promise<void> =>
       data: updatedAlbum,
     });
   } catch (error: any) {
+    if (error.name === 'CastError' || error.name === 'ValidationError') {
+      res.status(400).json({ success: false, message: error.message || 'Invalid input data' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to update album',
@@ -146,6 +195,10 @@ export const deleteAlbum = async (req: Request, res: Response): Promise<void> =>
       message: 'Album deleted successfully',
     });
   } catch (error: any) {
+    if (error.name === 'CastError') {
+      res.status(400).json({ success: false, message: 'Invalid album ID format' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to delete album',
