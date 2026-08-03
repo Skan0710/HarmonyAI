@@ -1,32 +1,71 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import type { Song, Genre, PaginationData } from '../types/music';
-import { fetchSongs, fetchGenres } from '../services/songService';
+import { useSearchParams } from 'react-router-dom';
+import type { Song, Genre, Artist, Album, PaginationData } from '../types/music';
+import { fetchSongs, fetchGenres, fetchArtists, fetchAlbums } from '../services/songService';
+import { MusicFilters } from '../components/MusicFilters';
 import { MusicGrid } from '../components/MusicGrid';
+import { Pagination } from '../components/Pagination';
 
 export const MusicLibraryPage: React.FC = () => {
-  const [songs, setSongs] = useState<Song[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // State for metadata lists
   const [genres, setGenres] = useState<Genre[]>([]);
+  const [artists, setArtists] = useState<Artist[]>([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
+
+  // State for fetched songs and pagination
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [pagination, setPagination] = useState<PaginationData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedGenreId, setSelectedGenreId] = useState<string>('');
-  const [sortBy, setSortBy] = useState<string>('createdAt');
-  const [page, setPage] = useState<number>(1);
-  const [pagination, setPagination] = useState<PaginationData | null>(null);
-
+  // Audio Preview Player
   const [currentPlayingSong, setCurrentPlayingSong] = useState<Song | null>(null);
 
-  useEffect(() => {
-    const loadGenres = async () => {
-      const res = await fetchGenres();
-      if (!res.error && res.genres) {
-        setGenres(res.genres);
+  // Extract initial values from URL search parameters (Preserves filters across navigation & reloads)
+  const searchQuery = searchParams.get('q') || '';
+  const selectedGenreId = searchParams.get('genre') || '';
+  const selectedArtistId = searchParams.get('artist') || '';
+  const selectedAlbumId = searchParams.get('album') || '';
+  const sortBy = searchParams.get('sort') || 'playCount';
+  const sortOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const limit = parseInt(searchParams.get('limit') || '15', 10);
+
+  // Helper to update URL search params preserving existing values
+  const updateUrlParams = (newParams: Record<string, string | number | undefined | null>) => {
+    const nextParams = new URLSearchParams(searchParams);
+
+    Object.entries(newParams).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '' && value !== 1 && value !== '15' && value !== 'playCount' && value !== 'desc') {
+        nextParams.set(key, String(value));
+      } else {
+        nextParams.delete(key);
       }
+    });
+
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  // Fetch filter metadata (Genres, Artists, Albums) on mount
+  useEffect(() => {
+    const loadFilterData = async () => {
+      const [genresRes, artistsRes, albumsRes] = await Promise.all([
+        fetchGenres(),
+        fetchArtists(),
+        fetchAlbums(),
+      ]);
+
+      if (genresRes.genres) setGenres(genresRes.genres);
+      if (artistsRes.artists) setArtists(artistsRes.artists);
+      if (albumsRes.albums) setAlbums(albumsRes.albums);
     };
-    loadGenres();
+
+    loadFilterData();
   }, []);
 
+  // Fetch songs when filter params change
   const loadSongs = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -34,10 +73,12 @@ export const MusicLibraryPage: React.FC = () => {
     const res = await fetchSongs({
       search: searchQuery || undefined,
       genreId: selectedGenreId || undefined,
+      artistId: selectedArtistId || undefined,
+      albumId: selectedAlbumId || undefined,
       sortBy,
-      sortOrder: sortBy === 'title' ? 'asc' : 'desc',
+      sortOrder,
       page,
-      limit: 15,
+      limit,
     });
 
     if (res.error) {
@@ -48,22 +89,54 @@ export const MusicLibraryPage: React.FC = () => {
         setPagination(res.pagination);
       }
     }
+
     setLoading(false);
-  }, [searchQuery, selectedGenreId, sortBy, page]);
+  }, [searchQuery, selectedGenreId, selectedArtistId, selectedAlbumId, sortBy, sortOrder, page, limit]);
 
   useEffect(() => {
     loadSongs();
   }, [loadSongs]);
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    setPage(1);
+  // Handlers
+  const handleSearchChange = (query: string) => {
+    updateUrlParams({ q: query, page: 1 });
   };
 
-  const handleGenreSelect = (genreId: string) => {
-    setSelectedGenreId(genreId === selectedGenreId ? '' : genreId);
-    setPage(1);
+  const handleGenreChange = (genreId: string) => {
+    updateUrlParams({ genre: genreId, page: 1 });
   };
+
+  const handleArtistChange = (artistId: string) => {
+    updateUrlParams({ artist: artistId, page: 1 });
+  };
+
+  const handleAlbumChange = (albumId: string) => {
+    updateUrlParams({ album: albumId, page: 1 });
+  };
+
+  const handleSortByChange = (newSortBy: string) => {
+    updateUrlParams({ sort: newSortBy, page: 1 });
+  };
+
+  const handleSortOrderToggle = () => {
+    updateUrlParams({ order: sortOrder === 'asc' ? 'desc' : 'asc', page: 1 });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    updateUrlParams({ page: newPage });
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    updateUrlParams({ limit: newLimit, page: 1 });
+  };
+
+  const handleClearFilters = () => {
+    setSearchParams(new URLSearchParams(), { replace: true });
+  };
+
+  const hasActiveFilters = Boolean(
+    searchQuery || selectedGenreId || selectedArtistId || selectedAlbumId || sortBy !== 'playCount' || sortOrder !== 'desc'
+  );
 
   const handlePlaySong = (song: Song) => {
     if (currentPlayingSong?._id === song._id) {
@@ -74,90 +147,39 @@ export const MusicLibraryPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="space-y-6 pb-16">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-slate-100 tracking-tight">Music Library</h1>
           <p className="text-slate-400 text-sm mt-1">
-            Explore tracks across genres, artists, and albums powered by HarmonyAI.
+            Browse and discover tracks across artists, albums, and genres with HarmonyAI.
           </p>
         </div>
-
-        <div className="relative w-full md:w-80">
-          <svg
-            className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search songs, artists..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setPage(1);
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-            >
-              ✕
-            </button>
-          )}
-        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <button
-            onClick={() => handleGenreSelect('')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-              selectedGenreId === ''
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700/60'
-            }`}
-          >
-            All Genres
-          </button>
-          {genres.map((g) => (
-            <button
-              key={g._id}
-              onClick={() => handleGenreSelect(g._id)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                selectedGenreId === g._id
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700/60'
-              }`}
-            >
-              {g.name}
-            </button>
-          ))}
-        </div>
+      {/* Reusable Filters Bar */}
+      <MusicFilters
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        selectedGenreId={selectedGenreId}
+        onGenreChange={handleGenreChange}
+        selectedArtistId={selectedArtistId}
+        onArtistChange={handleArtistChange}
+        selectedAlbumId={selectedAlbumId}
+        onAlbumChange={handleAlbumChange}
+        sortBy={sortBy}
+        onSortByChange={handleSortByChange}
+        sortOrder={sortOrder}
+        onSortOrderToggle={handleSortOrderToggle}
+        genres={genres}
+        artists={artists}
+        albums={albums}
+        onClearFilters={handleClearFilters}
+        hasActiveFilters={hasActiveFilters}
+      />
 
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-slate-400 font-medium">Sort by:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value);
-              setPage(1);
-            }}
-            className="bg-slate-800 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-          >
-            <option value="createdAt">Latest Added</option>
-            <option value="playCount">Most Popular</option>
-            <option value="title">Song Title (A-Z)</option>
-            <option value="releaseYear">Release Year</option>
-          </select>
-        </div>
-      </div>
-
+      {/* Main Music Grid Component */}
       <MusicGrid
         songs={songs}
         loading={loading}
@@ -166,40 +188,25 @@ export const MusicLibraryPage: React.FC = () => {
         onPlaySong={handlePlaySong}
         currentSongId={currentPlayingSong?._id}
         emptyMessage={
-          searchQuery || selectedGenreId
-            ? 'No songs match your filter criteria. Try clearing filters.'
-            : 'No songs available in the library.'
+          hasActiveFilters
+            ? 'No songs match your selected filter criteria. Try resetting filters.'
+            : 'No songs available in the music library.'
         }
       />
 
-      {!loading && !error && pagination && pagination.pages > 1 && (
-        <div className="flex items-center justify-between pt-6 border-t border-slate-800">
-          <p className="text-xs text-slate-400">
-            Showing Page <span className="font-semibold text-slate-200">{pagination.page}</span> of{' '}
-            <span className="font-semibold text-slate-200">{pagination.pages}</span> ({pagination.total} songs)
-          </p>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 rounded-lg text-xs font-medium transition-colors border border-slate-700/60"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))}
-              disabled={page >= pagination.pages}
-              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 rounded-lg text-xs font-medium transition-colors border border-slate-700/60"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+      {/* Reusable Pagination Component */}
+      {!loading && !error && pagination && (
+        <Pagination
+          pagination={pagination}
+          onPageChange={handlePageChange}
+          limit={limit}
+          onLimitChange={handleLimitChange}
+        />
       )}
 
+      {/* Audio Player Preview Bar */}
       {currentPlayingSong && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-2xl bg-slate-900/90 border border-indigo-500/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-2xl bg-slate-900/95 border border-indigo-500/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom duration-300">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-800 shrink-0">
               <img

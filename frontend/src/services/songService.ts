@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { SongsApiResponse, Genre } from '../types/music';
+import type { SongsApiResponse, Genre, Artist, Album } from '../types/music';
 
 export interface GetSongsParams {
   search?: string;
@@ -54,4 +54,24 @@ export const fetchGenres = async (): Promise<{ genres: Genre[]; error?: string }
   }
 
   return { genres: response.data.data || [] };
+};
+
+export const fetchArtists = async (): Promise<{ artists: Artist[]; error?: string }> => {
+  const response = await apiClient<{ success: boolean; data: Artist[] }>('/artists', { method: 'GET' });
+
+  if (response.error || !response.data) {
+    return { artists: [], error: response.error || 'Failed to load artists' };
+  }
+
+  return { artists: response.data.data || [] };
+};
+
+export const fetchAlbums = async (): Promise<{ albums: Album[]; error?: string }> => {
+  const response = await apiClient<{ success: boolean; data: Album[] }>('/albums', { method: 'GET' });
+
+  if (response.error || !response.data) {
+    return { albums: [], error: response.error || 'Failed to load albums' };
+  }
+
+  return { albums: response.data.data || [] };
 };
