@@ -5,13 +5,13 @@ export const createGenre = async (req: Request, res: Response): Promise<void> =>
   try {
     const { name, description, coverImage, parentGenre, tags, isFeatured } = req.body;
 
-    if (!name) {
-      res.status(400).json({ success: false, message: 'Genre name is required' });
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      res.status(400).json({ success: false, message: 'Genre name is required and must be a non-empty string' });
       return;
     }
 
     const genre = await GenreService.createGenre({
-      name,
+      name: name.trim(),
       description,
       coverImage,
       parentGenre,
@@ -27,6 +27,10 @@ export const createGenre = async (req: Request, res: Response): Promise<void> =>
   } catch (error: any) {
     if (error.code === 11000) {
       res.status(400).json({ success: false, message: 'Genre name or slug already exists' });
+      return;
+    }
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      res.status(400).json({ success: false, message: error.message || 'Invalid input data' });
       return;
     }
     res.status(500).json({
@@ -58,7 +62,12 @@ export const getGenres = async (req: Request, res: Response): Promise<void> => {
 export const getGenreById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const genre = await GenreService.getGenreById(id);
+    let genre = await GenreService.getGenreById(id);
+
+    // Support slug lookup if not an ObjectId
+    if (!genre && typeof id === 'string') {
+      genre = await GenreService.getGenreBySlug(id);
+    }
 
     if (!genre) {
       res.status(404).json({ success: false, message: 'Genre not found' });
@@ -70,6 +79,10 @@ export const getGenreById = async (req: Request, res: Response): Promise<void> =
       data: genre,
     });
   } catch (error: any) {
+    if (error.name === 'CastError') {
+      res.status(400).json({ success: false, message: 'Invalid genre ID format' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch genre',
@@ -80,6 +93,13 @@ export const getGenreById = async (req: Request, res: Response): Promise<void> =
 export const updateGenre = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const { name } = req.body;
+
+    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+      res.status(400).json({ success: false, message: 'Genre name must be a non-empty string' });
+      return;
+    }
+
     const updatedGenre = await GenreService.updateGenre(id, req.body);
 
     if (!updatedGenre) {
@@ -93,6 +113,14 @@ export const updateGenre = async (req: Request, res: Response): Promise<void> =>
       data: updatedGenre,
     });
   } catch (error: any) {
+    if (error.code === 11000) {
+      res.status(400).json({ success: false, message: 'Genre name or slug already exists' });
+      return;
+    }
+    if (error.name === 'CastError' || error.name === 'ValidationError') {
+      res.status(400).json({ success: false, message: error.message || 'Invalid input data' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to update genre',
@@ -115,6 +143,10 @@ export const deleteGenre = async (req: Request, res: Response): Promise<void> =>
       message: 'Genre deleted successfully',
     });
   } catch (error: any) {
+    if (error.name === 'CastError') {
+      res.status(400).json({ success: false, message: 'Invalid genre ID format' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to delete genre',

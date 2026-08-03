@@ -1,4 +1,6 @@
+import { Types } from 'mongoose';
 import { Album, IAlbum, AlbumType } from '../models/Album.js';
+import { Artist } from '../models/Artist.js';
 
 export interface CreateAlbumInput {
   title: string;
@@ -54,10 +56,15 @@ export class AlbumService {
     }
 
     if (artistId) {
-      query.artist = artistId;
+      if (Types.ObjectId.isValid(artistId)) {
+        query.artist = artistId;
+      } else {
+        const matchingArtists = await Artist.find({ name: { $regex: artistId, $options: 'i' } }).select('_id');
+        query.artist = { $in: matchingArtists.map((a) => a._id) };
+      }
     }
 
-    if (genreId) {
+    if (genreId && Types.ObjectId.isValid(genreId)) {
       query.genre = genreId;
     }
 
@@ -69,16 +76,18 @@ export class AlbumService {
       query.releaseYear = releaseYear;
     }
 
-    const skip = (page - 1) * limit;
+    const validPage = Math.max(1, page);
+    const validLimit = Math.max(1, Math.min(100, limit));
+    const skip = (validPage - 1) * validLimit;
 
     const [albums, total] = await Promise.all([
       Album.find(query)
-        .populate('artist', 'name avatar verified')
-        .populate('featuredArtists', 'name avatar')
+        .populate('artist', 'name profileImage avatar verified')
+        .populate('featuredArtists', 'name profileImage avatar')
         .populate('genre', 'name slug')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(validLimit),
       Album.countDocuments(query),
     ]);
 
@@ -86,20 +95,23 @@ export class AlbumService {
   }
 
   static async getAlbumById(albumId: string): Promise<IAlbum | null> {
+    if (!Types.ObjectId.isValid(albumId)) return null;
     return Album.findById(albumId)
-      .populate('artist', 'name avatar bio verified')
-      .populate('featuredArtists', 'name avatar')
-      .populate('genre', 'name slug');
+      .populate('artist', 'name profileImage avatar bio verified')
+      .populate('featuredArtists', 'name profileImage avatar')
+      .populate('genre', 'name slug description');
   }
 
   static async updateAlbum(albumId: string, data: UpdateAlbumInput): Promise<IAlbum | null> {
+    if (!Types.ObjectId.isValid(albumId)) return null;
     return Album.findByIdAndUpdate(albumId, { $set: data }, { new: true, runValidators: true })
-      .populate('artist', 'name avatar verified')
-      .populate('featuredArtists', 'name avatar')
+      .populate('artist', 'name profileImage avatar verified')
+      .populate('featuredArtists', 'name profileImage avatar')
       .populate('genre', 'name slug');
   }
 
   static async deleteAlbum(albumId: string): Promise<IAlbum | null> {
+    if (!Types.ObjectId.isValid(albumId)) return null;
     return Album.findByIdAndDelete(albumId);
   }
 }
