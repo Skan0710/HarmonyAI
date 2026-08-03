@@ -11,6 +11,7 @@ export interface IArtist extends Document {
   _id: Types.ObjectId;
   name: string;
   bio?: string;
+  profileImage?: string;
   avatar?: string;
   bannerImage?: string;
   genres: Types.ObjectId[];
@@ -18,6 +19,10 @@ export interface IArtist extends Document {
   monthlyListeners: number;
   verified: boolean;
   tags: string[];
+  // Recommendation extensibility fields
+  similarArtists?: Types.ObjectId[];
+  vectorEmbedding?: number[];
+  recommendationMetadata?: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,6 +36,10 @@ const artistSchema = new Schema<IArtist>(
       index: true,
     },
     bio: {
+      type: String,
+      default: '',
+    },
+    profileImage: {
       type: String,
       default: '',
     },
@@ -57,7 +66,7 @@ const artistSchema = new Schema<IArtist>(
     monthlyListeners: {
       type: Number,
       default: 0,
-      min: 0,
+      min: [0, 'Monthly listeners cannot be negative'],
     },
     verified: {
       type: Boolean,
@@ -67,12 +76,35 @@ const artistSchema = new Schema<IArtist>(
       type: [String],
       default: [],
     },
+    similarArtists: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Artist',
+      },
+    ],
+    vectorEmbedding: {
+      type: [Number],
+      default: undefined,
+    },
+    recommendationMetadata: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
   },
   {
     timestamps: true,
   }
 );
 
+artistSchema.pre('save', function () {
+  if (this.profileImage && !this.avatar) {
+    this.avatar = this.profileImage;
+  } else if (this.avatar && !this.profileImage) {
+    this.profileImage = this.avatar;
+  }
+});
+
 artistSchema.index({ name: 'text', tags: 'text' });
+artistSchema.index({ monthlyListeners: -1 });
 
 export const Artist = model<IArtist>('Artist', artistSchema);
