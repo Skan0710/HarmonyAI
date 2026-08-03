@@ -1,4 +1,8 @@
+import { Types } from 'mongoose';
 import { Song, ISong, IAudioFeatures } from '../models/Song.js';
+import { Artist } from '../models/Artist.js';
+import { Genre } from '../models/Genre.js';
+import { Album } from '../models/Album.js';
 
 export interface CreateSongInput {
   title: string;
@@ -103,16 +107,36 @@ export class SongService {
       ];
     }
 
+    // Filter by Artist (support ObjectId or artist name lookup)
     if (artistId) {
-      query.artist = artistId;
+      if (Types.ObjectId.isValid(artistId)) {
+        query.artist = artistId;
+      } else {
+        const matchingArtists = await Artist.find({ name: { $regex: artistId, $options: 'i' } }).select('_id');
+        query.artist = { $in: matchingArtists.map((a) => a._id) };
+      }
     }
 
+    // Filter by Album (support ObjectId or album title lookup)
     if (albumId) {
-      query.album = albumId;
+      if (Types.ObjectId.isValid(albumId)) {
+        query.album = albumId;
+      } else {
+        const matchingAlbums = await Album.find({ title: { $regex: albumId, $options: 'i' } }).select('_id');
+        query.album = { $in: matchingAlbums.map((a) => a._id) };
+      }
     }
 
+    // Filter by Genre (support ObjectId or genre slug/name lookup)
     if (genreId) {
-      query.genre = genreId;
+      if (Types.ObjectId.isValid(genreId)) {
+        query.genre = genreId;
+      } else {
+        const matchingGenres = await Genre.find({
+          $or: [{ slug: genreId.toLowerCase() }, { name: { $regex: genreId, $options: 'i' } }],
+        }).select('_id');
+        query.genre = { $in: matchingGenres.map((g) => g._id) };
+      }
     }
 
     if (tag) {
@@ -145,7 +169,9 @@ export class SongService {
       [sortBy]: sortOrder === 'asc' ? 1 : -1,
     };
 
-    const skip = (page - 1) * limit;
+    const validPage = Math.max(1, page);
+    const validLimit = Math.max(1, Math.min(100, limit));
+    const skip = (validPage - 1) * validLimit;
 
     const [songs, total] = await Promise.all([
       Song.find(query)
@@ -155,7 +181,7 @@ export class SongService {
         .populate('genre', 'name slug')
         .sort(sortOptions)
         .skip(skip)
-        .limit(limit),
+        .limit(validLimit),
       Song.countDocuments(query),
     ]);
 
@@ -163,6 +189,7 @@ export class SongService {
   }
 
   static async getSongById(songId: string): Promise<ISong | null> {
+    if (!Types.ObjectId.isValid(songId)) return null;
     return Song.findById(songId)
       .populate('artist', 'name avatar bio verified')
       .populate('featuredArtists', 'name avatar')
@@ -171,6 +198,7 @@ export class SongService {
   }
 
   static async updateSong(songId: string, data: UpdateSongInput): Promise<ISong | null> {
+    if (!Types.ObjectId.isValid(songId)) return null;
     return Song.findByIdAndUpdate(songId, { $set: data }, { new: true, runValidators: true })
       .populate('artist', 'name avatar verified')
       .populate('featuredArtists', 'name avatar')
@@ -179,10 +207,12 @@ export class SongService {
   }
 
   static async deleteSong(songId: string): Promise<ISong | null> {
+    if (!Types.ObjectId.isValid(songId)) return null;
     return Song.findByIdAndDelete(songId);
   }
 
   static async incrementPlayCount(songId: string): Promise<ISong | null> {
+    if (!Types.ObjectId.isValid(songId)) return null;
     return Song.findByIdAndUpdate(songId, { $inc: { playCount: 1 } }, { new: true });
   }
 
@@ -191,7 +221,7 @@ export class SongService {
 
     const query: Record<string, any> = { isPublished: true };
 
-    if (songId) {
+    if (songId && Types.ObjectId.isValid(songId)) {
       const seedSong = await Song.findById(songId);
       if (seedSong) {
         query._id = { $ne: seedSong._id };
@@ -208,7 +238,7 @@ export class SongService {
         }
       }
     } else {
-      if (genreId) query.genre = genreId;
+      if (genreId && Types.ObjectId.isValid(genreId)) query.genre = genreId;
       if (tags && tags.length > 0) query.tags = { $in: tags };
 
       if (targetBpm !== undefined) {
@@ -229,6 +259,6 @@ export class SongService {
       .populate('album', 'title coverImage')
       .populate('genre', 'name slug')
       .sort({ playCount: -1, createdAt: -1 })
-      .limit(limit);
+      .limit(Math.min(50, limit));
   }
 }

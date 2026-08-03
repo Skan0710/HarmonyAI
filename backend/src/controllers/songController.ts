@@ -55,6 +55,13 @@ export const createSong = async (req: Request, res: Response): Promise<void> => 
       data: song,
     });
   } catch (error: any) {
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Validation error',
+      });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to create song',
@@ -65,9 +72,9 @@ export const createSong = async (req: Request, res: Response): Promise<void> => 
 export const getSongs = async (req: Request, res: Response): Promise<void> => {
   try {
     const search = req.query.search ? String(req.query.search) : undefined;
-    const artistId = req.query.artistId ? String(req.query.artistId) : undefined;
-    const albumId = req.query.albumId ? String(req.query.albumId) : undefined;
-    const genreId = req.query.genreId ? String(req.query.genreId) : undefined;
+    const artistId = (req.query.artistId || req.query.artist) ? String(req.query.artistId || req.query.artist) : undefined;
+    const albumId = (req.query.albumId || req.query.album) ? String(req.query.albumId || req.query.album) : undefined;
+    const genreId = (req.query.genreId || req.query.genre) ? String(req.query.genreId || req.query.genre) : undefined;
     const tag = req.query.tag ? String(req.query.tag) : undefined;
     const releaseYear = req.query.releaseYear ? parseInt(String(req.query.releaseYear), 10) : undefined;
     const minBpm = req.query.minBpm ? parseFloat(String(req.query.minBpm)) : undefined;
@@ -133,6 +140,10 @@ export const getSongById = async (req: Request, res: Response): Promise<void> =>
       data: song,
     });
   } catch (error: any) {
+    if (error.name === 'CastError') {
+      res.status(400).json({ success: false, message: 'Invalid song ID format' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch song',
@@ -156,6 +167,10 @@ export const updateSong = async (req: Request, res: Response): Promise<void> => 
       data: updatedSong,
     });
   } catch (error: any) {
+    if (error.name === 'CastError' || error.name === 'ValidationError') {
+      res.status(400).json({ success: false, message: error.message || 'Invalid input data' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to update song',
@@ -178,6 +193,10 @@ export const deleteSong = async (req: Request, res: Response): Promise<void> => 
       message: 'Song deleted successfully',
     });
   } catch (error: any) {
+    if (error.name === 'CastError') {
+      res.status(400).json({ success: false, message: 'Invalid song ID format' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to delete song',
@@ -201,6 +220,10 @@ export const recordPlay = async (req: Request, res: Response): Promise<void> => 
       data: { id: song._id, playCount: song.playCount },
     });
   } catch (error: any) {
+    if (error.name === 'CastError') {
+      res.status(400).json({ success: false, message: 'Invalid song ID format' });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to record play count',
