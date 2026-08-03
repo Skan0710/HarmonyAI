@@ -5,6 +5,10 @@ import { connectDB } from './config/db.js';
 import healthRoutes from './routes/healthRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import genreRoutes from './routes/genreRoutes.js';
+import artistRoutes from './routes/artistRoutes.js';
+import albumRoutes from './routes/albumRoutes.js';
+import songRoutes from './routes/songRoutes.js';
 
 dotenv.config();
 
@@ -22,6 +26,10 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/genres', genreRoutes);
+app.use('/api/artists', artistRoutes);
+app.use('/api/albums', albumRoutes);
+app.use('/api/songs', songRoutes);
 
 const startServer = async (): Promise<void> => {
   await connectDB();
