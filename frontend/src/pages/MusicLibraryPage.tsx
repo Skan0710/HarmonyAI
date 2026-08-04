@@ -5,6 +5,7 @@ import { fetchSongs, fetchGenres, fetchArtists, fetchAlbums } from '../services/
 import { MusicFilters } from '../components/MusicFilters';
 import { MusicGrid } from '../components/MusicGrid';
 import { Pagination } from '../components/Pagination';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 
 export const MusicLibraryPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -148,6 +149,9 @@ export const MusicLibraryPage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-16">
+      {/* Breadcrumbs Navigation */}
+      <Breadcrumbs items={[{ label: 'Music Library' }]} />
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>

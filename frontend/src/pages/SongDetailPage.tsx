@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { Song } from '../types/music';
 import { fetchSongById, fetchSongs, recordSongPlay } from '../services/songService';
 import { MediaCarousel } from '../components/MediaCarousel';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 
 export const SongDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +32,6 @@ export const SongDetailPage: React.FC = () => {
       } else {
         setSong(res.song);
 
-        // Fetch related songs by genre or artist
         const genreId = typeof res.song.genre === 'object' ? res.song.genre._id : undefined;
         const relatedRes = await fetchSongs({
           genreId,
@@ -39,7 +39,6 @@ export const SongDetailPage: React.FC = () => {
         });
 
         if (relatedRes.songs) {
-          // Filter out the current song from related recommendations
           setRelatedSongs(relatedRes.songs.filter((s) => s._id !== res.song!._id));
         }
       }
@@ -101,6 +100,7 @@ export const SongDetailPage: React.FC = () => {
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto space-y-6 py-8 animate-pulse">
+        <div className="h-4 bg-slate-800 rounded w-1/3 mb-4" />
         <div className="flex flex-col md:flex-row gap-8">
           <div className="w-64 h-64 bg-slate-800 rounded-2xl shrink-0" />
           <div className="space-y-4 flex-1">
@@ -137,24 +137,19 @@ export const SongDetailPage: React.FC = () => {
   const coverUrl = imgError || !song.coverImage ? fallbackCover : song.coverImage;
 
   return (
-    <div className="space-y-10 pb-16">
-      {/* Back Button */}
-      <div>
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back
-        </button>
-      </div>
+    <div className="space-y-8 pb-16">
+      {/* Breadcrumbs Navigation */}
+      <Breadcrumbs
+        items={[
+          { label: 'Music Library', path: '/library' },
+          { label: getGenreName(), path: `/library?genre=${typeof song.genre === 'object' ? song.genre._id : ''}` },
+          { label: song.title },
+        ]}
+      />
 
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-8 z-10 relative">
-          {/* Cover Art */}
           <div className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-2xl overflow-hidden bg-slate-800 shadow-2xl shrink-0 border border-slate-700/60 group">
             <img
               src={coverUrl}
@@ -169,7 +164,6 @@ export const SongDetailPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Details Column */}
           <div className="flex-1 space-y-5 text-center md:text-left">
             <div>
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-1.5">
@@ -189,7 +183,6 @@ export const SongDetailPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Quick Metrics Bar */}
             <div className="grid grid-cols-3 gap-3 p-3.5 bg-slate-950/60 border border-slate-800 rounded-xl text-center md:text-left">
               <div>
                 <span className="text-[11px] font-medium text-slate-400 uppercase block">Duration</span>
@@ -207,7 +200,6 @@ export const SongDetailPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Main Action Buttons */}
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-1">
               <button
                 onClick={handlePlayToggle}
@@ -241,7 +233,6 @@ export const SongDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Audio Features Matrix (If present) */}
       {song.audioFeatures && (song.audioFeatures.bpm || song.audioFeatures.energy) && (
         <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
           <h3 className="text-base font-bold text-slate-200 tracking-tight flex items-center gap-2">
@@ -280,7 +271,6 @@ export const SongDetailPage: React.FC = () => {
         </section>
       )}
 
-      {/* Related Tracks Carousel */}
       {relatedSongs.length > 0 && (
         <MediaCarousel
           title={`More in ${getGenreName()}`}
@@ -291,7 +281,6 @@ export const SongDetailPage: React.FC = () => {
         />
       )}
 
-      {/* Mini Audio Player Overlay */}
       {isPlaying && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-2xl bg-slate-900/95 border border-indigo-500/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom duration-300">
           <div className="flex items-center gap-3 min-w-0">
