@@ -3,13 +3,16 @@ import { NavLink } from 'react-router-dom';
 
 export const Sidebar: React.FC = () => {
   return (
-    <aside className="w-64 bg-slate-800 text-slate-200 border-r border-slate-700 flex flex-col p-4">
-      <nav className="flex flex-col gap-2">
+    <aside className="w-64 bg-slate-800 text-slate-200 border-r border-slate-700 flex flex-col p-4 shrink-0">
+      <nav className="flex flex-col gap-1.5">
         <NavLink
           to="/"
+          end
           className={({ isActive }) =>
-            `px-4 py-2.5 rounded-lg transition-colors flex items-center gap-3 text-sm font-medium ${
-              isActive ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30' : 'hover:bg-slate-700/60 text-slate-300'
+            `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
+              isActive
+                ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30'
+                : 'hover:bg-slate-700/60 text-slate-300 hover:text-white'
             }`
           }
         >
@@ -22,8 +25,10 @@ export const Sidebar: React.FC = () => {
         <NavLink
           to="/library"
           className={({ isActive }) =>
-            `px-4 py-2.5 rounded-lg transition-colors flex items-center gap-3 text-sm font-medium ${
-              isActive ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30' : 'hover:bg-slate-700/60 text-slate-300'
+            `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
+              isActive
+                ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30'
+                : 'hover:bg-slate-700/60 text-slate-300 hover:text-white'
             }`
           }
         >

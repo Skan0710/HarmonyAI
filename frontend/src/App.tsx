@@ -7,6 +7,7 @@ import { MusicLibraryPage } from './pages/MusicLibraryPage';
 import { SongDetailPage } from './pages/SongDetailPage';
 import { ArtistDetailPage } from './pages/ArtistDetailPage';
 import { AlbumDetailPage } from './pages/AlbumDetailPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { useAuthStore } from './store/useAuthStore';
@@ -25,7 +26,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* Protected Routes */}
+        {/* Protected Routes with Nested Layout */}
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/" element={<HomePage />} />
@@ -33,6 +34,8 @@ function App() {
             <Route path="/songs/:id" element={<SongDetailPage />} />
             <Route path="/artists/:id" element={<ArtistDetailPage />} />
             <Route path="/albums/:id" element={<AlbumDetailPage />} />
+            {/* Catch-all 404 Route */}
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Route>
       </Routes>

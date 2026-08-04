@@ -4,6 +4,7 @@ import type { Artist, Song, Album } from '../types/music';
 import { fetchArtistById, fetchSongs, fetchAlbums, fetchSimilarArtists, recordSongPlay } from '../services/songService';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { MusicGrid } from '../components/MusicGrid';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 
 export const ArtistDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,7 +36,6 @@ export const ArtistDetailPage: React.FC = () => {
       } else {
         setArtist(res.artist);
 
-        // Fetch Songs, Albums, and Similar Artists in parallel
         const [songsRes, albumsRes, similarRes] = await Promise.all([
           fetchSongs({ artistId: id, limit: 20 }),
           fetchAlbums({ artistId: id }),
@@ -75,6 +75,7 @@ export const ArtistDetailPage: React.FC = () => {
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto space-y-8 py-8 animate-pulse">
+        <div className="h-4 bg-slate-800 rounded w-1/3 mb-4" />
         <div className="h-64 bg-slate-800 rounded-3xl" />
         <div className="space-y-4">
           <div className="h-6 bg-slate-800 rounded w-1/3" />
@@ -105,24 +106,19 @@ export const ArtistDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-10 pb-16">
-      {/* Back Button */}
-      <div>
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back
-        </button>
-      </div>
+    <div className="space-y-8 pb-16">
+      {/* Breadcrumbs Navigation */}
+      <Breadcrumbs
+        items={[
+          { label: 'Music Library', path: '/library' },
+          { label: 'Artists' },
+          { label: artist.name },
+        ]}
+      />
 
       {/* Artist Profile Header Hero */}
       <div className="relative overflow-hidden bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 backdrop-blur-xl shadow-2xl">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 z-10 relative">
-          {/* Profile Image Avatar */}
           <div className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-slate-800 border-4 border-slate-700/80 shadow-2xl shrink-0">
             <img
               src={imageUrl}
@@ -132,7 +128,6 @@ export const ArtistDetailPage: React.FC = () => {
             />
           </div>
 
-          {/* Artist Metadata */}
           <div className="flex-1 space-y-4 text-center sm:text-left">
             <div>
               <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
@@ -157,7 +152,6 @@ export const ArtistDetailPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Artist Bio */}
             {artist.bio && (
               <p className="text-slate-300 text-sm leading-relaxed max-w-3xl">
                 {artist.bio}
@@ -167,7 +161,6 @@ export const ArtistDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Discography Section: Albums Released by Artist */}
       {artistAlbums.length > 0 && (
         <MediaCarousel
           title="Albums & Discography"
@@ -177,7 +170,6 @@ export const ArtistDetailPage: React.FC = () => {
         />
       )}
 
-      {/* Songs Section: Top Tracks by Artist */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -199,7 +191,6 @@ export const ArtistDetailPage: React.FC = () => {
         />
       </section>
 
-      {/* Similar Artists Carousel Section */}
       {similarArtists.length > 0 && (
         <MediaCarousel
           title="Fans Also Like"
@@ -209,7 +200,6 @@ export const ArtistDetailPage: React.FC = () => {
         />
       )}
 
-      {/* Mini Audio Player Overlay */}
       {currentPlayingSong && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-2xl bg-slate-900/95 border border-indigo-500/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom duration-300">
           <div className="flex items-center gap-3 min-w-0">
