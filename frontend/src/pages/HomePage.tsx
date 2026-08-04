@@ -3,10 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import type { Song, Artist, Album } from '../types/music';
 import { fetchSongs, fetchArtists, fetchAlbums } from '../services/songService';
-import { SongCard } from '../components/SongCard';
-import { ArtistCard } from '../components/ArtistCard';
-import { AlbumCard } from '../components/AlbumCard';
-import { HorizontalSection } from '../components/HorizontalSection';
+import { MediaCarousel } from '../components/MediaCarousel';
 
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
@@ -75,20 +72,17 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="space-y-10 pb-16">
-      {/* 1. Hero Banner Section */}
+      {/* Hero Banner Section */}
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900/90 via-purple-900/80 to-slate-900 border border-indigo-500/30 p-6 sm:p-10 lg:p-12 shadow-2xl shadow-indigo-950/50">
-        {/* Background Ambient Glow & Graphic Orbs */}
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 max-w-3xl space-y-5">
-          {/* Welcome Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold backdrop-blur-md">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             Welcome back, {user?.name || 'Music Explorer'}!
           </div>
 
-          {/* Banner Title */}
           <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
             Discover Music Tailored to Your{' '}
             <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
@@ -96,12 +90,10 @@ export const HomePage: React.FC = () => {
             </span>
           </h1>
 
-          {/* Banner Subtitle */}
           <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl">
             HarmonyAI analyzes acoustics, mood vectors, and listening habits to generate seamless music recommendations and personalized catalog discovery.
           </p>
 
-          {/* CTA Action Buttons */}
           <div className="flex flex-wrap items-center gap-4 pt-2">
             <Link
               to="/library"
@@ -123,65 +115,49 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 2. Trending Songs Section */}
-      <HorizontalSection
+      {/* 1. Trending Songs Carousel */}
+      <MediaCarousel
         title="Trending Songs"
         subtitle="Most played tracks across the HarmonyAI network right now"
         seeAllLink="/library?sort=playCount"
+        type="song"
+        items={trendingSongs}
         loading={loadingTrending}
-      >
-        {trendingSongs.map((song) => (
-          <div key={song._id} className="w-44 sm:w-48 shrink-0">
-            <SongCard
-              song={song}
-              onPlay={handlePlaySong}
-              isPlaying={currentPlayingSong?._id === song._id}
-            />
-          </div>
-        ))}
-      </HorizontalSection>
+        onPlaySong={handlePlaySong}
+        currentPlayingSongId={currentPlayingSong?._id}
+      />
 
-      {/* 3. New Releases Section */}
-      <HorizontalSection
+      {/* 2. New Releases Carousel */}
+      <MediaCarousel
         title="New Releases"
         subtitle="Freshly uploaded albums, singles, and original productions"
         seeAllLink="/library?sort=releaseYear"
+        type="song"
+        items={newReleases}
         loading={loadingNewReleases}
-      >
-        {newReleases.map((song) => (
-          <div key={song._id} className="w-44 sm:w-48 shrink-0">
-            <SongCard
-              song={song}
-              onPlay={handlePlaySong}
-              isPlaying={currentPlayingSong?._id === song._id}
-            />
-          </div>
-        ))}
-      </HorizontalSection>
+        onPlaySong={handlePlaySong}
+        currentPlayingSongId={currentPlayingSong?._id}
+      />
 
-      {/* 4. Featured Artists Section */}
-      <HorizontalSection
+      {/* 3. Featured Artists Carousel */}
+      <MediaCarousel
         title="Featured Artists"
         subtitle="Top verified performers and independent creators on HarmonyAI"
         seeAllLink="/library"
+        type="artist"
+        items={featuredArtists}
         loading={loadingArtists}
-      >
-        {featuredArtists.map((artist) => (
-          <ArtistCard key={artist._id} artist={artist} />
-        ))}
-      </HorizontalSection>
+      />
 
-      {/* 5. Popular Albums Section */}
-      <HorizontalSection
+      {/* 4. Popular Albums Carousel */}
+      <MediaCarousel
         title="Popular Albums"
         subtitle="Curated albums, EPs, and compilations in your music catalog"
         seeAllLink="/library"
+        type="album"
+        items={popularAlbums}
         loading={loadingAlbums}
-      >
-        {popularAlbums.map((album) => (
-          <AlbumCard key={album._id} album={album} />
-        ))}
-      </HorizontalSection>
+      />
 
       {/* Mini Audio Player Preview Bar when a song is playing */}
       {currentPlayingSong && (
