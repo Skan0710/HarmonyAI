@@ -4,6 +4,7 @@ import { MainLayout } from './components/MainLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { MusicLibraryPage } from './pages/MusicLibraryPage';
+import { SongDetailPage } from './pages/SongDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { useAuthStore } from './store/useAuthStore';
@@ -27,6 +28,7 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/library" element={<MusicLibraryPage />} />
+            <Route path="/songs/:id" element={<SongDetailPage />} />
           </Route>
         </Route>
       </Routes>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Song } from '../types/music';
 
 interface SongCardProps {
@@ -8,6 +9,7 @@ interface SongCardProps {
 }
 
 export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying = false }) => {
+  const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
 
   const getArtistName = (): string => {
@@ -53,9 +55,21 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying = fa
 
   const coverUrl = imgError || !song.coverImage ? fallbackCover : song.coverImage;
 
+  const handleCardClick = () => {
+    if (song._id) {
+      navigate(`/songs/${song._id}`);
+    }
+  };
+
+  const handlePlayClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onPlay?.(song);
+  };
+
   return (
     <div
-      className={`group relative bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-indigo-500/50 rounded-xl p-3.5 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 flex flex-col justify-between overflow-hidden ${
+      onClick={handleCardClick}
+      className={`group relative cursor-pointer bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-indigo-500/50 rounded-xl p-3.5 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 flex flex-col justify-between overflow-hidden ${
         isPlaying ? 'border-indigo-500 ring-2 ring-indigo-500/30' : ''
       }`}
     >
@@ -77,7 +91,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying = fa
 
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
             <button
-              onClick={() => onPlay?.(song)}
+              onClick={handlePlayClick}
               className="w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/50 transform scale-90 group-hover:scale-100 transition-all duration-300"
               aria-label={`Play ${song.title}`}
             >
