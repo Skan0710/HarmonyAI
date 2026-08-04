@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Album } from '../types/music';
 
 interface AlbumCardProps {
@@ -6,6 +7,7 @@ interface AlbumCardProps {
 }
 
 export const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
+  const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
 
   const getArtistName = (): string => {
@@ -21,8 +23,17 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
 
   const coverUrl = imgError || !album.coverImage ? fallbackCover : album.coverImage;
 
+  const handleClick = () => {
+    if (album._id) {
+      navigate(`/albums/${album._id}`);
+    }
+  };
+
   return (
-    <div className="group relative w-44 sm:w-48 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-indigo-500/40 rounded-2xl p-3.5 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 flex flex-col justify-between shrink-0">
+    <div
+      onClick={handleClick}
+      className="group relative cursor-pointer w-44 sm:w-48 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-indigo-500/40 rounded-2xl p-3.5 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 flex flex-col justify-between shrink-0"
+    >
       <div>
         {/* Cover Container */}
         <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-900 mb-3 shadow-md">
