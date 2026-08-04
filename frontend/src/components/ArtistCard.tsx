@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Artist } from '../types/music';
 
 interface ArtistCardProps {
@@ -6,6 +7,7 @@ interface ArtistCardProps {
 }
 
 export const ArtistCard: React.FC<ArtistCardProps> = ({ artist }) => {
+  const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
 
   const formatListeners = (listeners?: number): string => {
@@ -20,8 +22,17 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({ artist }) => {
 
   const imageUrl = imgError || (!artist.profileImage && !artist.avatar) ? fallbackAvatar : (artist.profileImage || artist.avatar);
 
+  const handleClick = () => {
+    if (artist._id) {
+      navigate(`/artists/${artist._id}`);
+    }
+  };
+
   return (
-    <div className="group relative w-44 sm:w-48 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-indigo-500/40 rounded-2xl p-4 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 flex flex-col items-center text-center shrink-0">
+    <div
+      onClick={handleClick}
+      className="group relative cursor-pointer w-44 sm:w-48 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-indigo-500/40 rounded-2xl p-4 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 flex flex-col items-center text-center shrink-0"
+    >
       {/* Avatar Container */}
       <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden bg-slate-900 mb-3 group-hover:shadow-lg shadow-md border-2 border-slate-700/60 group-hover:border-indigo-500/50 transition-all duration-300">
         <img

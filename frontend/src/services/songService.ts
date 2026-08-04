@@ -80,8 +80,34 @@ export const fetchArtists = async (): Promise<{ artists: Artist[]; error?: strin
   return { artists: response.data.data || [] };
 };
 
-export const fetchAlbums = async (): Promise<{ albums: Album[]; error?: string }> => {
-  const response = await apiClient<{ success: boolean; data: Album[] }>('/albums', { method: 'GET' });
+export const fetchArtistById = async (artistId: string): Promise<{ artist?: Artist; error?: string }> => {
+  const response = await apiClient<{ success: boolean; data: Artist }>(`/artists/${artistId}`, { method: 'GET' });
+
+  if (response.error || !response.data) {
+    return { error: response.error || 'Failed to load artist profile' };
+  }
+
+  return { artist: response.data.data };
+};
+
+export const fetchSimilarArtists = async (artistId: string): Promise<{ artists: Artist[]; error?: string }> => {
+  const response = await apiClient<{ success: boolean; data: Artist[] }>(`/artists/${artistId}/similar`, { method: 'GET' });
+
+  if (response.error || !response.data) {
+    return { artists: [], error: response.error || 'Failed to load similar artists' };
+  }
+
+  return { artists: response.data.data || [] };
+};
+
+export const fetchAlbums = async (params: { artistId?: string } = {}): Promise<{ albums: Album[]; error?: string }> => {
+  const queryParams = new URLSearchParams();
+  if (params.artistId) queryParams.append('artistId', params.artistId);
+
+  const queryString = queryParams.toString();
+  const endpoint = `/albums${queryString ? `?${queryString}` : ''}`;
+
+  const response = await apiClient<{ success: boolean; data: Album[] }>(endpoint, { method: 'GET' });
 
   if (response.error || !response.data) {
     return { albums: [], error: response.error || 'Failed to load albums' };
