@@ -4,27 +4,24 @@ import { useAuth } from '../hooks/useAuth';
 import type { Song, Artist, Album } from '../types/music';
 import { fetchSongs, fetchArtists, fetchAlbums } from '../services/songService';
 import { MediaCarousel } from '../components/MediaCarousel';
+import { AudioPlayer } from '../components/AudioPlayer';
 
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
 
-  // Data States
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
   const [newReleases, setNewReleases] = useState<Song[]>([]);
   const [featuredArtists, setFeaturedArtists] = useState<Artist[]>([]);
   const [popularAlbums, setPopularAlbums] = useState<Album[]>([]);
 
-  // Loading States
   const [loadingTrending, setLoadingTrending] = useState<boolean>(true);
   const [loadingNewReleases, setLoadingNewReleases] = useState<boolean>(true);
   const [loadingArtists, setLoadingArtists] = useState<boolean>(true);
   const [loadingAlbums, setLoadingAlbums] = useState<boolean>(true);
 
-  // Audio Preview Player
   const [currentPlayingSong, setCurrentPlayingSong] = useState<Song | null>(null);
 
   useEffect(() => {
-    // 1. Fetch Trending Songs (Sorted by playCount)
     const loadTrending = async () => {
       setLoadingTrending(true);
       const res = await fetchSongs({ sortBy: 'playCount', sortOrder: 'desc', limit: 10 });
@@ -32,7 +29,6 @@ export const HomePage: React.FC = () => {
       setLoadingTrending(false);
     };
 
-    // 2. Fetch New Releases (Sorted by releaseYear/createdAt)
     const loadNewReleases = async () => {
       setLoadingNewReleases(true);
       const res = await fetchSongs({ sortBy: 'releaseYear', sortOrder: 'desc', limit: 10 });
@@ -40,7 +36,6 @@ export const HomePage: React.FC = () => {
       setLoadingNewReleases(false);
     };
 
-    // 3. Fetch Featured Artists
     const loadArtists = async () => {
       setLoadingArtists(true);
       const res = await fetchArtists();
@@ -48,7 +43,6 @@ export const HomePage: React.FC = () => {
       setLoadingArtists(false);
     };
 
-    // 4. Fetch Popular Albums
     const loadAlbums = async () => {
       setLoadingAlbums(true);
       const res = await fetchAlbums();
@@ -159,43 +153,8 @@ export const HomePage: React.FC = () => {
         loading={loadingAlbums}
       />
 
-      {/* Mini Audio Player Preview Bar when a song is playing */}
-      {currentPlayingSong && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-2xl bg-slate-900/95 border border-indigo-500/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom duration-300">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-800 shrink-0">
-              <img
-                src={currentPlayingSong.coverImage || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=100'}
-                alt={currentPlayingSong.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="min-w-0">
-              <h4 className="text-sm font-semibold text-slate-100 truncate">{currentPlayingSong.title}</h4>
-              <p className="text-xs text-indigo-400 truncate">
-                {typeof currentPlayingSong.artist === 'object' && 'name' in currentPlayingSong.artist
-                  ? currentPlayingSong.artist.name
-                  : String(currentPlayingSong.artist)}
-              </p>
-            </div>
-          </div>
-
-          <audio
-            src={currentPlayingSong.audioUrl}
-            controls
-            autoPlay
-            className="h-9 max-w-xs accent-indigo-500"
-          />
-
-          <button
-            onClick={() => setCurrentPlayingSong(null)}
-            className="text-slate-400 hover:text-slate-200 p-1 text-sm font-bold"
-            aria-label="Close Player"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      {/* Reusable Audio Player Bar */}
+      <AudioPlayer song={currentPlayingSong} onClose={() => setCurrentPlayingSong(null)} />
     </div>
   );
 };

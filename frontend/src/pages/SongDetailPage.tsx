@@ -4,6 +4,7 @@ import type { Song } from '../types/music';
 import { fetchSongById, fetchSongs, recordSongPlay } from '../services/songService';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { AudioPlayer } from '../components/AudioPlayer';
 
 export const SongDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -281,38 +282,8 @@ export const SongDetailPage: React.FC = () => {
         />
       )}
 
-      {isPlaying && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-2xl bg-slate-900/95 border border-indigo-500/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom duration-300">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-800 shrink-0">
-              <img
-                src={coverUrl}
-                alt={song.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="min-w-0">
-              <h4 className="text-sm font-semibold text-slate-100 truncate">{song.title}</h4>
-              <p className="text-xs text-indigo-400 truncate">{getArtistName()}</p>
-            </div>
-          </div>
-
-          <audio
-            src={song.audioUrl}
-            controls
-            autoPlay
-            className="h-9 max-w-xs accent-indigo-500"
-          />
-
-          <button
-            onClick={() => setIsPlaying(false)}
-            className="text-slate-400 hover:text-slate-200 p-1 text-sm font-bold"
-            aria-label="Close Player"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      {/* Audio Player Bar */}
+      <AudioPlayer song={isPlaying ? song : null} onClose={() => setIsPlaying(false)} />
     </div>
   );
 };

@@ -32,7 +32,7 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
   return (
     <div
       onClick={handleClick}
-      className="group relative cursor-pointer w-44 sm:w-48 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-indigo-500/40 rounded-2xl p-3.5 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 flex flex-col justify-between shrink-0"
+      className="group relative cursor-pointer w-40 sm:w-44 md:w-48 bg-slate-800/60 hover:bg-slate-800/90 border border-slate-700/50 hover:border-indigo-500/50 rounded-2xl p-3.5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/15 flex flex-col justify-between shrink-0"
     >
       <div>
         {/* Cover Container */}
@@ -47,7 +47,7 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
 
           {album.albumType && (
             <div className="absolute top-2 right-2">
-              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-slate-900/80 backdrop-blur-md text-slate-200 rounded-md border border-slate-700">
+              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-slate-900/85 backdrop-blur-md text-slate-200 rounded-md border border-slate-700">
                 {album.albumType}
               </span>
             </div>
@@ -55,7 +55,7 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
         </div>
 
         {/* Details */}
-        <h3 className="font-semibold text-slate-100 text-sm line-clamp-1 group-hover:text-indigo-400 transition-colors">
+        <h3 className="font-semibold text-slate-100 text-sm line-clamp-1 group-hover:text-indigo-300 transition-colors">
           {album.title}
         </h3>
         <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{getArtistName()}</p>

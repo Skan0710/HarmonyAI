@@ -69,12 +69,12 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying = fa
   return (
     <div
       onClick={handleCardClick}
-      className={`group relative cursor-pointer bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-indigo-500/50 rounded-xl p-3.5 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 flex flex-col justify-between overflow-hidden ${
-        isPlaying ? 'border-indigo-500 ring-2 ring-indigo-500/30' : ''
+      className={`group relative cursor-pointer bg-slate-800/70 hover:bg-slate-800/90 border border-slate-700/60 hover:border-indigo-500/60 rounded-2xl p-3.5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/15 flex flex-col justify-between overflow-hidden ${
+        isPlaying ? 'border-indigo-500 ring-2 ring-indigo-500/30 bg-slate-800' : ''
       }`}
     >
       <div>
-        <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-slate-900 mb-3 group-hover:shadow-md">
+        <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-900 mb-3 shadow-inner">
           <img
             src={coverUrl}
             alt={song.title}
@@ -84,7 +84,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying = fa
           />
 
           <div className="absolute top-2 left-2 z-10">
-            <span className="px-2 py-0.5 text-xs font-semibold tracking-wide bg-slate-900/80 backdrop-blur-md text-indigo-300 rounded-full border border-indigo-500/30">
+            <span className="px-2.5 py-0.5 text-[11px] font-bold tracking-wide bg-slate-900/85 backdrop-blur-md text-indigo-300 rounded-full border border-indigo-500/30 shadow-sm">
               {getGenreName()}
             </span>
           </div>
@@ -109,11 +109,11 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying = fa
         </div>
 
         <div className="space-y-1">
-          <h3 className="font-semibold text-slate-100 text-base leading-snug line-clamp-1 group-hover:text-indigo-400 transition-colors">
+          <h3 className="font-semibold text-slate-100 text-base leading-snug line-clamp-1 group-hover:text-indigo-300 transition-colors">
             {song.title}
           </h3>
-          <p className="text-sm font-medium text-slate-300 line-clamp-1">{getArtistName()}</p>
-          <p className="text-xs text-slate-400 line-clamp-1">{getAlbumTitle()}</p>
+          <p className="text-xs font-medium text-slate-300 line-clamp-1">{getArtistName()}</p>
+          <p className="text-[11px] text-slate-400 line-clamp-1">{getAlbumTitle()}</p>
         </div>
       </div>
 

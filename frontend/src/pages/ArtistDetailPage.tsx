@@ -5,6 +5,7 @@ import { fetchArtistById, fetchSongs, fetchAlbums, fetchSimilarArtists, recordSo
 import { MediaCarousel } from '../components/MediaCarousel';
 import { MusicGrid } from '../components/MusicGrid';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { AudioPlayer } from '../components/AudioPlayer';
 
 export const ArtistDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -200,38 +201,8 @@ export const ArtistDetailPage: React.FC = () => {
         />
       )}
 
-      {currentPlayingSong && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-2xl bg-slate-900/95 border border-indigo-500/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom duration-300">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-800 shrink-0">
-              <img
-                src={currentPlayingSong.coverImage || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=100'}
-                alt={currentPlayingSong.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="min-w-0">
-              <h4 className="text-sm font-semibold text-slate-100 truncate">{currentPlayingSong.title}</h4>
-              <p className="text-xs text-indigo-400 truncate">{artist.name}</p>
-            </div>
-          </div>
-
-          <audio
-            src={currentPlayingSong.audioUrl}
-            controls
-            autoPlay
-            className="h-9 max-w-xs accent-indigo-500"
-          />
-
-          <button
-            onClick={() => setCurrentPlayingSong(null)}
-            className="text-slate-400 hover:text-slate-200 p-1 text-sm font-bold"
-            aria-label="Close Player"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      {/* Audio Player Bar */}
+      <AudioPlayer song={currentPlayingSong} onClose={() => setCurrentPlayingSong(null)} />
     </div>
   );
 };
