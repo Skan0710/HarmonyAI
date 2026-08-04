@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { SongsApiResponse, Genre, Artist, Album } from '../types/music';
+import type { SongsApiResponse, Song, Genre, Artist, Album } from '../types/music';
 
 export interface GetSongsParams {
   search?: string;
@@ -44,6 +44,20 @@ export const fetchSongs = async (params: GetSongsParams = {}): Promise<{
     songs: response.data.data || [],
     pagination: response.data.pagination,
   };
+};
+
+export const fetchSongById = async (songId: string): Promise<{ song?: Song; error?: string }> => {
+  const response = await apiClient<{ success: boolean; data: Song }>(`/songs/${songId}`, { method: 'GET' });
+
+  if (response.error || !response.data) {
+    return { error: response.error || 'Failed to load song details' };
+  }
+
+  return { song: response.data.data };
+};
+
+export const recordSongPlay = async (songId: string): Promise<void> => {
+  await apiClient(`/songs/${songId}/play`, { method: 'POST' });
 };
 
 export const fetchGenres = async (): Promise<{ genres: Genre[]; error?: string }> => {
