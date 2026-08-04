@@ -115,3 +115,13 @@ export const fetchAlbums = async (params: { artistId?: string } = {}): Promise<{
 
   return { albums: response.data.data || [] };
 };
+
+export const fetchAlbumById = async (albumId: string): Promise<{ album?: Album; error?: string }> => {
+  const response = await apiClient<{ success: boolean; data: Album }>(`/albums/${albumId}`, { method: 'GET' });
+
+  if (response.error || !response.data) {
+    return { error: response.error || 'Failed to load album details' };
+  }
+
+  return { album: response.data.data };
+};
