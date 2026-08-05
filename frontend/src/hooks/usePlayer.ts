@@ -9,6 +9,8 @@ export const usePlayer = () => {
   const queueIndex = usePlayerStore((state) => state.queueIndex);
   const volume = usePlayerStore((state) => state.volume);
   const isMuted = usePlayerStore((state) => state.isMuted);
+  const isShuffle = usePlayerStore((state) => state.isShuffle);
+  const repeatMode = usePlayerStore((state) => state.repeatMode);
   const isQueueOpen = usePlayerStore((state) => state.isQueueOpen);
 
   const playSong = usePlayerStore((state) => state.playSong);
@@ -20,6 +22,8 @@ export const usePlayer = () => {
   const setDuration = usePlayerStore((state) => state.setDuration);
   const setVolume = usePlayerStore((state) => state.setVolume);
   const toggleMute = usePlayerStore((state) => state.toggleMute);
+  const toggleShuffle = usePlayerStore((state) => state.toggleShuffle);
+  const toggleRepeatMode = usePlayerStore((state) => state.toggleRepeatMode);
   const addToQueue = usePlayerStore((state) => state.addToQueue);
   const removeFromQueue = usePlayerStore((state) => state.removeFromQueue);
   const clearQueue = usePlayerStore((state) => state.clearQueue);
@@ -27,6 +31,7 @@ export const usePlayer = () => {
   const playQueueIndex = usePlayerStore((state) => state.playQueueIndex);
   const nextSong = usePlayerStore((state) => state.nextSong);
   const previousSong = usePlayerStore((state) => state.previousSong);
+  const handleSongEnd = usePlayerStore((state) => state.handleSongEnd);
   const toggleQueueOpen = usePlayerStore((state) => state.toggleQueueOpen);
   const setQueueOpen = usePlayerStore((state) => state.setQueueOpen);
 
@@ -39,6 +44,8 @@ export const usePlayer = () => {
     queueIndex,
     volume,
     isMuted,
+    isShuffle,
+    repeatMode,
     isQueueOpen,
 
     playSong,
@@ -50,6 +57,8 @@ export const usePlayer = () => {
     setDuration,
     setVolume,
     toggleMute,
+    toggleShuffle,
+    toggleRepeatMode,
     addToQueue,
     removeFromQueue,
     clearQueue,
@@ -57,6 +66,7 @@ export const usePlayer = () => {
     playQueueIndex,
     nextSong,
     previousSong,
+    handleSongEnd,
     toggleQueueOpen,
     setQueueOpen,
   };
