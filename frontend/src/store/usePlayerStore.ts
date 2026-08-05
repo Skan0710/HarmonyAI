@@ -12,6 +12,7 @@ interface PlayerState {
   queueIndex: number;
   volume: number; // 0 to 1
   isMuted: boolean;
+  isQueueOpen: boolean;
 
   // Actions / Functions
   playSong: (song: Song, queue?: Song[]) => void;
@@ -24,9 +25,14 @@ interface PlayerState {
   setVolume: (volume: number) => void;
   toggleMute: () => void;
   addToQueue: (song: Song) => void;
+  removeFromQueue: (index: number) => void;
+  clearQueue: () => void;
   setQueue: (queue: Song[], startIndex?: number) => void;
+  playQueueIndex: (index: number) => void;
   nextSong: () => void;
   previousSong: () => void;
+  toggleQueueOpen: () => void;
+  setQueueOpen: (isOpen: boolean) => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -38,6 +44,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   queueIndex: -1,
   volume: 0.8,
   isMuted: false,
+  isQueueOpen: false,
 
   playSong: (song, queue) => {
     const currentQueue = queue && queue.length > 0 ? queue : get().queue.length > 0 ? get().queue : [song];
@@ -99,9 +106,62 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   addToQueue: (song) => {
-    set((state) => ({
-      queue: [...state.queue, song],
-    }));
+    const { queue } = get();
+    // If no queue, start playing this song
+    if (queue.length === 0) {
+      get().playSong(song, [song]);
+      return;
+    }
+
+    set({ queue: [...queue, song] });
+  },
+
+  removeFromQueue: (index) => {
+    const { queue, queueIndex } = get();
+    if (index < 0 || index >= queue.length) return;
+
+    const newQueue = queue.filter((_, i) => i !== index);
+
+    if (newQueue.length === 0) {
+      set({
+        queue: [],
+        queueIndex: -1,
+        currentSong: null,
+        isPlaying: false,
+        currentTime: 0,
+      });
+      return;
+    }
+
+    let newQueueIndex = queueIndex;
+    if (index < queueIndex) {
+      newQueueIndex = queueIndex - 1;
+    } else if (index === queueIndex) {
+      newQueueIndex = index < newQueue.length ? index : newQueue.length - 1;
+      const nextSong = newQueue[newQueueIndex];
+      set({
+        currentSong: nextSong,
+        currentTime: 0,
+      });
+      if (nextSong?._id) {
+        recordSongPlay(nextSong._id).catch(() => {});
+      }
+    }
+
+    set({
+      queue: newQueue,
+      queueIndex: newQueueIndex,
+    });
+  },
+
+  clearQueue: () => {
+    set({
+      queue: [],
+      queueIndex: -1,
+      currentSong: null,
+      isPlaying: false,
+      currentTime: 0,
+    });
   },
 
   setQueue: (queue, startIndex = 0) => {
@@ -118,6 +178,23 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     if (song?._id) {
       recordSongPlay(song._id).catch(() => {});
+    }
+  },
+
+  playQueueIndex: (index) => {
+    const { queue } = get();
+    if (index < 0 || index >= queue.length) return;
+
+    const targetSong = queue[index];
+    set({
+      queueIndex: index,
+      currentSong: targetSong,
+      isPlaying: true,
+      currentTime: 0,
+    });
+
+    if (targetSong?._id) {
+      recordSongPlay(targetSong._id).catch(() => {});
     }
   },
 
@@ -146,7 +223,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { queue, queueIndex, currentTime } = get();
     if (queue.length === 0) return;
 
-    // If more than 3 seconds into song, restart current track
     if (currentTime > 3) {
       set({ currentTime: 0 });
       return;
@@ -168,4 +244,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       }
     }
   },
+
+  toggleQueueOpen: () => set((state) => ({ isQueueOpen: !state.isQueueOpen })),
+  setQueueOpen: (isOpen) => set({ isQueueOpen: isOpen }),
 }));

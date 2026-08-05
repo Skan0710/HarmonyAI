@@ -9,6 +9,7 @@ export const usePlayer = () => {
   const queueIndex = usePlayerStore((state) => state.queueIndex);
   const volume = usePlayerStore((state) => state.volume);
   const isMuted = usePlayerStore((state) => state.isMuted);
+  const isQueueOpen = usePlayerStore((state) => state.isQueueOpen);
 
   const playSong = usePlayerStore((state) => state.playSong);
   const togglePlay = usePlayerStore((state) => state.togglePlay);
@@ -20,9 +21,14 @@ export const usePlayer = () => {
   const setVolume = usePlayerStore((state) => state.setVolume);
   const toggleMute = usePlayerStore((state) => state.toggleMute);
   const addToQueue = usePlayerStore((state) => state.addToQueue);
+  const removeFromQueue = usePlayerStore((state) => state.removeFromQueue);
+  const clearQueue = usePlayerStore((state) => state.clearQueue);
   const setQueue = usePlayerStore((state) => state.setQueue);
+  const playQueueIndex = usePlayerStore((state) => state.playQueueIndex);
   const nextSong = usePlayerStore((state) => state.nextSong);
   const previousSong = usePlayerStore((state) => state.previousSong);
+  const toggleQueueOpen = usePlayerStore((state) => state.toggleQueueOpen);
+  const setQueueOpen = usePlayerStore((state) => state.setQueueOpen);
 
   return {
     currentSong,
@@ -33,6 +39,7 @@ export const usePlayer = () => {
     queueIndex,
     volume,
     isMuted,
+    isQueueOpen,
 
     playSong,
     togglePlay,
@@ -44,8 +51,13 @@ export const usePlayer = () => {
     setVolume,
     toggleMute,
     addToQueue,
+    removeFromQueue,
+    clearQueue,
     setQueue,
+    playQueueIndex,
     nextSong,
     previousSong,
+    toggleQueueOpen,
+    setQueueOpen,
   };
 };
