@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Song } from '../types/music';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { formatTime, formatCount } from '../utils/formatters';
 
 interface SongCardProps {
   song: Song;
@@ -45,20 +46,6 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
       return song.genre.name;
     }
     return String(song.genre);
-  };
-
-  const formatDuration = (seconds: number): string => {
-    if (!seconds || seconds <= 0) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
-  const formatPlayCount = (count?: number): string => {
-    if (!count) return '0';
-    if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-    if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
-    return count.toString();
   };
 
   const fallbackCover =
@@ -142,9 +129,9 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          {formatPlayCount(song.playCount)}
+          {formatCount(song.playCount)}
         </span>
-        <span className="font-mono text-slate-400">{formatDuration(song.duration)}</span>
+        <span className="font-mono text-slate-400">{formatTime(song.duration)}</span>
       </div>
     </div>
   );
