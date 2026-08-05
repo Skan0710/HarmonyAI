@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Artist } from '../types/music';
+import { formatListeners } from '../utils/formatters';
 
 interface ArtistCardProps {
   artist: Artist;
@@ -9,13 +10,6 @@ interface ArtistCardProps {
 export const ArtistCard: React.FC<ArtistCardProps> = ({ artist }) => {
   const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
-
-  const formatListeners = (listeners?: number): string => {
-    if (!listeners) return '0 listeners';
-    if (listeners >= 1_000_000) return `${(listeners / 1_000_000).toFixed(1)}M listeners`;
-    if (listeners >= 1_000) return `${(listeners / 1_000).toFixed(0)}k listeners`;
-    return `${listeners} listeners`;
-  };
 
   const fallbackAvatar =
     'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 24 24" fill="none" stroke="%23818cf8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231e293b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';

@@ -1,11 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { usePlayer } from '../hooks/usePlayer';
+import { usePlayerKeyboardShortcuts } from '../hooks/usePlayerKeyboardShortcuts';
+import { formatTime } from '../utils/formatters';
 
 export const MiniPlayer: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+
+  // Enable global keyboard shortcuts (Space = Play/Pause, Left = Prev, Right = Next)
+  usePlayerKeyboardShortcuts();
 
   const {
     currentSong,
@@ -33,7 +38,7 @@ export const MiniPlayer: React.FC = () => {
     toggleQueueOpen,
   } = usePlayer();
 
-  // Reset states when song changes
+  // Reset loading & error states when active song changes
   useEffect(() => {
     setIsLoadingAudio(true);
     setAudioError(null);
@@ -49,7 +54,7 @@ export const MiniPlayer: React.FC = () => {
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
           if (err.name !== 'AbortError') {
-            setAudioError('Playback failed. Please try again.');
+            setAudioError('Playback failed.');
             pause();
           }
         });
@@ -74,13 +79,6 @@ export const MiniPlayer: React.FC = () => {
       return currentSong.artist.name;
     }
     return String(currentSong.artist);
-  };
-
-  const formatTime = (seconds: number): string => {
-    if (!seconds || isNaN(seconds) || seconds <= 0) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   const handleTimeUpdate = () => {
@@ -116,7 +114,7 @@ export const MiniPlayer: React.FC = () => {
 
   const handleError = () => {
     setIsLoadingAudio(false);
-    setAudioError('Unable to stream audio resource.');
+    setAudioError('Stream unavailable');
     pause();
   };
 
@@ -139,7 +137,7 @@ export const MiniPlayer: React.FC = () => {
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 border-t border-indigo-500/30 backdrop-blur-xl px-4 py-3 shadow-2xl shadow-indigo-950/80 transition-all duration-300">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 border-t border-indigo-500/30 backdrop-blur-xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-2xl shadow-indigo-950/80 transition-all duration-300">
       {/* HTML5 Audio Element */}
       <audio
         ref={audioRef}
@@ -154,34 +152,45 @@ export const MiniPlayer: React.FC = () => {
         preload="metadata"
       />
 
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-6">
-        {/* 1. Song Metadata (Cover, Title, Artist) */}
-        <div className="flex items-center gap-3 w-full sm:w-1/4 min-w-0">
-          <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-slate-700/60 shadow-md relative">
-            <img
-              src={currentSong.coverImage || fallbackCover}
-              alt={currentSong.title}
-              className="w-full h-full object-cover"
-            />
-            {isLoadingAudio && (
-              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[1px] flex items-center justify-center">
-                <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
+      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-6">
+        {/* 1. Song Metadata (Cover, Title, Artist, Loading Spinner) */}
+        <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-1/4 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-slate-700/60 shadow-md relative">
+              <img
+                src={currentSong.coverImage || fallbackCover}
+                alt={currentSong.title}
+                className="w-full h-full object-cover"
+              />
+              {isLoadingAudio && (
+                <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-[1px] flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-slate-100 truncate hover:text-indigo-300 transition-colors">
+                {currentSong.title}
+              </h4>
+              <p className="text-[11px] font-medium text-indigo-400 truncate mt-0.5">{getArtistName()}</p>
+              {audioError && (
+                <p className="text-[10px] text-rose-400 truncate mt-0.5 font-medium">{audioError}</p>
+              )}
+            </div>
           </div>
 
-          <div className="min-w-0">
-            <h4 className="text-xs sm:text-sm font-bold text-slate-100 truncate hover:text-indigo-300 transition-colors">
-              {currentSong.title}
-            </h4>
-            <p className="text-[11px] font-medium text-indigo-400 truncate mt-0.5">{getArtistName()}</p>
-            {audioError && (
-              <p className="text-[10px] text-rose-400 truncate mt-0.5 font-medium">{audioError}</p>
-            )}
-          </div>
+          {/* Mobile Quick Action Close Button */}
+          <button
+            onClick={stop}
+            className="sm:hidden text-slate-400 hover:text-slate-200 p-1 text-xs font-bold"
+            aria-label="Close Player"
+          >
+            ✕
+          </button>
         </div>
 
-        {/* 2. Advanced Controls & Seek Bar */}
+        {/* 2. Controls & Seek Bar */}
         <div className="flex flex-col items-center gap-1.5 w-full sm:w-2/4">
           <div className="flex items-center gap-3 sm:gap-4">
             {/* Shuffle Button */}
@@ -205,8 +214,8 @@ export const MiniPlayer: React.FC = () => {
               onClick={previousSong}
               disabled={queue.length <= 1}
               className="text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors p-1"
-              aria-label="Previous Song"
-              title="Previous Track"
+              aria-label="Previous Song (Left Arrow)"
+              title="Previous Track (Left Arrow)"
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
@@ -217,8 +226,8 @@ export const MiniPlayer: React.FC = () => {
             <button
               onClick={togglePlay}
               className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/50 transition-all transform active:scale-95"
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-              title={isPlaying ? 'Pause' : 'Play'}
+              aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
             >
               {isLoadingAudio ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -238,8 +247,8 @@ export const MiniPlayer: React.FC = () => {
               onClick={nextSong}
               disabled={queue.length <= 1}
               className="text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors p-1"
-              aria-label="Next Song"
-              title="Next Track"
+              aria-label="Next Song (Right Arrow)"
+              title="Next Track (Right Arrow)"
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
@@ -294,9 +303,8 @@ export const MiniPlayer: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. Queue Drawer Button, Volume Control & Close Button */}
+        {/* 3. Queue Drawer Button, Volume Control & Desktop Close */}
         <div className="hidden sm:flex items-center justify-end gap-3 w-1/4">
-          {/* Queue Drawer Toggle Button */}
           <button
             onClick={toggleQueueOpen}
             className={`relative p-2 rounded-xl border transition-all flex items-center gap-1.5 ${
@@ -315,7 +323,6 @@ export const MiniPlayer: React.FC = () => {
             </span>
           </button>
 
-          {/* Volume Control & Mute Toggle */}
           <div className="flex items-center gap-2">
             <button
               onClick={toggleMute}
@@ -345,7 +352,6 @@ export const MiniPlayer: React.FC = () => {
             />
           </div>
 
-          {/* Close Player */}
           <button
             onClick={stop}
             className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800 transition-colors font-bold text-xs"
