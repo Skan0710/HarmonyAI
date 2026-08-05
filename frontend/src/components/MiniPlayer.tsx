@@ -1,8 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePlayer } from '../hooks/usePlayer';
 
 export const MiniPlayer: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
 
   const {
     currentSong,
@@ -13,6 +16,7 @@ export const MiniPlayer: React.FC = () => {
     volume,
     isMuted,
     togglePlay,
+    pause,
     stop,
     setCurrentTime,
     setDuration,
@@ -22,7 +26,13 @@ export const MiniPlayer: React.FC = () => {
     previousSong,
   } = usePlayer();
 
-  // Sync audio element play/pause state with global store
+  // Reset states when song changes
+  useEffect(() => {
+    setIsLoadingAudio(true);
+    setAudioError(null);
+  }, [currentSong?._id]);
+
+  // Sync HTML5 audio element play/pause state
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -30,14 +40,18 @@ export const MiniPlayer: React.FC = () => {
     if (isPlaying) {
       const playPromise = audio.play();
       if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          // Auto-play prevented by browser policy
+        playPromise.catch((err) => {
+          // Playback interrupted or prevented by browser
+          if (err.name !== 'AbortError') {
+            setAudioError('Playback failed. Please try again.');
+            pause();
+          }
         });
       }
     } else {
       audio.pause();
     }
-  }, [isPlaying, currentSong]);
+  }, [isPlaying, currentSong, pause]);
 
   // Sync audio volume & mute state
   useEffect(() => {
@@ -71,8 +85,33 @@ export const MiniPlayer: React.FC = () => {
 
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
-      setDuration(audioRef.current.duration || currentSong.duration || 0);
+      const audioDuration = audioRef.current.duration;
+      if (audioDuration && !isNaN(audioDuration)) {
+        setDuration(audioDuration);
+      } else if (currentSong.duration) {
+        setDuration(currentSong.duration);
+      }
     }
+    setIsLoadingAudio(false);
+  };
+
+  const handleCanPlay = () => {
+    setIsLoadingAudio(false);
+  };
+
+  const handleWaiting = () => {
+    setIsLoadingAudio(true);
+  };
+
+  const handlePlaying = () => {
+    setIsLoadingAudio(false);
+    setAudioError(null);
+  };
+
+  const handleError = () => {
+    setIsLoadingAudio(false);
+    setAudioError('Unable to stream audio resource.');
+    pause();
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,36 +134,49 @@ export const MiniPlayer: React.FC = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 border-t border-indigo-500/30 backdrop-blur-xl px-4 py-3 shadow-2xl shadow-indigo-950/80 transition-all duration-300">
-      {/* Hidden HTML5 Audio Element */}
+      {/* HTML5 Audio Element connected to database audioUrl */}
       <audio
         ref={audioRef}
         src={currentSong.audioUrl}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
+        onCanPlay={handleCanPlay}
+        onWaiting={handleWaiting}
+        onPlaying={handlePlaying}
+        onError={handleError}
         onEnded={nextSong}
+        preload="metadata"
       />
 
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-6">
         {/* 1. Song Metadata (Cover, Title, Artist) */}
         <div className="flex items-center gap-3 w-full sm:w-1/4 min-w-0">
-          <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-slate-700/60 shadow-md">
+          <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-slate-700/60 shadow-md relative">
             <img
               src={currentSong.coverImage || fallbackCover}
               alt={currentSong.title}
               className="w-full h-full object-cover"
             />
+            {isLoadingAudio && (
+              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[1px] flex items-center justify-center">
+                <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
           </div>
+
           <div className="min-w-0">
             <h4 className="text-xs sm:text-sm font-bold text-slate-100 truncate hover:text-indigo-300 transition-colors">
               {currentSong.title}
             </h4>
             <p className="text-[11px] font-medium text-indigo-400 truncate mt-0.5">{getArtistName()}</p>
+            {audioError && (
+              <p className="text-[10px] text-rose-400 truncate mt-0.5 font-medium">{audioError}</p>
+            )}
           </div>
         </div>
 
-        {/* 2. Controls & Playback Progress Bar */}
+        {/* 2. Controls & Seek Bar */}
         <div className="flex flex-col items-center gap-1.5 w-full sm:w-2/4">
-          {/* Controls: Previous, Play/Pause, Next */}
           <div className="flex items-center gap-4">
             <button
               onClick={previousSong}
@@ -144,7 +196,9 @@ export const MiniPlayer: React.FC = () => {
               aria-label={isPlaying ? 'Pause' : 'Play'}
               title={isPlaying ? 'Pause' : 'Play'}
             >
-              {isPlaying ? (
+              {isLoadingAudio ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : isPlaying ? (
                 <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                   <path d="M6 4h4v16H6zm8 0h4v16h-4z" />
                 </svg>
@@ -176,6 +230,7 @@ export const MiniPlayer: React.FC = () => {
                 type="range"
                 min={0}
                 max={duration || 100}
+                step={0.1}
                 value={currentTime}
                 onChange={handleSeek}
                 className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 z-10"
