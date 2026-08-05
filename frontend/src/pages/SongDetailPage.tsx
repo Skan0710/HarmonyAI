@@ -1,21 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { Song } from '../types/music';
-import { fetchSongById, fetchSongs, recordSongPlay } from '../services/songService';
+import { fetchSongById, fetchSongs } from '../services/songService';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { AudioPlayer } from '../components/AudioPlayer';
+import { usePlayerStore } from '../store/usePlayerStore';
 
 export const SongDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  const currentSong = usePlayerStore((state) => state.currentSong);
+  const isPlaying = usePlayerStore((state) => state.isPlaying);
+  const playSong = usePlayerStore((state) => state.playSong);
+  const togglePlay = usePlayerStore((state) => state.togglePlay);
+
   const [song, setSong] = useState<Song | null>(null);
   const [relatedSongs, setRelatedSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [imgError, setImgError] = useState<boolean>(false);
+
+  const isCurrentTrackActive = currentSong?._id === song?._id;
+  const isCurrentTrackPlaying = isCurrentTrackActive && isPlaying;
 
   useEffect(() => {
     if (!id) return;
@@ -52,10 +59,10 @@ export const SongDetailPage: React.FC = () => {
 
   const handlePlayToggle = () => {
     if (!song) return;
-    setIsPlaying(!isPlaying);
-    if (!isPlaying) {
-      recordSongPlay(song._id);
-      setSong((prev) => (prev ? { ...prev, playCount: prev.playCount + 1 } : null));
+    if (isCurrentTrackActive) {
+      togglePlay();
+    } else {
+      playSong(song, [song, ...relatedSongs]);
     }
   };
 
@@ -206,7 +213,7 @@ export const SongDetailPage: React.FC = () => {
                 onClick={handlePlayToggle}
                 className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-indigo-600/40 flex items-center gap-2"
               >
-                {isPlaying ? (
+                {isCurrentTrackPlaying ? (
                   <>
                     <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                       <path d="M6 4h4v16H6zm8 0h4v16h-4z" />
@@ -279,11 +286,9 @@ export const SongDetailPage: React.FC = () => {
           seeAllLink="/library"
           type="song"
           items={relatedSongs}
+          onPlaySong={(item) => playSong(item, relatedSongs)}
         />
       )}
-
-      {/* Audio Player Bar */}
-      <AudioPlayer song={isPlaying ? song : null} onClose={() => setIsPlaying(false)} />
     </div>
   );
 };

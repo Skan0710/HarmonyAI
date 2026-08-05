@@ -4,10 +4,11 @@ import { useAuth } from '../hooks/useAuth';
 import type { Song, Artist, Album } from '../types/music';
 import { fetchSongs, fetchArtists, fetchAlbums } from '../services/songService';
 import { MediaCarousel } from '../components/MediaCarousel';
-import { AudioPlayer } from '../components/AudioPlayer';
+import { usePlayerStore } from '../store/usePlayerStore';
 
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
+  const playSong = usePlayerStore((state) => state.playSong);
 
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
   const [newReleases, setNewReleases] = useState<Song[]>([]);
@@ -18,8 +19,6 @@ export const HomePage: React.FC = () => {
   const [loadingNewReleases, setLoadingNewReleases] = useState<boolean>(true);
   const [loadingArtists, setLoadingArtists] = useState<boolean>(true);
   const [loadingAlbums, setLoadingAlbums] = useState<boolean>(true);
-
-  const [currentPlayingSong, setCurrentPlayingSong] = useState<Song | null>(null);
 
   useEffect(() => {
     const loadTrending = async () => {
@@ -56,12 +55,8 @@ export const HomePage: React.FC = () => {
     loadAlbums();
   }, []);
 
-  const handlePlaySong = (song: Song) => {
-    if (currentPlayingSong?._id === song._id) {
-      setCurrentPlayingSong(null);
-    } else {
-      setCurrentPlayingSong(song);
-    }
+  const handlePlaySong = (song: Song, queueList: Song[]) => {
+    playSong(song, queueList);
   };
 
   return (
@@ -117,8 +112,7 @@ export const HomePage: React.FC = () => {
         type="song"
         items={trendingSongs}
         loading={loadingTrending}
-        onPlaySong={handlePlaySong}
-        currentPlayingSongId={currentPlayingSong?._id}
+        onPlaySong={(song) => handlePlaySong(song, trendingSongs)}
       />
 
       {/* 2. New Releases Carousel */}
@@ -129,8 +123,7 @@ export const HomePage: React.FC = () => {
         type="song"
         items={newReleases}
         loading={loadingNewReleases}
-        onPlaySong={handlePlaySong}
-        currentPlayingSongId={currentPlayingSong?._id}
+        onPlaySong={(song) => handlePlaySong(song, newReleases)}
       />
 
       {/* 3. Featured Artists Carousel */}
@@ -152,9 +145,6 @@ export const HomePage: React.FC = () => {
         items={popularAlbums}
         loading={loadingAlbums}
       />
-
-      {/* Reusable Audio Player Bar */}
-      <AudioPlayer song={currentPlayingSong} onClose={() => setCurrentPlayingSong(null)} />
     </div>
   );
 };
