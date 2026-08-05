@@ -15,6 +15,7 @@ export const MiniPlayer: React.FC = () => {
     queue,
     volume,
     isMuted,
+    isQueueOpen,
     togglePlay,
     pause,
     stop,
@@ -24,6 +25,7 @@ export const MiniPlayer: React.FC = () => {
     toggleMute,
     nextSong,
     previousSong,
+    toggleQueueOpen,
   } = usePlayer();
 
   // Reset states when song changes
@@ -41,7 +43,6 @@ export const MiniPlayer: React.FC = () => {
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
-          // Playback interrupted or prevented by browser
           if (err.name !== 'AbortError') {
             setAudioError('Playback failed. Please try again.');
             pause();
@@ -134,7 +135,7 @@ export const MiniPlayer: React.FC = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 border-t border-indigo-500/30 backdrop-blur-xl px-4 py-3 shadow-2xl shadow-indigo-950/80 transition-all duration-300">
-      {/* HTML5 Audio Element connected to database audioUrl */}
+      {/* HTML5 Audio Element */}
       <audio
         ref={audioRef}
         src={currentSong.audioUrl}
@@ -244,8 +245,28 @@ export const MiniPlayer: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. Volume Control & Close Button */}
+        {/* 3. Queue Drawer Button, Volume Control & Close Button */}
         <div className="hidden sm:flex items-center justify-end gap-3 w-1/4">
+          {/* Queue Drawer Toggle Button */}
+          <button
+            onClick={toggleQueueOpen}
+            className={`relative p-2 rounded-xl border transition-all flex items-center gap-1.5 ${
+              isQueueOpen
+                ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50'
+                : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border-slate-700/60 hover:bg-slate-700/60'
+            }`}
+            title="Toggle Playback Queue"
+            aria-label="Toggle Playback Queue"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h10M4 18h10" />
+            </svg>
+            <span className="text-[11px] font-bold text-indigo-300 px-1.5 py-0.2 rounded-full bg-indigo-500/20 border border-indigo-500/30">
+              {queue.length}
+            </span>
+          </button>
+
+          {/* Volume Control */}
           <div className="flex items-center gap-2">
             <button
               onClick={toggleMute}
@@ -271,10 +292,11 @@ export const MiniPlayer: React.FC = () => {
               step={0.05}
               value={isMuted ? 0 : volume}
               onChange={handleVolumeChange}
-              className="w-20 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              className="w-16 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
           </div>
 
+          {/* Close Player */}
           <button
             onClick={stop}
             className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800 transition-colors font-bold text-xs"
