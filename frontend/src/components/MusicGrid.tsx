@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Song } from '../types/music';
 import { SongCard } from './SongCard';
+import { usePlayerStore } from '../store/usePlayerStore';
 
 interface MusicGridProps {
   songs: Song[];
@@ -21,6 +22,16 @@ export const MusicGrid: React.FC<MusicGridProps> = ({
   currentSongId,
   emptyMessage = 'No songs available in the library right now.',
 }) => {
+  const playSong = usePlayerStore((state) => state.playSong);
+
+  const handlePlay = (song: Song) => {
+    if (onPlaySong) {
+      onPlaySong(song);
+    } else {
+      playSong(song, songs);
+    }
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
@@ -90,7 +101,7 @@ export const MusicGrid: React.FC<MusicGridProps> = ({
         <SongCard
           key={song._id}
           song={song}
-          onPlay={onPlaySong}
+          onPlay={() => handlePlay(song)}
           isPlaying={currentSongId === song._id}
         />
       ))}
