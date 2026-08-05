@@ -2,6 +2,21 @@ import { create } from 'zustand';
 import type { Song } from '../types/music';
 import { recordSongPlay } from '../services/songService';
 
+export type RepeatMode = 'off' | 'all' | 'one';
+
+const getInitialVolume = (): number => {
+  try {
+    const saved = sessionStorage.getItem('harmony_volume');
+    if (saved !== null) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return 0.8;
+};
+
 interface PlayerState {
   // State variables
   currentSong: Song | null;
@@ -12,6 +27,8 @@ interface PlayerState {
   queueIndex: number;
   volume: number; // 0 to 1
   isMuted: boolean;
+  isShuffle: boolean;
+  repeatMode: RepeatMode;
   isQueueOpen: boolean;
 
   // Actions / Functions
@@ -24,6 +41,8 @@ interface PlayerState {
   setDuration: (duration: number) => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
+  toggleShuffle: () => void;
+  toggleRepeatMode: () => void;
   addToQueue: (song: Song) => void;
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
@@ -31,6 +50,7 @@ interface PlayerState {
   playQueueIndex: (index: number) => void;
   nextSong: () => void;
   previousSong: () => void;
+  handleSongEnd: () => void;
   toggleQueueOpen: () => void;
   setQueueOpen: (isOpen: boolean) => void;
 }
@@ -42,8 +62,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   duration: 0,
   queue: [],
   queueIndex: -1,
-  volume: 0.8,
+  volume: getInitialVolume(),
   isMuted: false,
+  isShuffle: false,
+  repeatMode: 'off',
   isQueueOpen: false,
 
   playSong: (song, queue) => {
@@ -95,6 +117,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   setVolume: (volume) => {
     const clampedVolume = Math.max(0, Math.min(1, volume));
+    try {
+      sessionStorage.setItem('harmony_volume', String(clampedVolume));
+    } catch {}
+
     set({
       volume: clampedVolume,
       isMuted: clampedVolume === 0,
@@ -105,14 +131,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set((state) => ({ isMuted: !state.isMuted }));
   },
 
+  toggleShuffle: () => {
+    set((state) => ({ isShuffle: !state.isShuffle }));
+  },
+
+  toggleRepeatMode: () => {
+    const current = get().repeatMode;
+    const next: RepeatMode = current === 'off' ? 'all' : current === 'all' ? 'one' : 'off';
+    set({ repeatMode: next });
+  },
+
   addToQueue: (song) => {
     const { queue } = get();
-    // If no queue, start playing this song
     if (queue.length === 0) {
       get().playSong(song, [song]);
       return;
     }
-
     set({ queue: [...queue, song] });
   },
 
@@ -199,10 +233,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   nextSong: () => {
-    const { queue, queueIndex } = get();
+    const { queue, queueIndex, isShuffle } = get();
     if (queue.length === 0) return;
 
-    const nextIdx = (queueIndex + 1) % queue.length;
+    let nextIdx: number;
+
+    if (isShuffle && queue.length > 1) {
+      // Pick random index excluding current index
+      do {
+        nextIdx = Math.floor(Math.random() * queue.length);
+      } while (nextIdx === queueIndex);
+    } else {
+      nextIdx = (queueIndex + 1) % queue.length;
+    }
+
     const nextSongItem = queue[nextIdx];
 
     if (nextSongItem) {
@@ -220,7 +264,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   previousSong: () => {
-    const { queue, queueIndex, currentTime } = get();
+    const { queue, queueIndex, currentTime, isShuffle } = get();
     if (queue.length === 0) return;
 
     if (currentTime > 3) {
@@ -228,7 +272,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return;
     }
 
-    const prevIdx = queueIndex - 1 < 0 ? queue.length - 1 : queueIndex - 1;
+    let prevIdx: number;
+
+    if (isShuffle && queue.length > 1) {
+      do {
+        prevIdx = Math.floor(Math.random() * queue.length);
+      } while (prevIdx === queueIndex);
+    } else {
+      prevIdx = queueIndex - 1 < 0 ? queue.length - 1 : queueIndex - 1;
+    }
+
     const prevSongItem = queue[prevIdx];
 
     if (prevSongItem) {
@@ -242,6 +295,29 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       if (prevSongItem._id) {
         recordSongPlay(prevSongItem._id).catch(() => {});
       }
+    }
+  },
+
+  handleSongEnd: () => {
+    const { repeatMode, queue, queueIndex } = get();
+
+    if (repeatMode === 'one') {
+      // Replay current song from start
+      set({ currentTime: 0, isPlaying: true });
+      return;
+    }
+
+    if (repeatMode === 'all') {
+      get().nextSong();
+      return;
+    }
+
+    // repeatMode === 'off'
+    if (queueIndex + 1 < queue.length) {
+      get().nextSong();
+    } else {
+      // Reached end of queue -> stop playback
+      set({ isPlaying: false, currentTime: 0 });
     }
   },
 

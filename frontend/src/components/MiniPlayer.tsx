@@ -15,6 +15,8 @@ export const MiniPlayer: React.FC = () => {
     queue,
     volume,
     isMuted,
+    isShuffle,
+    repeatMode,
     isQueueOpen,
     togglePlay,
     pause,
@@ -23,8 +25,11 @@ export const MiniPlayer: React.FC = () => {
     setDuration,
     setVolume,
     toggleMute,
+    toggleShuffle,
+    toggleRepeatMode,
     nextSong,
     previousSong,
+    handleSongEnd,
     toggleQueueOpen,
   } = usePlayer();
 
@@ -145,7 +150,7 @@ export const MiniPlayer: React.FC = () => {
         onWaiting={handleWaiting}
         onPlaying={handlePlaying}
         onError={handleError}
-        onEnded={nextSong}
+        onEnded={handleSongEnd}
         preload="metadata"
       />
 
@@ -176,9 +181,26 @@ export const MiniPlayer: React.FC = () => {
           </div>
         </div>
 
-        {/* 2. Controls & Seek Bar */}
+        {/* 2. Advanced Controls & Seek Bar */}
         <div className="flex flex-col items-center gap-1.5 w-full sm:w-2/4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Shuffle Button */}
+            <button
+              onClick={toggleShuffle}
+              className={`p-1.5 rounded-lg transition-colors relative ${
+                isShuffle
+                  ? 'text-indigo-400 bg-indigo-500/20 border border-indigo-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title={isShuffle ? 'Shuffle Enabled' : 'Enable Shuffle'}
+              aria-label="Toggle Shuffle"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h2m8 0h2a2 2 0 012 2v8a2 2 0 01-2 2h-2m-4-4l4-4m0 0l-4-4m4 4H4m16 4l-4 4m0 0l4 4m-4-4H8" />
+              </svg>
+            </button>
+
+            {/* Previous Track */}
             <button
               onClick={previousSong}
               disabled={queue.length <= 1}
@@ -191,6 +213,7 @@ export const MiniPlayer: React.FC = () => {
               </svg>
             </button>
 
+            {/* Play / Pause Main Button */}
             <button
               onClick={togglePlay}
               className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/50 transition-all transform active:scale-95"
@@ -210,6 +233,7 @@ export const MiniPlayer: React.FC = () => {
               )}
             </button>
 
+            {/* Next Track */}
             <button
               onClick={nextSong}
               disabled={queue.length <= 1}
@@ -220,6 +244,31 @@ export const MiniPlayer: React.FC = () => {
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
               </svg>
+            </button>
+
+            {/* Repeat Mode Button */}
+            <button
+              onClick={toggleRepeatMode}
+              className={`p-1.5 rounded-lg transition-colors relative flex items-center gap-0.5 ${
+                repeatMode !== 'off'
+                  ? 'text-indigo-400 bg-indigo-500/20 border border-indigo-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title={
+                repeatMode === 'one'
+                  ? 'Repeat One (Active)'
+                  : repeatMode === 'all'
+                  ? 'Repeat All (Active)'
+                  : 'Enable Repeat'
+              }
+              aria-label="Toggle Repeat Mode"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {repeatMode === 'one' && (
+                <span className="text-[9px] font-extrabold leading-none -ml-1 text-indigo-300">1</span>
+              )}
             </button>
           </div>
 
@@ -266,7 +315,7 @@ export const MiniPlayer: React.FC = () => {
             </span>
           </button>
 
-          {/* Volume Control */}
+          {/* Volume Control & Mute Toggle */}
           <div className="flex items-center gap-2">
             <button
               onClick={toggleMute}
@@ -292,7 +341,7 @@ export const MiniPlayer: React.FC = () => {
               step={0.05}
               value={isMuted ? 0 : volume}
               onChange={handleVolumeChange}
-              className="w-16 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              className="w-20 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
           </div>
 
