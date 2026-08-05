@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Artist, Song, Album } from '../types/music';
-import { fetchArtistById, fetchSongs, fetchAlbums, fetchSimilarArtists, recordSongPlay } from '../services/songService';
+import { fetchArtistById, fetchSongs, fetchAlbums, fetchSimilarArtists } from '../services/songService';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { MusicGrid } from '../components/MusicGrid';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { AudioPlayer } from '../components/AudioPlayer';
+import { usePlayerStore } from '../store/usePlayerStore';
 
 export const ArtistDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  const playSong = usePlayerStore((state) => state.playSong);
 
   const [artist, setArtist] = useState<Artist | null>(null);
   const [artistSongs, setArtistSongs] = useState<Song[]>([]);
@@ -19,7 +21,6 @@ export const ArtistDetailPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState<boolean>(false);
-  const [currentPlayingSong, setCurrentPlayingSong] = useState<Song | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -55,12 +56,7 @@ export const ArtistDetailPage: React.FC = () => {
   }, [id]);
 
   const handlePlaySong = (song: Song) => {
-    if (currentPlayingSong?._id === song._id) {
-      setCurrentPlayingSong(null);
-    } else {
-      setCurrentPlayingSong(song);
-      recordSongPlay(song._id);
-    }
+    playSong(song, artistSongs);
   };
 
   const formatListeners = (listeners?: number): string => {
@@ -187,7 +183,6 @@ export const ArtistDetailPage: React.FC = () => {
           songs={artistSongs}
           loading={false}
           onPlaySong={handlePlaySong}
-          currentSongId={currentPlayingSong?._id}
           emptyMessage={`No songs uploaded for ${artist.name} yet.`}
         />
       </section>
@@ -200,9 +195,6 @@ export const ArtistDetailPage: React.FC = () => {
           items={similarArtists}
         />
       )}
-
-      {/* Audio Player Bar */}
-      <AudioPlayer song={currentPlayingSong} onClose={() => setCurrentPlayingSong(null)} />
     </div>
   );
 };

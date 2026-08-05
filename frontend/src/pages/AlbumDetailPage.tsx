@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { Album, Song } from '../types/music';
-import { fetchAlbumById, fetchSongs, recordSongPlay } from '../services/songService';
+import { fetchAlbumById, fetchSongs } from '../services/songService';
 import { MusicGrid } from '../components/MusicGrid';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { AudioPlayer } from '../components/AudioPlayer';
+import { usePlayerStore } from '../store/usePlayerStore';
 
 export const AlbumDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  const playSong = usePlayerStore((state) => state.playSong);
 
   const [album, setAlbum] = useState<Album | null>(null);
   const [albumSongs, setAlbumSongs] = useState<Song[]>([]);
@@ -16,7 +18,6 @@ export const AlbumDetailPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState<boolean>(false);
-  const [currentPlayingSong, setCurrentPlayingSong] = useState<Song | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -47,12 +48,7 @@ export const AlbumDetailPage: React.FC = () => {
   }, [id]);
 
   const handlePlaySong = (song: Song) => {
-    if (currentPlayingSong?._id === song._id) {
-      setCurrentPlayingSong(null);
-    } else {
-      setCurrentPlayingSong(song);
-      recordSongPlay(song._id);
-    }
+    playSong(song, albumSongs);
   };
 
   const getArtistId = (): string | null => {
@@ -202,13 +198,9 @@ export const AlbumDetailPage: React.FC = () => {
           songs={albumSongs}
           loading={false}
           onPlaySong={handlePlaySong}
-          currentSongId={currentPlayingSong?._id}
           emptyMessage={`No songs uploaded under "${album.title}" yet.`}
         />
       </section>
-
-      {/* Audio Player Bar */}
-      <AudioPlayer song={currentPlayingSong} onClose={() => setCurrentPlayingSong(null)} />
     </div>
   );
 };

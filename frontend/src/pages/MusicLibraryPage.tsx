@@ -6,10 +6,11 @@ import { MusicFilters } from '../components/MusicFilters';
 import { MusicGrid } from '../components/MusicGrid';
 import { Pagination } from '../components/Pagination';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { AudioPlayer } from '../components/AudioPlayer';
+import { usePlayerStore } from '../store/usePlayerStore';
 
 export const MusicLibraryPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const playSong = usePlayerStore((state) => state.playSong);
 
   const [genres, setGenres] = useState<Genre[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
@@ -19,8 +20,6 @@ export const MusicLibraryPage: React.FC = () => {
   const [pagination, setPagination] = useState<PaginationData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [currentPlayingSong, setCurrentPlayingSong] = useState<Song | null>(null);
 
   const searchQuery = searchParams.get('q') || '';
   const selectedGenreId = searchParams.get('genre') || '';
@@ -133,11 +132,7 @@ export const MusicLibraryPage: React.FC = () => {
   );
 
   const handlePlaySong = (song: Song) => {
-    if (currentPlayingSong?._id === song._id) {
-      setCurrentPlayingSong(null);
-    } else {
-      setCurrentPlayingSong(song);
-    }
+    playSong(song, songs);
   };
 
   return (
@@ -183,7 +178,6 @@ export const MusicLibraryPage: React.FC = () => {
         error={error}
         onRetry={loadSongs}
         onPlaySong={handlePlaySong}
-        currentSongId={currentPlayingSong?._id}
         emptyMessage={
           hasActiveFilters
             ? 'No songs match your selected filter criteria. Try resetting filters.'
@@ -200,9 +194,6 @@ export const MusicLibraryPage: React.FC = () => {
           onLimitChange={handleLimitChange}
         />
       )}
-
-      {/* Audio Player Bar */}
-      <AudioPlayer song={currentPlayingSong} onClose={() => setCurrentPlayingSong(null)} />
     </div>
   );
 };

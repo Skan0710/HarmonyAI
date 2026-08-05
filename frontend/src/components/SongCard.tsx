@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Song } from '../types/music';
+import { usePlayerStore } from '../store/usePlayerStore';
 
 interface SongCardProps {
   song: Song;
@@ -8,9 +9,19 @@ interface SongCardProps {
   isPlaying?: boolean;
 }
 
-export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying = false }) => {
+export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) => {
   const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
+
+  const activeSong = usePlayerStore((state) => state.currentSong);
+  const activeIsPlaying = usePlayerStore((state) => state.isPlaying);
+  const playSong = usePlayerStore((state) => state.playSong);
+  const togglePlay = usePlayerStore((state) => state.togglePlay);
+
+  const isCurrentTrackPlaying =
+    isPlaying !== undefined
+      ? isPlaying
+      : activeSong?._id === song._id && activeIsPlaying;
 
   const getArtistName = (): string => {
     if (!song.artist) return 'Unknown Artist';
@@ -63,14 +74,22 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying = fa
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onPlay?.(song);
+    if (onPlay) {
+      onPlay(song);
+    } else {
+      if (activeSong?._id === song._id) {
+        togglePlay();
+      } else {
+        playSong(song);
+      }
+    }
   };
 
   return (
     <div
       onClick={handleCardClick}
       className={`group relative cursor-pointer bg-slate-800/70 hover:bg-slate-800/90 border border-slate-700/60 hover:border-indigo-500/60 rounded-2xl p-3.5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/15 flex flex-col justify-between overflow-hidden ${
-        isPlaying ? 'border-indigo-500 ring-2 ring-indigo-500/30 bg-slate-800' : ''
+        isCurrentTrackPlaying ? 'border-indigo-500 ring-2 ring-indigo-500/30 bg-slate-800' : ''
       }`}
     >
       <div>
@@ -95,7 +114,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying = fa
               className="w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/50 transform scale-90 group-hover:scale-100 transition-all duration-300"
               aria-label={`Play ${song.title}`}
             >
-              {isPlaying ? (
+              {isCurrentTrackPlaying ? (
                 <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                   <path d="M6 4h4v16H6zm8 0h4v16h-4z" />
                 </svg>
