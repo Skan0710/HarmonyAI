@@ -7,6 +7,8 @@ import { ArtistCard } from '../components/ArtistCard';
 import { AlbumCard } from '../components/AlbumCard';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { SearchSuggestionsDropdown } from '../components/SearchSuggestionsDropdown';
+import { TrendingSearches } from '../components/TrendingSearches';
+import { SearchSkeletonLoader } from '../components/SearchSkeletonLoader';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useRecentSearchesStore } from '../store/useRecentSearchesStore';
 
@@ -72,7 +74,7 @@ export const SearchPage: React.FC = () => {
     return () => clearTimeout(handler);
   }, [queryInput, searchParams, setSearchParams, executeSearch]);
 
-  // Click outside listener to hide dropdown
+  // Click outside listener to hide suggestions dropdown
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -89,7 +91,7 @@ export const SearchPage: React.FC = () => {
     setResults({ songs: [], artists: [], albums: [], total: 0 });
   };
 
-  const handleSelectRecent = (term: string) => {
+  const handleSelectSearchTerm = (term: string) => {
     setQueryInput(term);
     setSearchParams({ q: term }, { replace: true });
     executeSearch(term);
@@ -116,7 +118,7 @@ export const SearchPage: React.FC = () => {
         <div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Explore & Search</h1>
           <p className="text-slate-400 text-sm mt-1">
-            Search across songs, artists, and albums in the HarmonyAI library.
+            Search across songs, artists, and albums in the HarmonyAI catalog.
           </p>
         </div>
 
@@ -154,58 +156,43 @@ export const SearchPage: React.FC = () => {
               query={queryInput}
               suggestions={results}
               loading={loading}
-              onSelectSearch={handleSelectRecent}
+              onSelectSearch={handleSelectSearchTerm}
               onClose={() => setIsFocused(false)}
             />
           )}
         </div>
       </div>
 
-      {/* Loading Skeleton */}
-      {loading && !results && (
-        <div className="space-y-8 animate-pulse">
-          <div className="space-y-3">
-            <div className="h-6 bg-slate-800 rounded w-48" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-44 bg-slate-800/60 rounded-xl" />
-              ))}
+      {/* 1. Trending Searches Section (Displayed when no query is typed) */}
+      {!hasQuery && !loading && (
+        <div className="space-y-8">
+          <TrendingSearches onSelectTrending={handleSelectSearchTerm} />
+
+          <div className="py-12 text-center max-w-md mx-auto space-y-3">
+            <div className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-700/60 text-indigo-400 flex items-center justify-center mx-auto shadow-lg">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
-          </div>
-          <div className="space-y-3">
-            <div className="h-6 bg-slate-800 rounded w-48" />
-            <div className="flex gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="w-40 h-48 bg-slate-800/60 rounded-2xl" />
-              ))}
-            </div>
+            <h3 className="text-lg font-bold text-slate-200">Start Discovering</h3>
+            <p className="text-slate-400 text-xs">
+              Type anything in the search bar or select a trending topic above to explore.
+            </p>
           </div>
         </div>
       )}
 
-      {/* Error Message */}
+      {/* 2. Loading Skeleton Loader */}
+      {loading && !results && <SearchSkeletonLoader />}
+
+      {/* 3. Error State */}
       {error && !loading && (
         <div className="p-6 bg-slate-800/60 border border-rose-500/30 rounded-2xl text-center max-w-lg mx-auto">
           <p className="text-rose-400 font-medium text-sm">{error}</p>
         </div>
       )}
 
-      {/* Empty Search Prompt (No query typed) */}
-      {!hasQuery && !loading && (
-        <div className="py-16 text-center max-w-md mx-auto space-y-4">
-          <div className="w-20 h-20 rounded-full bg-slate-800/80 border border-slate-700/60 text-indigo-400 flex items-center justify-center mx-auto shadow-lg">
-            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-          <h3 className="text-xl font-bold text-slate-200">Start Searching</h3>
-          <p className="text-slate-400 text-sm">
-            Type anything above to search songs, artists, and albums instantly.
-          </p>
-        </div>
-      )}
-
-      {/* No Results Found */}
+      {/* 4. No Results Found */}
       {hasQuery && !hasResults && !loading && !error && (
         <div className="py-16 text-center max-w-md mx-auto space-y-4">
           <div className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-500 flex items-center justify-center mx-auto">
@@ -220,10 +207,10 @@ export const SearchPage: React.FC = () => {
         </div>
       )}
 
-      {/* Grouped Results Display */}
+      {/* 5. Grouped Results Display */}
       {hasQuery && hasResults && results && (
         <div className="space-y-10">
-          {/* 1. Grouped Songs */}
+          {/* Songs */}
           {results.songs.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
@@ -238,7 +225,7 @@ export const SearchPage: React.FC = () => {
             </section>
           )}
 
-          {/* 2. Grouped Artists */}
+          {/* Artists */}
           {results.artists.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
@@ -254,7 +241,7 @@ export const SearchPage: React.FC = () => {
             </section>
           )}
 
-          {/* 3. Grouped Albums */}
+          {/* Albums */}
           {results.albums.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
