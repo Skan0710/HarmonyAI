@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Song } from '../types/music';
 import { recordSongPlay } from '../services/songService';
+import { recordPlaybackApi } from '../services/historyService';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -15,6 +16,12 @@ const getInitialVolume = (): number => {
     }
   } catch {}
   return 0.8;
+};
+
+const notifyTrackPlay = (songId?: string) => {
+  if (!songId) return;
+  recordSongPlay(songId).catch(() => {});
+  recordPlaybackApi(songId).catch(() => {});
 };
 
 interface PlayerState {
@@ -80,9 +87,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       queueIndex: index >= 0 ? index : 0,
     });
 
-    if (song._id) {
-      recordSongPlay(song._id).catch(() => {});
-    }
+    notifyTrackPlay(song._id);
   },
 
   togglePlay: () => {
@@ -177,9 +182,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         currentSong: nextSong,
         currentTime: 0,
       });
-      if (nextSong?._id) {
-        recordSongPlay(nextSong._id).catch(() => {});
-      }
+      notifyTrackPlay(nextSong?._id);
     }
 
     set({
@@ -210,9 +213,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       currentTime: 0,
     });
 
-    if (song?._id) {
-      recordSongPlay(song._id).catch(() => {});
-    }
+    notifyTrackPlay(song?._id);
   },
 
   playQueueIndex: (index) => {
@@ -227,9 +228,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       currentTime: 0,
     });
 
-    if (targetSong?._id) {
-      recordSongPlay(targetSong._id).catch(() => {});
-    }
+    notifyTrackPlay(targetSong?._id);
   },
 
   nextSong: () => {
@@ -239,7 +238,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     let nextIdx: number;
 
     if (isShuffle && queue.length > 1) {
-      // Pick random index excluding current index
       do {
         nextIdx = Math.floor(Math.random() * queue.length);
       } while (nextIdx === queueIndex);
@@ -257,9 +255,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         currentTime: 0,
       });
 
-      if (nextSongItem._id) {
-        recordSongPlay(nextSongItem._id).catch(() => {});
-      }
+      notifyTrackPlay(nextSongItem._id);
     }
   },
 
@@ -292,9 +288,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         currentTime: 0,
       });
 
-      if (prevSongItem._id) {
-        recordSongPlay(prevSongItem._id).catch(() => {});
-      }
+      notifyTrackPlay(prevSongItem._id);
     }
   },
 
@@ -302,7 +296,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { repeatMode, queue, queueIndex } = get();
 
     if (repeatMode === 'one') {
-      // Replay current song from start
       set({ currentTime: 0, isPlaying: true });
       return;
     }
@@ -312,11 +305,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return;
     }
 
-    // repeatMode === 'off'
     if (queueIndex + 1 < queue.length) {
       get().nextSong();
     } else {
-      // Reached end of queue -> stop playback
       set({ isPlaying: false, currentTime: 0 });
     }
   },

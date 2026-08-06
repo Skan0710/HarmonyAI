@@ -10,6 +10,7 @@ import artistRoutes from './routes/artistRoutes.js';
 import albumRoutes from './routes/albumRoutes.js';
 import songRoutes from './routes/songRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
+import historyRoutes from './routes/historyRoutes.js';
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use('/api/artists', artistRoutes);
 app.use('/api/albums', albumRoutes);
 app.use('/api/songs', songRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/history', historyRoutes);
 
 const startServer = async (): Promise<void> => {
   await connectDB();

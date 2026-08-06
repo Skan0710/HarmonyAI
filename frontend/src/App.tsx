@@ -6,6 +6,7 @@ import { HomePage } from './pages/HomePage';
 import { MusicLibraryPage } from './pages/MusicLibraryPage';
 import { SearchPage } from './pages/SearchPage';
 import { LikedSongsPage } from './pages/LikedSongsPage';
+import { HistoryPage } from './pages/HistoryPage';
 import { SongDetailPage } from './pages/SongDetailPage';
 import { ArtistDetailPage } from './pages/ArtistDetailPage';
 import { AlbumDetailPage } from './pages/AlbumDetailPage';
@@ -43,6 +44,7 @@ function App() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/library" element={<MusicLibraryPage />} />
             <Route path="/liked-songs" element={<LikedSongsPage />} />
+            <Route path="/history" element={<HistoryPage />} />
             <Route path="/songs/:id" element={<SongDetailPage />} />
             <Route path="/artists/:id" element={<ArtistDetailPage />} />
             <Route path="/albums/:id" element={<AlbumDetailPage />} />
