@@ -5,6 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { MusicLibraryPage } from './pages/MusicLibraryPage';
 import { SearchPage } from './pages/SearchPage';
+import { GenresPage } from './pages/GenresPage';
 import { LikedSongsPage } from './pages/LikedSongsPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { SongDetailPage } from './pages/SongDetailPage';
@@ -42,6 +43,7 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/genres" element={<GenresPage />} />
             <Route path="/library" element={<MusicLibraryPage />} />
             <Route path="/liked-songs" element={<LikedSongsPage />} />
             <Route path="/history" element={<HistoryPage />} />

@@ -4,6 +4,7 @@ export interface Genre {
   slug?: string;
   description?: string;
   coverImage?: string;
+  songCount?: number;
 }
 
 export interface Artist {
