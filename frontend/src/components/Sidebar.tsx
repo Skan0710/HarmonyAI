@@ -23,6 +23,22 @@ export const Sidebar: React.FC = () => {
         </NavLink>
 
         <NavLink
+          to="/search"
+          className={({ isActive }) =>
+            `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
+              isActive
+                ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30'
+                : 'hover:bg-slate-700/60 text-slate-300 hover:text-white'
+            }`
+          }
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          Search
+        </NavLink>
+
+        <NavLink
           to="/library"
           className={({ isActive }) =>
             `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${

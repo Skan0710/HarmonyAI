@@ -4,6 +4,7 @@ import { MainLayout } from './components/MainLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { MusicLibraryPage } from './pages/MusicLibraryPage';
+import { SearchPage } from './pages/SearchPage';
 import { SongDetailPage } from './pages/SongDetailPage';
 import { ArtistDetailPage } from './pages/ArtistDetailPage';
 import { AlbumDetailPage } from './pages/AlbumDetailPage';
@@ -30,6 +31,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/" element={<HomePage />} />
+            <Route path="/search" element={<SearchPage />} />
             <Route path="/library" element={<MusicLibraryPage />} />
             <Route path="/songs/:id" element={<SongDetailPage />} />
             <Route path="/artists/:id" element={<ArtistDetailPage />} />
