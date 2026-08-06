@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { searchGlobal } from '../services/searchService';
 import type { GroupedSearchResults } from '../services/searchService';
@@ -6,17 +6,23 @@ import { MusicGrid } from '../components/MusicGrid';
 import { ArtistCard } from '../components/ArtistCard';
 import { AlbumCard } from '../components/AlbumCard';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { SearchSuggestionsDropdown } from '../components/SearchSuggestionsDropdown';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { useRecentSearchesStore } from '../store/useRecentSearchesStore';
 
 export const SearchPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const playSong = usePlayerStore((state) => state.playSong);
+  const addSearch = useRecentSearchesStore((state) => state.addSearch);
 
   const initialQuery = searchParams.get('q') || '';
   const [queryInput, setQueryInput] = useState<string>(initialQuery);
   const [results, setResults] = useState<GroupedSearchResults | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState<boolean>(false);
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Sync internal state if URL param changes
   useEffect(() => {
@@ -41,10 +47,13 @@ export const SearchPage: React.FC = () => {
       setResults(null);
     } else {
       setResults(data);
+      if (trimmed.length >= 2) {
+        addSearch(trimmed);
+      }
     }
 
     setLoading(false);
-  }, []);
+  }, [addSearch]);
 
   // Debounced search trigger when typing
   useEffect(() => {
@@ -63,10 +72,27 @@ export const SearchPage: React.FC = () => {
     return () => clearTimeout(handler);
   }, [queryInput, searchParams, setSearchParams, executeSearch]);
 
+  // Click outside listener to hide dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleClear = () => {
     setQueryInput('');
     setSearchParams({}, { replace: true });
     setResults({ songs: [], artists: [], albums: [], total: 0 });
+  };
+
+  const handleSelectRecent = (term: string) => {
+    setQueryInput(term);
+    setSearchParams({ q: term }, { replace: true });
+    executeSearch(term);
   };
 
   const handleSongPlay = (song: any) => {
@@ -85,8 +111,8 @@ export const SearchPage: React.FC = () => {
       {/* Breadcrumbs Navigation */}
       <Breadcrumbs items={[{ label: 'Search' }]} />
 
-      {/* Header & Search Bar */}
-      <div className="max-w-3xl space-y-4">
+      {/* Header & Search Bar with Suggestions */}
+      <div ref={containerRef} className="max-w-3xl space-y-4 relative">
         <div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Explore & Search</h1>
           <p className="text-slate-400 text-sm mt-1">
@@ -106,6 +132,7 @@ export const SearchPage: React.FC = () => {
             type="text"
             value={queryInput}
             onChange={(e) => setQueryInput(e.target.value)}
+            onFocus={() => setIsFocused(true)}
             placeholder="Search by song title, artist name, or album..."
             className="w-full pl-12 pr-10 py-3.5 bg-slate-900/90 border border-slate-700/80 focus:border-indigo-500 rounded-2xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-sm sm:text-base shadow-xl transition-all"
             autoFocus
@@ -120,11 +147,22 @@ export const SearchPage: React.FC = () => {
               ✕
             </button>
           )}
+
+          {/* Live Search Suggestions & Recent Searches Dropdown */}
+          {isFocused && (
+            <SearchSuggestionsDropdown
+              query={queryInput}
+              suggestions={results}
+              loading={loading}
+              onSelectSearch={handleSelectRecent}
+              onClose={() => setIsFocused(false)}
+            />
+          )}
         </div>
       </div>
 
       {/* Loading Skeleton */}
-      {loading && (
+      {loading && !results && (
         <div className="space-y-8 animate-pulse">
           <div className="space-y-3">
             <div className="h-6 bg-slate-800 rounded w-48" />
@@ -183,7 +221,7 @@ export const SearchPage: React.FC = () => {
       )}
 
       {/* Grouped Results Display */}
-      {hasQuery && hasResults && !loading && results && (
+      {hasQuery && hasResults && results && (
         <div className="space-y-10">
           {/* 1. Grouped Songs */}
           {results.songs.length > 0 && (

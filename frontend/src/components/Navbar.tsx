@@ -1,11 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
+import { searchGlobal } from '../services/searchService';
+import type { GroupedSearchResults } from '../services/searchService';
+import { SearchSuggestionsDropdown } from './SearchSuggestionsDropdown';
+import { useRecentSearchesStore } from '../store/useRecentSearchesStore';
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const addSearch = useRecentSearchesStore((state) => state.addSearch);
+
   const [navSearch, setNavSearch] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<GroupedSearchResults | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Debounced search suggestions while typing in navbar
+  useEffect(() => {
+    const trimmed = navSearch.trim();
+    if (!trimmed) {
+      setSuggestions(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const handler = setTimeout(async () => {
+      const { results } = await searchGlobal(trimmed, 5);
+      setSuggestions(results);
+      setLoading(false);
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [navSearch]);
+
+  // Click outside to dismiss dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -15,9 +56,18 @@ export const Navbar: React.FC = () => {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (navSearch.trim()) {
+      addSearch(navSearch.trim());
       navigate(`/search?q=${encodeURIComponent(navSearch.trim())}`);
       setNavSearch('');
+      setIsFocused(false);
     }
+  };
+
+  const handleSelectRecent = (searchTerm: string) => {
+    addSearch(searchTerm);
+    navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
+    setNavSearch('');
+    setIsFocused(false);
   };
 
   const getInitials = (name: string): string => {
@@ -30,7 +80,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="h-16 bg-slate-900 text-white flex items-center justify-between px-4 sm:px-6 border-b border-slate-800 shadow-sm gap-4">
+    <header className="h-16 bg-slate-900 text-white flex items-center justify-between px-4 sm:px-6 border-b border-slate-800 shadow-sm gap-4 relative z-40">
       {/* Brand Logo */}
       <div className="flex items-center gap-3 shrink-0">
         <Link to="/" className="font-bold text-xl tracking-wide text-white hover:text-indigo-400 transition-colors flex items-center gap-2">
@@ -39,21 +89,34 @@ export const Navbar: React.FC = () => {
         </Link>
       </div>
 
-      {/* Global Navbar Quick Search Input */}
-      <form onSubmit={handleSearchSubmit} className="flex-1 max-w-xs sm:max-w-md">
-        <div className="relative flex items-center">
-          <svg className="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            value={navSearch}
-            onChange={(e) => setNavSearch(e.target.value)}
-            placeholder="Search songs, artists..."
-            className="w-full pl-9 pr-3 py-1.5 bg-slate-800/80 border border-slate-700/70 focus:border-indigo-500 rounded-full text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+      {/* Global Navbar Quick Search Input with Live Suggestions */}
+      <div ref={searchContainerRef} className="flex-1 max-w-xs sm:max-w-md relative">
+        <form onSubmit={handleSearchSubmit}>
+          <div className="relative flex items-center">
+            <svg className="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={navSearch}
+              onChange={(e) => setNavSearch(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              placeholder="Search songs, artists..."
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-800/80 border border-slate-700/70 focus:border-indigo-500 rounded-full text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+            />
+          </div>
+        </form>
+
+        {isFocused && (
+          <SearchSuggestionsDropdown
+            query={navSearch}
+            suggestions={suggestions}
+            loading={loading}
+            onSelectSearch={handleSelectRecent}
+            onClose={() => setIsFocused(false)}
           />
-        </div>
-      </form>
+        )}
+      </div>
 
       {/* Right User Actions */}
       <div className="flex items-center gap-4 text-sm shrink-0">
