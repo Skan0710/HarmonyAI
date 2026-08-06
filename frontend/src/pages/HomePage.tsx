@@ -3,24 +3,37 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import type { Song, Artist, Album } from '../types/music';
 import { fetchSongs, fetchArtists, fetchAlbums } from '../services/songService';
+import { fetchRecentlyPlayedApi } from '../services/historyService';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { usePlayerStore } from '../store/usePlayerStore';
 
 export const HomePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const playSong = usePlayerStore((state) => state.playSong);
 
+  const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
   const [newReleases, setNewReleases] = useState<Song[]>([]);
   const [featuredArtists, setFeaturedArtists] = useState<Artist[]>([]);
   const [popularAlbums, setPopularAlbums] = useState<Album[]>([]);
 
+  const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState<boolean>(false);
   const [loadingTrending, setLoadingTrending] = useState<boolean>(true);
   const [loadingNewReleases, setLoadingNewReleases] = useState<boolean>(true);
   const [loadingArtists, setLoadingArtists] = useState<boolean>(true);
   const [loadingAlbums, setLoadingAlbums] = useState<boolean>(true);
 
   useEffect(() => {
+    const loadRecentlyPlayed = async () => {
+      if (!isAuthenticated) return;
+      setLoadingRecentlyPlayed(true);
+      const res = await fetchRecentlyPlayedApi(10);
+      if (res.songs && res.songs.length > 0) {
+        setRecentlyPlayed(res.songs);
+      }
+      setLoadingRecentlyPlayed(false);
+    };
+
     const loadTrending = async () => {
       setLoadingTrending(true);
       const res = await fetchSongs({ sortBy: 'playCount', sortOrder: 'desc', limit: 10 });
@@ -49,11 +62,12 @@ export const HomePage: React.FC = () => {
       setLoadingAlbums(false);
     };
 
+    loadRecentlyPlayed();
     loadTrending();
     loadNewReleases();
     loadArtists();
     loadAlbums();
-  }, []);
+  }, [isAuthenticated]);
 
   const handlePlaySong = (song: Song, queueList: Song[]) => {
     playSong(song, queueList);
@@ -95,16 +109,29 @@ export const HomePage: React.FC = () => {
             </Link>
 
             <Link
-              to="/library?sort=playCount"
+              to="/history"
               className="px-6 py-3 bg-slate-800/80 hover:bg-slate-800 text-slate-200 hover:text-white font-semibold text-sm rounded-xl border border-slate-700/80 transition-colors flex items-center gap-2 backdrop-blur-md"
             >
-              🔥 Top Trending Tracks
+              🕒 View Listening History
             </Link>
           </div>
         </div>
       </section>
 
-      {/* 1. Trending Songs Carousel */}
+      {/* 1. Recently Played Carousel (Rendered if user has playback history) */}
+      {(recentlyPlayed.length > 0 || loadingRecentlyPlayed) && (
+        <MediaCarousel
+          title="Recently Played"
+          subtitle="Pick up right where you left off"
+          seeAllLink="/history"
+          type="song"
+          items={recentlyPlayed}
+          loading={loadingRecentlyPlayed}
+          onPlaySong={(song) => handlePlaySong(song, recentlyPlayed)}
+        />
+      )}
+
+      {/* 2. Trending Songs Carousel */}
       <MediaCarousel
         title="Trending Songs"
         subtitle="Most played tracks across the HarmonyAI network right now"
@@ -115,7 +142,7 @@ export const HomePage: React.FC = () => {
         onPlaySong={(song) => handlePlaySong(song, trendingSongs)}
       />
 
-      {/* 2. New Releases Carousel */}
+      {/* 3. New Releases Carousel */}
       <MediaCarousel
         title="New Releases"
         subtitle="Freshly uploaded albums, singles, and original productions"
@@ -126,7 +153,7 @@ export const HomePage: React.FC = () => {
         onPlaySong={(song) => handlePlaySong(song, newReleases)}
       />
 
-      {/* 3. Featured Artists Carousel */}
+      {/* 4. Featured Artists Carousel */}
       <MediaCarousel
         title="Featured Artists"
         subtitle="Top verified performers and independent creators on HarmonyAI"
@@ -136,7 +163,7 @@ export const HomePage: React.FC = () => {
         loading={loadingArtists}
       />
 
-      {/* 4. Popular Albums Carousel */}
+      {/* 5. Popular Albums Carousel */}
       <MediaCarousel
         title="Popular Albums"
         subtitle="Curated albums, EPs, and compilations in your music catalog"

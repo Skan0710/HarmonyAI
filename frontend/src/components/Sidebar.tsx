@@ -69,6 +69,22 @@ export const Sidebar: React.FC = () => {
           </svg>
           Liked Songs
         </NavLink>
+
+        <NavLink
+          to="/history"
+          className={({ isActive }) =>
+            `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
+              isActive
+                ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30'
+                : 'hover:bg-slate-700/60 text-slate-300 hover:text-white'
+            }`
+          }
+        >
+          <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Listening History
+        </NavLink>
       </nav>
     </aside>
   );
