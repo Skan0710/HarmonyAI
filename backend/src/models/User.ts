@@ -7,6 +7,7 @@ export interface IUser extends Document {
   email: string;
   password?: string;
   profilePicture?: string;
+  likedSongs: Types.ObjectId[];
   createdAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
@@ -35,6 +36,12 @@ const userSchema = new Schema<IUser>(
       type: String,
       default: '',
     },
+    likedSongs: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Song',
+      },
+    ],
     createdAt: {
       type: Date,
       default: Date.now,

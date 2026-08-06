@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Song } from '../types/music';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { formatTime, formatCount } from '../utils/formatters';
 
 interface SongCardProps {
@@ -18,6 +19,9 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
   const activeIsPlaying = usePlayerStore((state) => state.isPlaying);
   const playSong = usePlayerStore((state) => state.playSong);
   const togglePlay = usePlayerStore((state) => state.togglePlay);
+
+  const isLiked = useLikedSongsStore((state) => state.isLiked(song._id));
+  const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
 
   const isCurrentTrackPlaying =
     isPlaying !== undefined
@@ -72,6 +76,11 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
     }
   };
 
+  const handleLikeClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleLikeSong(song);
+  };
+
   return (
     <div
       onClick={handleCardClick}
@@ -94,6 +103,24 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
               {getGenreName()}
             </span>
           </div>
+
+          {/* Like / Heart Button */}
+          <button
+            onClick={handleLikeClick}
+            className="absolute top-2 right-2 z-20 p-1.5 rounded-full bg-slate-900/70 hover:bg-slate-900/90 backdrop-blur-md transition-transform transform active:scale-90 border border-slate-700/50 shadow-md"
+            title={isLiked ? 'Unlike song' : 'Like song'}
+            aria-label={isLiked ? 'Unlike song' : 'Like song'}
+          >
+            {isLiked ? (
+              <svg className="w-4 h-4 text-rose-500 fill-current animate-in zoom-in-75 duration-200" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-slate-300 hover:text-rose-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            )}
+          </button>
 
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
             <button

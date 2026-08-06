@@ -31,6 +31,7 @@ export const getCurrentUser = async (
         name: user.name,
         email: user.email,
         profilePicture: user.profilePicture,
+        likedSongs: user.likedSongs?.map((id) => id.toString()) || [],
         createdAt: user.createdAt,
       },
     });
@@ -78,6 +79,7 @@ export const updateCurrentUser = async (
         name: updatedUser.name,
         email: updatedUser.email,
         profilePicture: updatedUser.profilePicture,
+        likedSongs: updatedUser.likedSongs?.map((id) => id.toString()) || [],
         createdAt: updatedUser.createdAt,
       },
     });
@@ -85,6 +87,92 @@ export const updateCurrentUser = async (
     res.status(500).json({
       success: false,
       message: 'Failed to update user profile',
+    });
+  }
+};
+
+export const getLikedSongs = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized access',
+      });
+      return;
+    }
+
+    const songs = await UserService.getLikedSongs(req.user._id.toString());
+
+    res.status(200).json({
+      success: true,
+      data: songs,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve liked songs',
+      error: error.message,
+    });
+  }
+};
+
+export const likeSong = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized access',
+      });
+      return;
+    }
+
+    const { songId } = req.params;
+    const likedSongs = await UserService.likeSong(req.user._id.toString(), songId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Song added to liked songs',
+      data: { likedSongs },
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to like song',
+    });
+  }
+};
+
+export const unlikeSong = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized access',
+      });
+      return;
+    }
+
+    const { songId } = req.params;
+    const likedSongs = await UserService.unlikeSong(req.user._id.toString(), songId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Song removed from liked songs',
+      data: { likedSongs },
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to unlike song',
     });
   }
 };
