@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 import { Genre, IGenre } from '../models/Genre.js';
+import { Song } from '../models/Song.js';
 
 export interface CreateGenreInput {
   name: string;
@@ -25,7 +26,7 @@ export class GenreService {
     return genre.save();
   }
 
-  static async getAllGenres(query: { isFeatured?: boolean; search?: string } = {}): Promise<IGenre[]> {
+  static async getAllGenres(query: { isFeatured?: boolean; search?: string } = {}): Promise<any[]> {
     const filter: Record<string, any> = {};
 
     if (query.isFeatured !== undefined) {
@@ -36,16 +37,46 @@ export class GenreService {
       filter.name = { $regex: query.search, $options: 'i' };
     }
 
-    return Genre.find(filter).populate('parentGenre', 'name slug').sort({ name: 1 });
+    const genres = await Genre.find(filter)
+      .populate('parentGenre', 'name slug')
+      .sort({ name: 1 })
+      .lean();
+
+    // Attach total song counts for each genre
+    const genresWithCounts = await Promise.all(
+      genres.map(async (g) => {
+        const songCount = await Song.countDocuments({ genre: g._id });
+        return {
+          ...g,
+          songCount,
+        };
+      })
+    );
+
+    return genresWithCounts;
   }
 
-  static async getGenreById(genreId: string): Promise<IGenre | null> {
+  static async getGenreById(genreId: string): Promise<any | null> {
     if (!Types.ObjectId.isValid(genreId)) return null;
-    return Genre.findById(genreId).populate('parentGenre', 'name slug');
+    const genre = await Genre.findById(genreId).populate('parentGenre', 'name slug').lean();
+    if (!genre) return null;
+
+    const songCount = await Song.countDocuments({ genre: genre._id });
+    return {
+      ...genre,
+      songCount,
+    };
   }
 
-  static async getGenreBySlug(slug: string): Promise<IGenre | null> {
-    return Genre.findOne({ slug: slug.toLowerCase() }).populate('parentGenre', 'name slug');
+  static async getGenreBySlug(slug: string): Promise<any | null> {
+    const genre = await Genre.findOne({ slug: slug.toLowerCase() }).populate('parentGenre', 'name slug').lean();
+    if (!genre) return null;
+
+    const songCount = await Song.countDocuments({ genre: genre._id });
+    return {
+      ...genre,
+      songCount,
+    };
   }
 
   static async updateGenre(genreId: string, data: UpdateGenreInput): Promise<IGenre | null> {
