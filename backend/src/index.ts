@@ -11,6 +11,7 @@ import albumRoutes from './routes/albumRoutes.js';
 import songRoutes from './routes/songRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
 import historyRoutes from './routes/historyRoutes.js';
+import playlistRoutes from './routes/playlistRoutes.js';
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ app.use('/api/albums', albumRoutes);
 app.use('/api/songs', songRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api/playlists', playlistRoutes);
 
 const startServer = async (): Promise<void> => {
   await connectDB();
