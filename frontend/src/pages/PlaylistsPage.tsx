@@ -3,13 +3,18 @@ import type { Playlist } from '../types/music';
 import { fetchUserPlaylistsApi, deletePlaylistApi } from '../services/playlistService';
 import { PlaylistCard } from '../components/PlaylistCard';
 import { CreatePlaylistModal } from '../components/CreatePlaylistModal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 
 export const PlaylistsPage: React.FC = () => {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  // Modals state
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [deletingPlaylistId, setDeletingPlaylistId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   const loadPlaylists = async () => {
     setLoading(true);
@@ -34,17 +39,22 @@ export const PlaylistsPage: React.FC = () => {
     setPlaylists((prev) => [newPlaylist, ...prev]);
   };
 
-  const handleDeletePlaylist = async (playlistId: string) => {
-    if (!window.confirm('Are you sure you want to delete this playlist?')) return;
+  const handleConfirmDelete = async () => {
+    if (!deletingPlaylistId) return;
+    setDeleting(true);
 
-    const { success, error: err } = await deletePlaylistApi(playlistId);
+    const { success, error: err } = await deletePlaylistApi(deletingPlaylistId);
+    setDeleting(false);
 
     if (success) {
-      setPlaylists((prev) => prev.filter((p) => p._id !== playlistId));
+      setPlaylists((prev) => prev.filter((p) => p._id !== deletingPlaylistId));
+      setDeletingPlaylistId(null);
     } else {
       alert(err || 'Failed to delete playlist');
     }
   };
+
+  const targetPlaylist = playlists.find((p) => p._id === deletingPlaylistId);
 
   return (
     <div className="space-y-8 pb-16">
@@ -66,7 +76,7 @@ export const PlaylistsPage: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => setIsCreateModalOpen(true)}
           className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-2xl transition-all shadow-lg shadow-indigo-600/40 hover:scale-105 active:scale-95 flex items-center gap-2 self-start sm:self-center shrink-0"
         >
           <span className="text-base font-bold">+</span>
@@ -85,8 +95,14 @@ export const PlaylistsPage: React.FC = () => {
 
       {/* Error Message */}
       {error && !loading && (
-        <div className="p-6 bg-slate-800/60 border border-rose-500/30 rounded-2xl text-center max-w-lg mx-auto">
-          <p className="text-rose-400 font-medium text-sm">{error}</p>
+        <div className="p-8 bg-slate-900/80 border border-rose-500/30 rounded-3xl text-center max-w-lg mx-auto space-y-4 shadow-xl">
+          <p className="text-rose-400 font-semibold text-sm">{error}</p>
+          <button
+            onClick={loadPlaylists}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md"
+          >
+            Retry
+          </button>
         </div>
       )}
 
@@ -103,7 +119,7 @@ export const PlaylistsPage: React.FC = () => {
             Create your first playlist to organize your favorite tracks and build custom mixes.
           </p>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setIsCreateModalOpen(true)}
             className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all"
           >
             Create Playlist Now
@@ -118,7 +134,7 @@ export const PlaylistsPage: React.FC = () => {
             <PlaylistCard
               key={playlist._id}
               playlist={playlist}
-              onDelete={handleDeletePlaylist}
+              onDelete={(id) => setDeletingPlaylistId(id)}
             />
           ))}
         </div>
@@ -126,9 +142,19 @@ export const PlaylistsPage: React.FC = () => {
 
       {/* Create Playlist Modal Dialog */}
       <CreatePlaylistModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handlePlaylistCreated}
+      />
+
+      {/* Confirm Delete Modal Dialog */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(deletingPlaylistId)}
+        title={`Delete "${targetPlaylist?.name || 'Playlist'}"?`}
+        message="Are you sure you want to delete this playlist? This action cannot be undone."
+        loading={deleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeletingPlaylistId(null)}
       />
     </div>
   );
