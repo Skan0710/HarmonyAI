@@ -36,7 +36,14 @@ export class PlaylistService {
       $or: [{ owner: userObjectId }, { collaborators: userObjectId }],
     })
       .populate('owner', 'name profilePicture')
-      .populate('songs', 'title duration coverImage')
+      .populate({
+        path: 'songs',
+        populate: [
+          { path: 'artist', select: 'name profileImage avatar verified' },
+          { path: 'album', select: 'title coverImage releaseYear' },
+          { path: 'genre', select: 'name slug' },
+        ],
+      })
       .sort({ updatedAt: -1 })
       .lean();
   }
@@ -136,6 +143,7 @@ export class PlaylistService {
       throw new Error('Unauthorized to modify this playlist');
     }
 
+    // $addToSet guarantees duplicate songs are prevented atomically
     const updated = await Playlist.findByIdAndUpdate(
       playlistId,
       { $addToSet: { songs: songId } },
@@ -144,7 +152,11 @@ export class PlaylistService {
       .populate('owner', 'name profilePicture')
       .populate({
         path: 'songs',
-        populate: ['artist', 'album', 'genre'],
+        populate: [
+          { path: 'artist', select: 'name profileImage avatar verified' },
+          { path: 'album', select: 'title coverImage releaseYear' },
+          { path: 'genre', select: 'name slug' },
+        ],
       })
       .lean();
 
@@ -180,7 +192,11 @@ export class PlaylistService {
       .populate('owner', 'name profilePicture')
       .populate({
         path: 'songs',
-        populate: ['artist', 'album', 'genre'],
+        populate: [
+          { path: 'artist', select: 'name profileImage avatar verified' },
+          { path: 'album', select: 'title coverImage releaseYear' },
+          { path: 'genre', select: 'name slug' },
+        ],
       })
       .lean();
 
