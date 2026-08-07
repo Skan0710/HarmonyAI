@@ -4,6 +4,9 @@ import type { Playlist, Song } from '../types/music';
 import { fetchPlaylistByIdApi, removeSongFromPlaylistApi, deletePlaylistApi } from '../services/playlistService';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { EditPlaylistModal } from '../components/EditPlaylistModal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { PlaylistSkeletonLoader } from '../components/PlaylistSkeletonLoader';
 import { formatTime } from '../utils/formatters';
 
 export const PlaylistDetailPage: React.FC = () => {
@@ -14,6 +17,11 @@ export const PlaylistDetailPage: React.FC = () => {
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Modals state
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   const loadPlaylist = async () => {
     if (!id) return;
@@ -60,12 +68,15 @@ export const PlaylistDetailPage: React.FC = () => {
     }
   };
 
-  const handleDeletePlaylist = async () => {
-    if (!id || !window.confirm('Are you sure you want to delete this playlist?')) return;
+  const handleConfirmDelete = async () => {
+    if (!id) return;
+    setDeleting(true);
 
     const { success, error: err } = await deletePlaylistApi(id);
+    setDeleting(false);
 
     if (success) {
+      setIsDeleteModalOpen(false);
       navigate('/playlists', { replace: true });
     } else {
       alert(err || 'Failed to delete playlist');
@@ -111,19 +122,30 @@ export const PlaylistDetailPage: React.FC = () => {
         ]}
       />
 
-      {loading && (
-        <div className="h-64 bg-slate-800/60 rounded-3xl animate-pulse w-full" />
-      )}
+      {loading && <PlaylistSkeletonLoader />}
 
       {error && !loading && (
-        <div className="p-6 bg-slate-800/60 border border-rose-500/30 rounded-2xl text-center max-w-lg mx-auto space-y-3">
-          <p className="text-rose-400 font-medium text-sm">{error}</p>
-          <button
-            onClick={() => navigate('/playlists')}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl"
-          >
-            ← Back to Playlists
-          </button>
+        <div className="p-8 bg-slate-900/80 border border-rose-500/30 rounded-3xl text-center max-w-lg mx-auto space-y-4 shadow-xl">
+          <div className="w-14 h-14 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto">
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <p className="text-rose-400 font-semibold text-sm">{error}</p>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              onClick={loadPlaylist}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => navigate('/playlists')}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl"
+            >
+              Back to Playlists
+            </button>
+          </div>
         </div>
       )}
 
@@ -171,7 +193,7 @@ export const PlaylistDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Header Buttons */}
+              {/* Header Action Buttons */}
               <div className="flex items-center gap-3 shrink-0">
                 {playlist.songs && playlist.songs.length > 0 && (
                   <button
@@ -185,8 +207,21 @@ export const PlaylistDetailPage: React.FC = () => {
                   </button>
                 )}
 
+                {/* Edit Playlist Button */}
                 <button
-                  onClick={handleDeletePlaylist}
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="p-3.5 bg-slate-800/80 hover:bg-indigo-600/80 text-slate-300 hover:text-white rounded-2xl border border-slate-700/80 transition-colors"
+                  title="Edit Playlist Details"
+                  aria-label="Edit Playlist Details"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+
+                {/* Delete Playlist Button */}
+                <button
+                  onClick={() => setIsDeleteModalOpen(true)}
                   className="p-3.5 bg-slate-800/80 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 rounded-2xl border border-slate-700/80 transition-colors"
                   title="Delete Playlist"
                   aria-label="Delete Playlist"
@@ -270,6 +305,24 @@ export const PlaylistDetailPage: React.FC = () => {
               ))}
             </div>
           )}
+
+          {/* Edit Playlist Modal Dialog */}
+          <EditPlaylistModal
+            playlist={playlist}
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            onSuccess={(updated) => setPlaylist(updated)}
+          />
+
+          {/* Confirm Delete Playlist Modal Dialog */}
+          <ConfirmDeleteModal
+            isOpen={isDeleteModalOpen}
+            title={`Delete "${playlist.name}"?`}
+            message="Are you sure you want to delete this playlist? This action cannot be undone."
+            loading={deleting}
+            onConfirm={handleConfirmDelete}
+            onClose={() => setIsDeleteModalOpen(false)}
+          />
         </>
       )}
     </div>
