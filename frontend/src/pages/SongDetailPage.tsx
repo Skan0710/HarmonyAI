@@ -4,6 +4,7 @@ import type { Song } from '../types/music';
 import { fetchSongById, fetchSongs } from '../services/songService';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { usePlayerStore } from '../store/usePlayerStore';
 
 export const SongDetailPage: React.FC = () => {
@@ -20,6 +21,7 @@ export const SongDetailPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState<boolean>(false);
+  const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState<boolean>(false);
 
   const isCurrentTrackActive = currentSong?._id === song?._id;
   const isCurrentTrackPlaying = isCurrentTrackActive && isPlaying;
@@ -230,9 +232,17 @@ export const SongDetailPage: React.FC = () => {
                 )}
               </button>
 
+              <button
+                onClick={() => setIsPlaylistModalOpen(true)}
+                className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-medium text-sm rounded-xl border border-slate-700 transition-colors flex items-center gap-2"
+              >
+                <span className="text-indigo-400 font-bold">+</span>
+                <span>Add to Playlist</span>
+              </button>
+
               <Link
                 to="/library"
-                className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-sm rounded-xl border border-slate-700 transition-colors"
+                className="px-5 py-3 bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white font-medium text-sm rounded-xl border border-slate-700/80 transition-colors"
               >
                 Explore More Songs
               </Link>
@@ -289,6 +299,13 @@ export const SongDetailPage: React.FC = () => {
           onPlaySong={(item) => playSong(item, relatedSongs)}
         />
       )}
+
+      {/* Add To Playlist Modal Dialog */}
+      <AddToPlaylistModal
+        song={song}
+        isOpen={isPlaylistModalOpen}
+        onClose={() => setIsPlaylistModalOpen(false)}
+      />
     </div>
   );
 };
