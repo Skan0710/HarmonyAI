@@ -80,6 +80,25 @@ export const PlaylistDetailPage: React.FC = () => {
     return String(artist);
   };
 
+  const totalDurationSecs = playlist?.songs
+    ? playlist.songs.reduce((acc, song) => acc + (song.duration || 0), 0)
+    : 0;
+
+  const formatTotalDuration = (totalSeconds: number): string => {
+    if (!totalSeconds) return '0 secs';
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours} hr ${minutes} mins`;
+    }
+    if (minutes > 0) {
+      return `${minutes} mins ${seconds} secs`;
+    }
+    return `${seconds} secs`;
+  };
+
   const fallbackCover =
     'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 24 24" fill="none" stroke="%23818cf8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231e293b;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
 
@@ -134,7 +153,7 @@ export const PlaylistDetailPage: React.FC = () => {
                   </p>
                 )}
 
-                <div className="flex items-center justify-center sm:justify-start gap-4 pt-1 text-xs text-slate-400">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-1 text-xs text-slate-400">
                   <span>
                     Created by{' '}
                     <strong className="text-slate-200">
@@ -143,7 +162,11 @@ export const PlaylistDetailPage: React.FC = () => {
                   </span>
                   <span>•</span>
                   <span className="font-mono text-indigo-400 font-semibold">
-                    {playlist.songs ? playlist.songs.length : 0} tracks
+                    {playlist.songs ? playlist.songs.length : 0} {playlist.songs?.length === 1 ? 'song' : 'songs'}
+                  </span>
+                  <span>•</span>
+                  <span className="font-mono text-emerald-400 font-semibold">
+                    {formatTotalDuration(totalDurationSecs)}
                   </span>
                 </div>
               </div>
