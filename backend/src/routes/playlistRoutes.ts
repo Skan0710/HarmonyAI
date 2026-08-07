@@ -8,14 +8,14 @@ import {
   addSongToPlaylist,
   removeSongFromPlaylist,
 } from '../controllers/playlistController.js';
-import { protect } from '../middlewares/authMiddleware.js';
+import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
-// Routes
+// Protected & Public Playlist Routes
 router.post('/', protect, createPlaylist);
 router.get('/', protect, getUserPlaylists);
-router.get('/:id', getPlaylistById); // Allows public or authenticated retrieval
+router.get('/:id', optionalAuth, getPlaylistById); // Allows public retrieval for public playlists and authenticated for private playlists
 router.put('/:id', protect, updatePlaylist);
 router.delete('/:id', protect, deletePlaylist);
 
