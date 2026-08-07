@@ -55,6 +55,22 @@ export const Sidebar: React.FC = () => {
         </NavLink>
 
         <NavLink
+          to="/playlists"
+          className={({ isActive }) =>
+            `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
+              isActive
+                ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30'
+                : 'hover:bg-slate-700/60 text-slate-300 hover:text-white'
+            }`
+          }
+        >
+          <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          Playlists
+        </NavLink>
+
+        <NavLink
           to="/library"
           className={({ isActive }) =>
             `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
