@@ -71,6 +71,22 @@ export const Sidebar: React.FC = () => {
         </NavLink>
 
         <NavLink
+          to="/preferences"
+          className={({ isActive }) =>
+            `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
+              isActive
+                ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30'
+                : 'hover:bg-slate-700/60 text-slate-300 hover:text-white'
+            }`
+          }
+        >
+          <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Preferences
+        </NavLink>
+
+        <NavLink
           to="/library"
           className={({ isActive }) =>
             `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
