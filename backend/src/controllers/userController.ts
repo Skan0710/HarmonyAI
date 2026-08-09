@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { UserService } from '../services/userService.js';
+import { ListeningProfileService } from '../services/listeningProfileService.js';
 
 export const getCurrentUser = async (
   req: Request,
@@ -290,6 +291,28 @@ export const getUserPreferences = async (req: Request, res: Response): Promise<v
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to retrieve user preferences',
+    });
+  }
+};
+
+// Listening Profile & Analytics Handler
+export const getListeningProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Unauthorized access' });
+      return;
+    }
+
+    const profile = await ListeningProfileService.getUserListeningProfile(req.user._id.toString());
+
+    res.status(200).json({
+      success: true,
+      data: profile,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate listening profile',
     });
   }
 };

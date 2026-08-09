@@ -10,6 +10,7 @@ import {
   addFavoriteGenre,
   removeFavoriteGenre,
   getUserPreferences,
+  getListeningProfile,
 } from '../controllers/userController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
@@ -18,6 +19,9 @@ const router = Router();
 // Protected user profile routes
 router.get('/me', protect, getCurrentUser);
 router.put('/me', protect, updateCurrentUser);
+
+// Listening Profile & Stats analytics
+router.get('/listening-profile', protect, getListeningProfile);
 
 // Liked Songs routes
 router.get('/liked-songs', protect, getLikedSongs);
