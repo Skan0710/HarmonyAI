@@ -12,6 +12,7 @@ import {
   getUserPreferences,
   getListeningProfile,
 } from '../controllers/userController.js';
+import { getPersonalizedFeed } from '../controllers/personalizedFeedController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
 const router = Router();
@@ -23,6 +24,9 @@ router.put('/me', protect, updateCurrentUser);
 // Listening Profile & Stats analytics (accessible via /me/listening-profile and /listening-profile)
 router.get('/me/listening-profile', protect, getListeningProfile);
 router.get('/listening-profile', protect, getListeningProfile);
+
+// Personalized Home Feed route
+router.get('/me/personalized-feed', protect, getPersonalizedFeed);
 
 // Liked Songs routes
 router.get('/liked-songs', protect, getLikedSongs);
