@@ -20,7 +20,8 @@ const router = Router();
 router.get('/me', protect, getCurrentUser);
 router.put('/me', protect, updateCurrentUser);
 
-// Listening Profile & Stats analytics
+// Listening Profile & Stats analytics (accessible via /me/listening-profile and /listening-profile)
+router.get('/me/listening-profile', protect, getListeningProfile);
 router.get('/listening-profile', protect, getListeningProfile);
 
 // Liked Songs routes
