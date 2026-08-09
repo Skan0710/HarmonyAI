@@ -32,6 +32,8 @@ export const getCurrentUser = async (
         email: user.email,
         profilePicture: user.profilePicture,
         likedSongs: user.likedSongs?.map((id) => id.toString()) || [],
+        favoriteArtists: user.favoriteArtists || [],
+        favoriteGenres: user.favoriteGenres || [],
         createdAt: user.createdAt,
       },
     });
@@ -173,6 +175,121 @@ export const unlikeSong = async (
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to unlike song',
+    });
+  }
+};
+
+// Favorite Artists Handlers
+export const addFavoriteArtist = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Unauthorized access' });
+      return;
+    }
+
+    const { artistId } = req.params;
+    const favoriteArtists = await UserService.addFavoriteArtist(req.user._id.toString(), artistId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Artist added to favorites',
+      data: { favoriteArtists },
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to add favorite artist',
+    });
+  }
+};
+
+export const removeFavoriteArtist = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Unauthorized access' });
+      return;
+    }
+
+    const { artistId } = req.params;
+    const favoriteArtists = await UserService.removeFavoriteArtist(req.user._id.toString(), artistId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Artist removed from favorites',
+      data: { favoriteArtists },
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to remove favorite artist',
+    });
+  }
+};
+
+// Favorite Genres Handlers
+export const addFavoriteGenre = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Unauthorized access' });
+      return;
+    }
+
+    const { genreId } = req.params;
+    const favoriteGenres = await UserService.addFavoriteGenre(req.user._id.toString(), genreId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Genre added to favorites',
+      data: { favoriteGenres },
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to add favorite genre',
+    });
+  }
+};
+
+export const removeFavoriteGenre = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Unauthorized access' });
+      return;
+    }
+
+    const { genreId } = req.params;
+    const favoriteGenres = await UserService.removeFavoriteGenre(req.user._id.toString(), genreId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Genre removed from favorites',
+      data: { favoriteGenres },
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to remove favorite genre',
+    });
+  }
+};
+
+export const getUserPreferences = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Unauthorized access' });
+      return;
+    }
+
+    const preferences = await UserService.getUserPreferences(req.user._id.toString());
+
+    res.status(200).json({
+      success: true,
+      data: preferences,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to retrieve user preferences',
     });
   }
 };
