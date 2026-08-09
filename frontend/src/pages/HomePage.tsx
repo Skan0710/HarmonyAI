@@ -8,6 +8,7 @@ import {
   fetchNewReleasesApi,
 } from '../services/songService';
 import { fetchRecentlyPlayedApi } from '../services/historyService';
+import { fetchPersonalizedFeedApi } from '../services/personalizedFeedService';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { usePlayerStore } from '../store/usePlayerStore';
 
@@ -16,12 +17,17 @@ export const HomePage: React.FC = () => {
   const playSong = usePlayerStore((state) => state.playSong);
 
   const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
+  const [basedOnTaste, setBasedOnTaste] = useState<Song[]>([]);
+  const [favoriteGenreTracks, setFavoriteGenreTracks] = useState<Song[]>([]);
+  const [suggestedArtists, setSuggestedArtists] = useState<Artist[]>([]);
+
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
   const [newReleaseSongs, setNewReleaseSongs] = useState<Song[]>([]);
   const [newReleaseAlbums, setNewReleaseAlbums] = useState<Album[]>([]);
   const [featuredArtists, setFeaturedArtists] = useState<Artist[]>([]);
 
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState<boolean>(false);
+  const [loadingPersonalized, setLoadingPersonalized] = useState<boolean>(false);
   const [loadingTrending, setLoadingTrending] = useState<boolean>(true);
   const [loadingNewReleases, setLoadingNewReleases] = useState<boolean>(true);
   const [loadingArtists, setLoadingArtists] = useState<boolean>(true);
@@ -35,6 +41,18 @@ export const HomePage: React.FC = () => {
         setRecentlyPlayed(res.songs);
       }
       setLoadingRecentlyPlayed(false);
+    };
+
+    const loadPersonalizedFeed = async () => {
+      if (!isAuthenticated) return;
+      setLoadingPersonalized(true);
+      const res = await fetchPersonalizedFeedApi();
+      if (res.feed) {
+        setBasedOnTaste(res.feed.basedOnTaste || []);
+        setFavoriteGenreTracks(res.feed.favoriteGenreTracks || []);
+        setSuggestedArtists(res.feed.suggestedArtists || []);
+      }
+      setLoadingPersonalized(false);
     };
 
     const loadTrending = async () => {
@@ -60,6 +78,7 @@ export const HomePage: React.FC = () => {
     };
 
     loadRecentlyPlayed();
+    loadPersonalizedFeed();
     loadTrending();
     loadNewReleases();
     loadArtists();
@@ -105,10 +124,10 @@ export const HomePage: React.FC = () => {
             </Link>
 
             <Link
-              to="/history"
+              to="/preferences"
               className="px-6 py-3 bg-slate-800/80 hover:bg-slate-800 text-slate-200 hover:text-white font-semibold text-sm rounded-xl border border-slate-700/80 transition-colors flex items-center gap-2 backdrop-blur-md"
             >
-              🕒 View Listening History
+              ⚡ Set Music Preferences
             </Link>
           </div>
         </div>
@@ -127,7 +146,45 @@ export const HomePage: React.FC = () => {
         />
       )}
 
-      {/* 2. Trending Songs Carousel (Dynamic recency-weighted scoring) */}
+      {/* 2. "Based on Your Taste" Carousel (Personalized Feed) */}
+      {(basedOnTaste.length > 0 || loadingPersonalized) && (
+        <MediaCarousel
+          title="Based on Your Taste"
+          subtitle="Tailored to your favorite performers and listening history"
+          seeAllLink="/preferences"
+          type="song"
+          items={basedOnTaste}
+          loading={loadingPersonalized}
+          onPlaySong={(song) => handlePlaySong(song, basedOnTaste)}
+        />
+      )}
+
+      {/* 3. "Your Favorite Genres" Carousel (Personalized Feed) */}
+      {(favoriteGenreTracks.length > 0 || loadingPersonalized) && (
+        <MediaCarousel
+          title="Your Favorite Genres"
+          subtitle="Top tracks from your preferred musical genres"
+          seeAllLink="/genres"
+          type="song"
+          items={favoriteGenreTracks}
+          loading={loadingPersonalized}
+          onPlaySong={(song) => handlePlaySong(song, favoriteGenreTracks)}
+        />
+      )}
+
+      {/* 4. "Artists You May Like" Carousel (Personalized Feed) */}
+      {(suggestedArtists.length > 0 || loadingPersonalized) && (
+        <MediaCarousel
+          title="Artists You May Like"
+          subtitle="Recommended creators matching your acoustic preferences"
+          seeAllLink="/preferences"
+          type="artist"
+          items={suggestedArtists}
+          loading={loadingPersonalized}
+        />
+      )}
+
+      {/* 5. Trending Songs Carousel (Dynamic recency-weighted scoring) */}
       <MediaCarousel
         title="Trending Songs"
         subtitle="Dynamic real-time trending songs calculated from play recency & history"
@@ -138,7 +195,7 @@ export const HomePage: React.FC = () => {
         onPlaySong={(song) => handlePlaySong(song, trendingSongs)}
       />
 
-      {/* 3. New Releases Tracks Carousel */}
+      {/* 6. New Releases Tracks Carousel */}
       <MediaCarousel
         title="New Release Tracks"
         subtitle="Freshly uploaded original tracks and singles"
@@ -149,7 +206,7 @@ export const HomePage: React.FC = () => {
         onPlaySong={(song) => handlePlaySong(song, newReleaseSongs)}
       />
 
-      {/* 4. New Release Albums Carousel */}
+      {/* 7. New Release Albums Carousel */}
       <MediaCarousel
         title="New Release Albums"
         subtitle="Recently published albums, EPs, and compilations"
@@ -159,7 +216,7 @@ export const HomePage: React.FC = () => {
         loading={loadingNewReleases}
       />
 
-      {/* 5. Featured Artists Carousel */}
+      {/* 8. Featured Artists Carousel */}
       <MediaCarousel
         title="Featured Artists"
         subtitle="Top verified performers and independent creators on HarmonyAI"
