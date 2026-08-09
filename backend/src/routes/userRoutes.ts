@@ -5,6 +5,11 @@ import {
   getLikedSongs,
   likeSong,
   unlikeSong,
+  addFavoriteArtist,
+  removeFavoriteArtist,
+  addFavoriteGenre,
+  removeFavoriteGenre,
+  getUserPreferences,
 } from '../controllers/userController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
@@ -18,5 +23,12 @@ router.put('/me', protect, updateCurrentUser);
 router.get('/liked-songs', protect, getLikedSongs);
 router.post('/liked-songs/:songId', protect, likeSong);
 router.delete('/liked-songs/:songId', protect, unlikeSong);
+
+// User Preferences routes (Favorite Artists & Genres)
+router.get('/preferences', protect, getUserPreferences);
+router.post('/favorite-artists/:artistId', protect, addFavoriteArtist);
+router.delete('/favorite-artists/:artistId', protect, removeFavoriteArtist);
+router.post('/favorite-genres/:genreId', protect, addFavoriteGenre);
+router.delete('/favorite-genres/:genreId', protect, removeFavoriteGenre);
 
 export default router;

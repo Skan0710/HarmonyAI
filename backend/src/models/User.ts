@@ -8,6 +8,8 @@ export interface IUser extends Document {
   password?: string;
   profilePicture?: string;
   likedSongs: Types.ObjectId[];
+  favoriteArtists: Types.ObjectId[];
+  favoriteGenres: Types.ObjectId[];
   createdAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
@@ -40,6 +42,18 @@ const userSchema = new Schema<IUser>(
       {
         type: Schema.Types.ObjectId,
         ref: 'Song',
+      },
+    ],
+    favoriteArtists: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Artist',
+      },
+    ],
+    favoriteGenres: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Genre',
       },
     ],
     createdAt: {
