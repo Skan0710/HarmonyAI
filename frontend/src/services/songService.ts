@@ -60,6 +60,47 @@ export const recordSongPlay = async (songId: string): Promise<void> => {
   await apiClient(`/songs/${songId}/play`, { method: 'POST' });
 };
 
+export const fetchTrendingSongsApi = async (limit = 10): Promise<{ songs: Song[]; error?: string }> => {
+  const response = await apiClient<{ success: boolean; data: Song[] }>(`/music/trending?limit=${limit}`, {
+    method: 'GET',
+  });
+
+  if (response.error || !response.data) {
+    return { songs: [], error: response.error || 'Failed to load trending songs' };
+  }
+
+  return { songs: response.data.data || [] };
+};
+
+export const fetchNewReleasesApi = async (
+  page = 1,
+  limit = 10
+): Promise<{
+  songs: Song[];
+  albums: Album[];
+  pagination?: { page: number; limit: number; totalSongs: number; totalAlbums: number };
+  error?: string;
+}> => {
+  const response = await apiClient<{
+    success: boolean;
+    data: {
+      songs: Song[];
+      albums: Album[];
+      pagination: { page: number; limit: number; totalSongs: number; totalAlbums: number };
+    };
+  }>(`/music/new-releases?page=${page}&limit=${limit}`, { method: 'GET' });
+
+  if (response.error || !response.data || !response.data.data) {
+    return { songs: [], albums: [], error: response.error || 'Failed to load new releases' };
+  }
+
+  return {
+    songs: response.data.data.songs || [],
+    albums: response.data.data.albums || [],
+    pagination: response.data.data.pagination,
+  };
+};
+
 export const fetchGenres = async (): Promise<{ genres: Genre[]; error?: string }> => {
   const response = await apiClient<{ success: boolean; data: Genre[] }>('/genres', { method: 'GET' });
 

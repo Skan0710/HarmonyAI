@@ -2,7 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import type { Song, Artist, Album } from '../types/music';
-import { fetchSongs, fetchArtists, fetchAlbums } from '../services/songService';
+import {
+  fetchArtists,
+  fetchTrendingSongsApi,
+  fetchNewReleasesApi,
+} from '../services/songService';
 import { fetchRecentlyPlayedApi } from '../services/historyService';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { usePlayerStore } from '../store/usePlayerStore';
@@ -13,15 +17,14 @@ export const HomePage: React.FC = () => {
 
   const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
-  const [newReleases, setNewReleases] = useState<Song[]>([]);
+  const [newReleaseSongs, setNewReleaseSongs] = useState<Song[]>([]);
+  const [newReleaseAlbums, setNewReleaseAlbums] = useState<Album[]>([]);
   const [featuredArtists, setFeaturedArtists] = useState<Artist[]>([]);
-  const [popularAlbums, setPopularAlbums] = useState<Album[]>([]);
 
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState<boolean>(false);
   const [loadingTrending, setLoadingTrending] = useState<boolean>(true);
   const [loadingNewReleases, setLoadingNewReleases] = useState<boolean>(true);
   const [loadingArtists, setLoadingArtists] = useState<boolean>(true);
-  const [loadingAlbums, setLoadingAlbums] = useState<boolean>(true);
 
   useEffect(() => {
     const loadRecentlyPlayed = async () => {
@@ -36,15 +39,16 @@ export const HomePage: React.FC = () => {
 
     const loadTrending = async () => {
       setLoadingTrending(true);
-      const res = await fetchSongs({ sortBy: 'playCount', sortOrder: 'desc', limit: 10 });
+      const res = await fetchTrendingSongsApi(10);
       if (res.songs) setTrendingSongs(res.songs);
       setLoadingTrending(false);
     };
 
     const loadNewReleases = async () => {
       setLoadingNewReleases(true);
-      const res = await fetchSongs({ sortBy: 'releaseYear', sortOrder: 'desc', limit: 10 });
-      if (res.songs) setNewReleases(res.songs);
+      const res = await fetchNewReleasesApi(1, 10);
+      if (res.songs) setNewReleaseSongs(res.songs);
+      if (res.albums) setNewReleaseAlbums(res.albums);
       setLoadingNewReleases(false);
     };
 
@@ -55,18 +59,10 @@ export const HomePage: React.FC = () => {
       setLoadingArtists(false);
     };
 
-    const loadAlbums = async () => {
-      setLoadingAlbums(true);
-      const res = await fetchAlbums();
-      if (res.albums) setPopularAlbums(res.albums);
-      setLoadingAlbums(false);
-    };
-
     loadRecentlyPlayed();
     loadTrending();
     loadNewReleases();
     loadArtists();
-    loadAlbums();
   }, [isAuthenticated]);
 
   const handlePlaySong = (song: Song, queueList: Song[]) => {
@@ -131,10 +127,10 @@ export const HomePage: React.FC = () => {
         />
       )}
 
-      {/* 2. Trending Songs Carousel */}
+      {/* 2. Trending Songs Carousel (Dynamic recency-weighted scoring) */}
       <MediaCarousel
         title="Trending Songs"
-        subtitle="Most played tracks across the HarmonyAI network right now"
+        subtitle="Dynamic real-time trending songs calculated from play recency & history"
         seeAllLink="/library?sort=playCount"
         type="song"
         items={trendingSongs}
@@ -142,18 +138,28 @@ export const HomePage: React.FC = () => {
         onPlaySong={(song) => handlePlaySong(song, trendingSongs)}
       />
 
-      {/* 3. New Releases Carousel */}
+      {/* 3. New Releases Tracks Carousel */}
       <MediaCarousel
-        title="New Releases"
-        subtitle="Freshly uploaded albums, singles, and original productions"
+        title="New Release Tracks"
+        subtitle="Freshly uploaded original tracks and singles"
         seeAllLink="/library?sort=releaseYear"
         type="song"
-        items={newReleases}
+        items={newReleaseSongs}
         loading={loadingNewReleases}
-        onPlaySong={(song) => handlePlaySong(song, newReleases)}
+        onPlaySong={(song) => handlePlaySong(song, newReleaseSongs)}
       />
 
-      {/* 4. Featured Artists Carousel */}
+      {/* 4. New Release Albums Carousel */}
+      <MediaCarousel
+        title="New Release Albums"
+        subtitle="Recently published albums, EPs, and compilations"
+        seeAllLink="/library"
+        type="album"
+        items={newReleaseAlbums}
+        loading={loadingNewReleases}
+      />
+
+      {/* 5. Featured Artists Carousel */}
       <MediaCarousel
         title="Featured Artists"
         subtitle="Top verified performers and independent creators on HarmonyAI"
@@ -161,16 +167,6 @@ export const HomePage: React.FC = () => {
         type="artist"
         items={featuredArtists}
         loading={loadingArtists}
-      />
-
-      {/* 5. Popular Albums Carousel */}
-      <MediaCarousel
-        title="Popular Albums"
-        subtitle="Curated albums, EPs, and compilations in your music catalog"
-        seeAllLink="/library"
-        type="album"
-        items={popularAlbums}
-        loading={loadingAlbums}
       />
     </div>
   );
