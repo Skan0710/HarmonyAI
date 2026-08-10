@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { Song } from '../types/music';
-import { fetchSongById, fetchSongs } from '../services/songService';
+import { fetchSongById, fetchSimilarSongsApi } from '../services/songService';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
@@ -17,8 +17,9 @@ export const SongDetailPage: React.FC = () => {
   const togglePlay = usePlayerStore((state) => state.togglePlay);
 
   const [song, setSong] = useState<Song | null>(null);
-  const [relatedSongs, setRelatedSongs] = useState<Song[]>([]);
+  const [similarSongs, setSimilarSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingSimilar, setLoadingSimilar] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState<boolean>(false);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState<boolean>(false);
@@ -39,21 +40,19 @@ export const SongDetailPage: React.FC = () => {
       if (res.error || !res.song) {
         setError(res.error || 'Song not found');
         setSong(null);
+        setLoading(false);
       } else {
         setSong(res.song);
+        setLoading(false);
 
-        const genreId = typeof res.song.genre === 'object' ? res.song.genre._id : undefined;
-        const relatedRes = await fetchSongs({
-          genreId,
-          limit: 8,
-        });
-
-        if (relatedRes.songs) {
-          setRelatedSongs(relatedRes.songs.filter((s) => s._id !== res.song!._id));
+        // Fetch Similar Songs Recommendations from API
+        setLoadingSimilar(true);
+        const similarRes = await fetchSimilarSongsApi(id, 10);
+        if (similarRes.songs) {
+          setSimilarSongs(similarRes.songs);
         }
+        setLoadingSimilar(false);
       }
-
-      setLoading(false);
     };
 
     loadSongData();
@@ -64,7 +63,7 @@ export const SongDetailPage: React.FC = () => {
     if (isCurrentTrackActive) {
       togglePlay();
     } else {
-      playSong(song, [song, ...relatedSongs]);
+      playSong(song, [song, ...similarSongs]);
     }
   };
 
@@ -289,16 +288,16 @@ export const SongDetailPage: React.FC = () => {
         </section>
       )}
 
-      {relatedSongs.length > 0 && (
-        <MediaCarousel
-          title={`More in ${getGenreName()}`}
-          subtitle="Explore tracks with similar acoustic vibes and energy"
-          seeAllLink="/library"
-          type="song"
-          items={relatedSongs}
-          onPlaySong={(item) => playSong(item, relatedSongs)}
-        />
-      )}
+      {/* "You May Also Like" Content-Based Recommendation Section */}
+      <MediaCarousel
+        title="You May Also Like"
+        subtitle="AI content-based recommendations ranked by acoustic feature vector similarity"
+        seeAllLink="/library"
+        type="song"
+        items={similarSongs}
+        loading={loadingSimilar}
+        onPlaySong={(item) => playSong(item, similarSongs)}
+      />
 
       {/* Add To Playlist Modal Dialog */}
       <AddToPlaylistModal

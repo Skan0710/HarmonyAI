@@ -60,6 +60,22 @@ export const recordSongPlay = async (songId: string): Promise<void> => {
   await apiClient(`/songs/${songId}/play`, { method: 'POST' });
 };
 
+export const fetchSimilarSongsApi = async (
+  songId: string,
+  limit = 10
+): Promise<{ songs: Song[]; error?: string }> => {
+  const response = await apiClient<{ success: boolean; data: Song[] }>(
+    `/recommendations/similar/${songId}?limit=${limit}`,
+    { method: 'GET' }
+  );
+
+  if (response.error || !response.data) {
+    return { songs: [], error: response.error || 'Failed to load similar songs' };
+  }
+
+  return { songs: response.data.data || [] };
+};
+
 export const fetchTrendingSongsApi = async (limit = 10): Promise<{ songs: Song[]; error?: string }> => {
   const response = await apiClient<{ success: boolean; data: Song[] }>(`/music/trending?limit=${limit}`, {
     method: 'GET',
