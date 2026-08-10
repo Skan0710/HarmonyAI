@@ -24,8 +24,9 @@ export interface ISong extends Document {
   audioUrl: string;
   releaseYear?: number;
   playCount: number;
-  // Recommendation & AI features schema extensibility
+  // Recommendation & Content-based AI features
   audioFeatures?: IAudioFeatures;
+  mood?: string;
   tags: string[];
   language?: string;
   explicit: boolean;
@@ -39,15 +40,15 @@ export interface ISong extends Document {
 
 const audioFeaturesSchema = new Schema<IAudioFeatures>(
   {
-    bpm: { type: Number, min: 0, max: 500 },
-    key: { type: String, default: '' },
-    energy: { type: Number, min: 0, max: 1 },
-    danceability: { type: Number, min: 0, max: 1 },
-    valence: { type: Number, min: 0, max: 1 },
-    acousticness: { type: Number, min: 0, max: 1 },
-    instrumentalness: { type: Number, min: 0, max: 1 },
-    liveness: { type: Number, min: 0, max: 1 },
-    speechiness: { type: Number, min: 0, max: 1 },
+    bpm: { type: Number, min: 0, max: 500, default: 120 },
+    key: { type: String, default: 'C' },
+    energy: { type: Number, min: 0, max: 1, default: 0.5 },
+    danceability: { type: Number, min: 0, max: 1, default: 0.5 },
+    valence: { type: Number, min: 0, max: 1, default: 0.5 },
+    acousticness: { type: Number, min: 0, max: 1, default: 0.5 },
+    instrumentalness: { type: Number, min: 0, max: 1, default: 0.1 },
+    liveness: { type: Number, min: 0, max: 1, default: 0.1 },
+    speechiness: { type: Number, min: 0, max: 1, default: 0.05 },
   },
   { _id: false }
 );
@@ -111,7 +112,13 @@ const songSchema = new Schema<ISong>(
     },
     audioFeatures: {
       type: audioFeaturesSchema,
-      default: {},
+      default: () => ({}),
+    },
+    mood: {
+      type: String,
+      default: 'Chill',
+      trim: true,
+      index: true,
     },
     tags: {
       type: [String],
@@ -121,6 +128,8 @@ const songSchema = new Schema<ISong>(
     language: {
       type: String,
       default: 'English',
+      trim: true,
+      index: true,
     },
     explicit: {
       type: Boolean,
@@ -148,7 +157,7 @@ const songSchema = new Schema<ISong>(
   }
 );
 
-songSchema.index({ title: 'text', tags: 'text' });
+songSchema.index({ title: 'text', tags: 'text', mood: 'text' });
 songSchema.index({ genre: 1, playCount: -1 });
 
 export const Song = model<ISong>('Song', songSchema);
