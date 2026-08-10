@@ -34,6 +34,9 @@ export interface AudioFeatures {
   danceability?: number;
   valence?: number;
   acousticness?: number;
+  instrumentalness?: number;
+  liveness?: number;
+  speechiness?: number;
 }
 
 export interface Song {
@@ -49,7 +52,9 @@ export interface Song {
   releaseYear?: number;
   playCount: number;
   audioFeatures?: AudioFeatures;
+  mood?: string;
   tags?: string[];
+  language?: string;
   explicit?: boolean;
   createdAt?: string;
 }
