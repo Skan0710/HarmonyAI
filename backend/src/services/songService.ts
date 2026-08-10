@@ -219,39 +219,29 @@ export class SongService {
   static async getRecommendations(params: RecommendationParams): Promise<ISong[]> {
     const { songId, genreId, targetBpm, targetEnergy, targetValence, tags, limit = 10 } = params;
 
-    const query: Record<string, any> = { isPublished: true };
-
+    // Use ContentRecommendationService when a seed songId is provided
     if (songId && Types.ObjectId.isValid(songId)) {
-      const seedSong = await Song.findById(songId);
-      if (seedSong) {
-        query._id = { $ne: seedSong._id };
-        const genreToMatch = genreId || seedSong.genre;
-        query.genre = genreToMatch;
-
-        if (seedSong.tags && seedSong.tags.length > 0) {
-          query.$or = [{ tags: { $in: seedSong.tags } }, { genre: genreToMatch }];
-        }
-
-        if (seedSong.audioFeatures?.bpm) {
-          const bpm = seedSong.audioFeatures.bpm;
-          query['audioFeatures.bpm'] = { $gte: bpm - 20, $lte: bpm + 20 };
-        }
+      const { ContentRecommendationService } = await import('./recommendationService.js');
+      const recommendations = await ContentRecommendationService.getRecommendationsForSong(songId, limit);
+      if (recommendations && recommendations.length > 0) {
+        return recommendations;
       }
-    } else {
-      if (genreId && Types.ObjectId.isValid(genreId)) query.genre = genreId;
-      if (tags && tags.length > 0) query.tags = { $in: tags };
+    }
 
-      if (targetBpm !== undefined) {
-        query['audioFeatures.bpm'] = { $gte: targetBpm - 15, $lte: targetBpm + 15 };
-      }
+    const query: Record<string, any> = { isPublished: true };
+    if (genreId && Types.ObjectId.isValid(genreId)) query.genre = genreId;
+    if (tags && tags.length > 0) query.tags = { $in: tags };
 
-      if (targetEnergy !== undefined) {
-        query['audioFeatures.energy'] = { $gte: Math.max(0, targetEnergy - 0.2), $lte: Math.min(1, targetEnergy + 0.2) };
-      }
+    if (targetBpm !== undefined) {
+      query['audioFeatures.bpm'] = { $gte: targetBpm - 15, $lte: targetBpm + 15 };
+    }
 
-      if (targetValence !== undefined) {
-        query['audioFeatures.valence'] = { $gte: Math.max(0, targetValence - 0.2), $lte: Math.min(1, targetValence + 0.2) };
-      }
+    if (targetEnergy !== undefined) {
+      query['audioFeatures.energy'] = { $gte: Math.max(0, targetEnergy - 0.2), $lte: Math.min(1, targetEnergy + 0.2) };
+    }
+
+    if (targetValence !== undefined) {
+      query['audioFeatures.valence'] = { $gte: Math.max(0, targetValence - 0.2), $lte: Math.min(1, targetValence + 0.2) };
     }
 
     return Song.find(query)
