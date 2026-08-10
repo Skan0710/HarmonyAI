@@ -17,14 +17,20 @@ export const getSimilarSongs = async (req: Request, res: Response): Promise<void
     const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
     const parsedLimit = isNaN(limit) || limit < 1 ? 10 : limit;
 
+    // Enable debugging only when debug=true query parameter is passed AND not in production
+    const isDebugMode =
+      req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
+
     const recommendations = await ContentRecommendationService.getRecommendationsForSong(
       songId,
-      parsedLimit
+      parsedLimit,
+      isDebugMode
     );
 
     res.status(200).json({
       success: true,
       data: recommendations,
+      ...(isDebugMode ? { debug: { isDebugEnabled: true, evaluatedCandidates: recommendations.length } } : {}),
     });
   } catch (error: any) {
     if (error.message === 'Seed song not found' || error.message === 'Song not found') {

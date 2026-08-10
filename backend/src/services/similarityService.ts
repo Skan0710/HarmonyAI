@@ -8,6 +8,36 @@ export interface SimilarityWeights {
   audioVectorWeight: number; // default: 0.25
 }
 
+export interface SimilarityExplanation {
+  isIdentical: boolean;
+  matchingMetadata: {
+    genreMatch: boolean;
+    artistMatch: boolean;
+    moodMatch: boolean;
+    languageMatch: boolean;
+  };
+  featureBreakdown: {
+    genreScore: number;
+    artistScore: number;
+    moodScore: number;
+    languageScore: number;
+    cosineAudioScore: number;
+  };
+  weightedContributions: {
+    genreContribution: number;
+    artistContribution: number;
+    moodContribution: number;
+    languageContribution: number;
+    audioVectorContribution: number;
+  };
+  majorContributors: string[];
+}
+
+export interface SimilarityDetailResult {
+  similarityScore: number;
+  explanation: SimilarityExplanation;
+}
+
 const DEFAULT_WEIGHTS: SimilarityWeights = {
   genreWeight: 0.35,
   artistWeight: 0.20,
@@ -19,60 +49,98 @@ const DEFAULT_WEIGHTS: SimilarityWeights = {
 export class ContentSimilarityService {
   /**
    * Calculates a normalized similarity score between 0.0 and 1.0 comparing two song feature representations.
-   * Combines Cosine Similarity on numerical audio vectors with categorical metadata matching (genre, artist, mood, language).
    */
   static calculateSimilarity(
     featuresA: NormalizedSongFeatures,
     featuresB: NormalizedSongFeatures,
     customWeights: Partial<SimilarityWeights> = {}
   ): number {
-    if (!featuresA || !featuresB) {
-      return 0;
-    }
+    return this.calculateSimilarityWithExplanation(featuresA, featuresB, customWeights).similarityScore;
+  }
 
-    // 1. Identical song fast path
-    if (featuresA.songId && featuresA.songId === featuresB.songId) {
-      return 1.0;
+  /**
+   * Development-oriented method returning similarity score along with an in-depth breakdown explanation
+   * of major matching features and feature score contributions.
+   */
+  static calculateSimilarityWithExplanation(
+    featuresA: NormalizedSongFeatures,
+    featuresB: NormalizedSongFeatures,
+    customWeights: Partial<SimilarityWeights> = {}
+  ): SimilarityDetailResult {
+    if (!featuresA || !featuresB) {
+      return {
+        similarityScore: 0,
+        explanation: {
+          isIdentical: false,
+          matchingMetadata: { genreMatch: false, artistMatch: false, moodMatch: false, languageMatch: false },
+          featureBreakdown: { genreScore: 0, artistScore: 0, moodScore: 0, languageScore: 0, cosineAudioScore: 0 },
+          weightedContributions: {
+            genreContribution: 0,
+            artistContribution: 0,
+            moodContribution: 0,
+            languageContribution: 0,
+            audioVectorContribution: 0,
+          },
+          majorContributors: ['Missing or null song features'],
+        },
+      };
     }
 
     const weights = { ...DEFAULT_WEIGHTS, ...customWeights };
 
-    // 2. Categorical Metadata Matching Scores (0.0 or 1.0)
-    const genreScore =
+    // 1. Identical song check
+    const isIdentical = Boolean(featuresA.songId && featuresA.songId === featuresB.songId);
+    if (isIdentical) {
+      return {
+        similarityScore: 1.0,
+        explanation: {
+          isIdentical: true,
+          matchingMetadata: { genreMatch: true, artistMatch: true, moodMatch: true, languageMatch: true },
+          featureBreakdown: { genreScore: 1, artistScore: 1, moodScore: 1, languageScore: 1, cosineAudioScore: 1 },
+          weightedContributions: {
+            genreContribution: weights.genreWeight,
+            artistContribution: weights.artistWeight,
+            moodContribution: weights.moodWeight,
+            languageContribution: weights.languageWeight,
+            audioVectorContribution: weights.audioVectorWeight,
+          },
+          majorContributors: ['Identical Track Match (100%)'],
+        },
+      };
+    }
+
+    // 2. Categorical Metadata Matching
+    const genreMatch = Boolean(
       featuresA.genreId && featuresB.genreId && featuresA.genreId === featuresB.genreId
-        ? 1.0
-        : 0.0;
-
-    const artistScore =
+    );
+    const artistMatch = Boolean(
       featuresA.artistId && featuresB.artistId && featuresA.artistId === featuresB.artistId
-        ? 1.0
-        : 0.0;
-
-    const moodScore =
+    );
+    const moodMatch = Boolean(
       featuresA.mood && featuresB.mood && featuresA.mood === featuresB.mood
-        ? 1.0
-        : 0.0;
-
-    const languageScore =
+    );
+    const languageMatch = Boolean(
       featuresA.language && featuresB.language && featuresA.language === featuresB.language
-        ? 1.0
-        : 0.0;
+    );
 
-    // 3. Cosine Similarity for Numerical Audio Feature Vector
-    const cosineScore = this.calculateVectorCosineSimilarity(
+    const genreScore = genreMatch ? 1.0 : 0.0;
+    const artistScore = artistMatch ? 1.0 : 0.0;
+    const moodScore = moodMatch ? 1.0 : 0.0;
+    const languageScore = languageMatch ? 1.0 : 0.0;
+
+    // 3. Numerical Audio Feature Cosine Similarity
+    const cosineAudioScore = this.calculateVectorCosineSimilarity(
       featuresA.numericalFeatureVector,
       featuresB.numericalFeatureVector
     );
 
-    // 4. Weighted Combined Score Calculation
-    const rawCombinedScore =
-      genreScore * weights.genreWeight +
-      artistScore * weights.artistWeight +
-      moodScore * weights.moodWeight +
-      languageScore * weights.languageWeight +
-      cosineScore * weights.audioVectorWeight;
+    // 4. Weighted Contributions
+    const genreContribution = genreScore * weights.genreWeight;
+    const artistContribution = artistScore * weights.artistWeight;
+    const moodContribution = moodScore * weights.moodWeight;
+    const languageContribution = languageScore * weights.languageWeight;
+    const audioVectorContribution = cosineAudioScore * weights.audioVectorWeight;
 
-    // Normalize weights sum in case custom weights don't equal 1.0
     const totalWeight =
       weights.genreWeight +
       weights.artistWeight +
@@ -80,19 +148,55 @@ export class ContentSimilarityService {
       weights.languageWeight +
       weights.audioVectorWeight;
 
-    const normalizedScore = totalWeight > 0 ? rawCombinedScore / totalWeight : 0;
+    const rawCombinedScore =
+      genreContribution +
+      artistContribution +
+      moodContribution +
+      languageContribution +
+      audioVectorContribution;
 
-    // Guarantee score bounds [0.0, 1.0]
-    return Math.max(0, Math.min(1, Number(normalizedScore.toFixed(4))));
+    const normalizedScore = totalWeight > 0 ? rawCombinedScore / totalWeight : 0;
+    const finalScore = Math.max(0, Math.min(1, Number(normalizedScore.toFixed(4))));
+
+    // 5. Build Major Contributors List
+    const majorContributors: string[] = [];
+    if (genreMatch) majorContributors.push(`Matching Genre (${featuresA.genreId})`);
+    if (artistMatch) majorContributors.push(`Matching Artist (${featuresA.artistId})`);
+    if (moodMatch) majorContributors.push(`Matching Mood (${featuresA.mood})`);
+    if (languageMatch) majorContributors.push(`Matching Language (${featuresA.language})`);
+    if (cosineAudioScore > 0.7) {
+      majorContributors.push(`High Audio Feature Similarity (${(cosineAudioScore * 100).toFixed(1)}%)`);
+    }
+
+    if (majorContributors.length === 0) {
+      majorContributors.push('Low overall feature similarity');
+    }
+
+    return {
+      similarityScore: finalScore,
+      explanation: {
+        isIdentical: false,
+        matchingMetadata: { genreMatch, artistMatch, moodMatch, languageMatch },
+        featureBreakdown: { genreScore, artistScore, moodScore, languageScore, cosineAudioScore },
+        weightedContributions: {
+          genreContribution,
+          artistContribution,
+          moodContribution,
+          languageContribution,
+          audioVectorContribution,
+        },
+        majorContributors,
+      },
+    };
   }
 
   /**
    * Safe Cosine Similarity calculation for numerical vectors.
-   * Returns a score between 0.0 and 1.0. Handles zero vectors, NaNs, and unequal vector lengths.
+   * Handles zero vectors, NaNs, missing data, and unequal lengths.
    */
   public static calculateVectorCosineSimilarity(vecA: number[], vecB: number[]): number {
     if (!vecA || !vecB || vecA.length === 0 || vecB.length === 0) {
-      return 0.5; // Neutral fallback when vector data is missing
+      return 0.0;
     }
 
     const minLen = Math.min(vecA.length, vecB.length);
