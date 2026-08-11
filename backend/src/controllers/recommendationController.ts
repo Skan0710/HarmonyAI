@@ -65,14 +65,32 @@ export const getCollaborativeRecommendations = async (
     const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
     const parsedLimit = isNaN(limit) || limit < 1 ? 10 : limit;
 
-    const recommendations = await CollaborativeFilteringService.getRecommendationsForUser(
+    // Enable debugging only when debug=true query parameter is passed AND not in production
+    const isDebugMode =
+      req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
+
+    const result = await CollaborativeFilteringService.getRecommendationsForUser(
       req.user._id.toString(),
-      parsedLimit
+      parsedLimit,
+      20,
+      isDebugMode
     );
+
+    if (isDebugMode && result && typeof result === 'object' && 'diagnostics' in result) {
+      res.status(200).json({
+        success: true,
+        data: result.recommendations,
+        debug: {
+          isDebugEnabled: true,
+          diagnostics: result.diagnostics,
+        },
+      });
+      return;
+    }
 
     res.status(200).json({
       success: true,
-      data: recommendations || [],
+      data: Array.isArray(result) ? result : [],
     });
   } catch (error: any) {
     // Handle cold start users or insufficient history gracefully by returning empty array
