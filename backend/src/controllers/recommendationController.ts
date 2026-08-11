@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import { ContentRecommendationService } from '../services/recommendationService.js';
+import { CollaborativeFilteringService } from '../services/collaborativeFilteringService.js';
 
 export const getSimilarSongs = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -44,6 +45,41 @@ export const getSimilarSongs = async (req: Request, res: Response): Promise<void
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch similar song recommendations',
+    });
+  }
+};
+
+export const getCollaborativeRecommendations = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized access. Authentication token required.',
+      });
+      return;
+    }
+
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
+    const parsedLimit = isNaN(limit) || limit < 1 ? 10 : limit;
+
+    const recommendations = await CollaborativeFilteringService.getRecommendationsForUser(
+      req.user._id.toString(),
+      parsedLimit
+    );
+
+    res.status(200).json({
+      success: true,
+      data: recommendations || [],
+    });
+  } catch (error: any) {
+    // Handle cold start users or insufficient history gracefully by returning empty array
+    res.status(200).json({
+      success: true,
+      data: [],
+      message: error.message || 'Insufficient listening history for collaborative recommendations',
     });
   }
 };
