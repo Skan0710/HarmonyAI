@@ -4,6 +4,9 @@ export interface IListeningHistory extends Document {
   user: Types.ObjectId;
   song: Types.ObjectId;
   playedAt: Date;
+  completed?: boolean;
+  skipped?: boolean;
+  progressPercent?: number;
 }
 
 const listeningHistorySchema = new Schema<IListeningHistory>(
@@ -24,6 +27,20 @@ const listeningHistorySchema = new Schema<IListeningHistory>(
       type: Date,
       default: Date.now,
       index: true,
+    },
+    completed: {
+      type: Boolean,
+      default: true,
+    },
+    skipped: {
+      type: Boolean,
+      default: false,
+    },
+    progressPercent: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 100,
     },
   },
   {
