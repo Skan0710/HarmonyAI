@@ -8,6 +8,12 @@ export interface CollaborativeRecommendationResult {
   recommendationScore: number;
 }
 
+export interface CollaborativeDiagnostics {
+  totalUsersConsidered: number;
+  similarUsersFound: number;
+  candidateSongsEvaluated: number;
+}
+
 export class CollaborativeFilteringService {
   /**
    * Generates Collaborative Filtering song recommendations for a target user ID.
@@ -17,18 +23,21 @@ export class CollaborativeFilteringService {
    * @param userId Target user ObjectId string
    * @param limit Maximum number of recommended songs to return (default 10)
    * @param neighborLimit Maximum number of similar neighbors to evaluate (default 20)
+   * @param debug Return development diagnostics breakdown
    */
   static async getRecommendationsForUser(
     userId: string,
     limit = 10,
-    neighborLimit = 20
-  ): Promise<any[]> {
+    neighborLimit = 20,
+    debug = false
+  ): Promise<any | { recommendations: any[]; diagnostics: CollaborativeDiagnostics }> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new Error('Invalid user ID');
     }
 
     // 1. Build User-Song Interaction Matrix
     const matrix = await UserSongInteractionMatrixService.buildInteractionMatrix();
+    const totalUsersConsidered = Math.max(0, matrix.userIds.length - 1); // Exclude target user
 
     const targetRowMap = matrix.getUserRowMap(userId);
 
@@ -40,8 +49,14 @@ export class CollaborativeFilteringService {
       0.001
     );
 
+    const diagnostics: CollaborativeDiagnostics = {
+      totalUsersConsidered,
+      similarUsersFound: similarUsers.length,
+      candidateSongsEvaluated: 0,
+    };
+
     if (similarUsers.length === 0) {
-      return [];
+      return debug ? { recommendations: [], diagnostics } : [];
     }
 
     // Map to accumulate predicted scores per candidate songId
@@ -78,8 +93,10 @@ export class CollaborativeFilteringService {
       }
     }
 
+    diagnostics.candidateSongsEvaluated = candidateScoreMap.size;
+
     if (candidateScoreMap.size === 0) {
-      return [];
+      return debug ? { recommendations: [], diagnostics } : [];
     }
 
     // 4. Compute final normalized recommendation score per candidate song
@@ -119,6 +136,10 @@ export class CollaborativeFilteringService {
           recommendationScore: cand.score,
         });
       }
+    }
+
+    if (debug) {
+      return { recommendations: results, diagnostics };
     }
 
     return results;
