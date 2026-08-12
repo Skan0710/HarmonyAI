@@ -63,7 +63,15 @@ export const fetchHybridRecommendationsApi = async (
 
   if (response.data && response.data.success && Array.isArray(response.data.data)) {
     const rawHybridItems = response.data.data;
-    const songs = rawHybridItems.map((item) => item.song).filter(Boolean);
+    const songs = rawHybridItems
+      .filter((item) => Boolean(item.song))
+      .map((item) => ({
+        ...item.song,
+        hybridScore: item.hybridScore,
+        componentScores: item.componentScores,
+        sources: item.sources,
+      }));
+
     return { songs, rawHybridItems, error: null };
   }
 
