@@ -4,6 +4,7 @@ import type { Song } from '../types/music';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { AddToPlaylistModal } from './AddToPlaylistModal';
+import { RecommendationExplanationModal } from './RecommendationExplanationModal';
 import { formatTime, formatCount } from '../utils/formatters';
 
 interface SongCardProps {
@@ -16,6 +17,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
   const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
+  const [isExplanationModalOpen, setIsExplanationModalOpen] = useState(false);
 
   const activeSong = usePlayerStore((state) => state.currentSong);
   const activeIsPlaying = usePlayerStore((state) => state.isPlaying);
@@ -24,6 +26,12 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
 
   const isLiked = useLikedSongsStore((state) => state.isLiked(song._id));
   const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
+
+  const hasRecommendationInfo =
+    Boolean((song as any).componentScores) ||
+    Boolean((song as any).explanation) ||
+    Boolean((song as any).hybridScore) ||
+    Boolean((song as any).recommendationScore);
 
   const isCurrentTrackPlaying =
     isPlaying !== undefined
@@ -88,6 +96,11 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
     setIsPlaylistModalOpen(true);
   };
 
+  const handleExplanationClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsExplanationModalOpen(true);
+  };
+
   return (
     <>
       <div
@@ -114,6 +127,18 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
 
             {/* Action Buttons Header */}
             <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5">
+              {/* "Why this song?" Info Button for Recommendations */}
+              {hasRecommendationInfo && (
+                <button
+                  onClick={handleExplanationClick}
+                  className="px-2 py-1 text-[10px] font-extrabold rounded-full bg-indigo-600/90 hover:bg-indigo-500 text-white backdrop-blur-md transition-all border border-indigo-400/40 shadow-md flex items-center gap-0.5 hover:scale-105"
+                  title="Why this song?"
+                  aria-label="Why this song?"
+                >
+                  <span>💡 Why?</span>
+                </button>
+              )}
+
               {/* Add to Playlist Button */}
               <button
                 onClick={handlePlaylistClick}
@@ -190,6 +215,13 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
         song={song}
         isOpen={isPlaylistModalOpen}
         onClose={() => setIsPlaylistModalOpen(false)}
+      />
+
+      {/* Recommendation Explanation Modal Dialog */}
+      <RecommendationExplanationModal
+        song={song}
+        isOpen={isExplanationModalOpen}
+        onClose={() => setIsExplanationModalOpen(false)}
       />
     </>
   );
