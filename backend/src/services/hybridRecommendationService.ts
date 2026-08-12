@@ -1,9 +1,5 @@
 import { Types } from 'mongoose';
-import { Song } from '../models/Song.js';
-import { User } from '../models/User.js';
-import { ContentRecommendationService } from './recommendationService.js';
-import { CollaborativeFilteringService } from './collaborativeFilteringService.js';
-import { TrendingService } from './trendingService.js';
+import { CandidateGenerationService } from './candidateGenerationService.js';
 import {
   HybridScoringWeights,
   getHybridConfigWeights,
@@ -42,102 +38,22 @@ export class HybridRecommendationService {
       ...customWeights,
     };
 
-    // 1. Fetch User Liked Songs & History to Exclude Already Interacted Songs
-    const userDoc = await User.findById(userId).select('likedSongs').lean();
-    const userLikedSet = new Set<string>((userDoc?.likedSongs || []).map((id) => id.toString()));
-
-    const candidateMap = new Map<
-      string,
-      {
-        songDoc: any;
-        rawContentScore: number;
-        rawCollaborativeScore: number;
-        rawPopularityScore: number;
-        rawRecencyScore: number;
-      }
-    >();
-
-    const getOrCreateCandidate = (songDoc: any) => {
-      const songId = songDoc._id.toString();
-      if (!candidateMap.has(songId)) {
-        candidateMap.set(songId, {
-          songDoc,
-          rawContentScore: 0,
-          rawCollaborativeScore: 0,
-          rawPopularityScore: songDoc.playCount || 0,
-          rawRecencyScore: calculateRecencyRawScore(songDoc),
-        });
-      }
-      return candidateMap.get(songId)!;
-    };
-
-    // 2. Fetch Content-Based Recommendation Scores
-    if (seedSongId && Types.ObjectId.isValid(seedSongId)) {
-      const contentResults = await ContentRecommendationService.getRecommendationsForSong(
-        seedSongId,
-        40
-      );
-      for (const item of contentResults) {
-        const cand = getOrCreateCandidate(item);
-        cand.rawContentScore = item.similarityScore || 0;
-      }
-    }
-
-    // 3. Fetch Collaborative Filtering Recommendation Scores
-    const collabResults = await CollaborativeFilteringService.getRecommendationsForUser(
+    // 1. Generate Merged Candidates Pool from Content, Collaborative, and Trending Sources
+    const candidates = await CandidateGenerationService.generateHybridCandidates({
       userId,
-      40
-    );
-    for (const item of collabResults) {
-      const cand = getOrCreateCandidate(item);
-      cand.rawCollaborativeScore = item.recommendationScore || 0;
-    }
+      seedSongId,
+      candidateLimit: 50,
+    });
 
-    // 4. Fetch Trending & Catalog Songs for Popularity / Recency Coverage
-    const trendingResults = await TrendingService.getTrendingSongs(40);
-    for (const item of trendingResults) {
-      const cand = getOrCreateCandidate(item);
-      if (item.trendingScore) {
-        cand.rawRecencyScore = Math.max(cand.rawRecencyScore, item.trendingScore);
-      }
-    }
-
-    // Exclude seedSongId and songs user has already liked
-    if (seedSongId) {
-      candidateMap.delete(seedSongId);
-    }
-    for (const likedId of userLikedSet) {
-      candidateMap.delete(likedId);
-    }
-
-    if (candidateMap.size === 0) {
-      // Fallback: Fetch general catalog songs if candidate map is empty
-      const catalogSongs = await Song.find({ isPublished: true })
-        .populate('artist', 'name profileImage avatar verified')
-        .populate('album', 'title coverImage releaseYear')
-        .populate('genre', 'name slug')
-        .sort({ playCount: -1 })
-        .limit(20)
-        .lean();
-
-      for (const song of catalogSongs) {
-        const idStr = song._id.toString();
-        if (idStr !== seedSongId && !userLikedSet.has(idStr)) {
-          getOrCreateCandidate(song);
-        }
-      }
-    }
-
-    const candidates = Array.from(candidateMap.values());
     if (candidates.length === 0) {
       return [];
     }
 
-    // 5. Min-Max Normalization to Common [0.0, 1.0] Range
-    const maxContent = Math.max(...candidates.map((c) => c.rawContentScore), 0.0001);
-    const maxCollab = Math.max(...candidates.map((c) => c.rawCollaborativeScore), 0.0001);
-    const maxPop = Math.max(...candidates.map((c) => c.rawPopularityScore), 1);
-    const maxRec = Math.max(...candidates.map((c) => c.rawRecencyScore), 0.0001);
+    // 2. Min-Max Normalization to Common [0.0, 1.0] Range
+    const maxContent = Math.max(...candidates.map((c) => c.contentScore), 0.0001);
+    const maxCollab = Math.max(...candidates.map((c) => c.collaborativeScore), 0.0001);
+    const maxPop = Math.max(...candidates.map((c) => c.popularitySignal), 1);
+    const maxRec = Math.max(...candidates.map((c) => c.recencySignal), 0.0001);
 
     const totalWeightSum =
       weights.contentSimilarityWeight +
@@ -145,12 +61,12 @@ export class HybridRecommendationService {
       weights.popularityWeight +
       weights.recencyWeight;
 
-    // 6. Compute Final Hybrid Score & Component Breakdown
+    // 3. Compute Final Hybrid Score & Component Breakdown per Candidate
     const scoredItems: HybridCandidateItem[] = candidates.map((cand) => {
-      const normContent = cand.rawContentScore / maxContent;
-      const normCollab = cand.rawCollaborativeScore / maxCollab;
-      const normPop = cand.rawPopularityScore / maxPop;
-      const normRec = cand.rawRecencyScore / maxRec;
+      const normContent = cand.contentScore / maxContent;
+      const normCollab = cand.collaborativeScore / maxCollab;
+      const normPop = cand.popularitySignal / maxPop;
+      const normRec = cand.recencySignal / maxRec;
 
       const weightedScoreSum =
         normContent * weights.contentSimilarityWeight +
@@ -173,18 +89,9 @@ export class HybridRecommendationService {
       };
     });
 
-    // 7. Sort Descending by Hybrid Score
+    // 4. Sort Descending by Hybrid Score
     scoredItems.sort((a, b) => b.hybridScore - a.hybridScore);
 
     return scoredItems.slice(0, Math.max(1, limit));
   }
-}
-
-function calculateRecencyRawScore(songDoc: any): number {
-  if (!songDoc) return 0;
-  const currentYear = new Date().getFullYear();
-  const releaseYear = songDoc.releaseYear || currentYear - 5;
-  const yearsOld = Math.max(0, currentYear - releaseYear);
-  // Recency score decays as track grows older
-  return Math.max(0.1, 1 / (1 + 0.3 * yearsOld));
 }
