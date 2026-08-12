@@ -9,7 +9,10 @@ import {
 } from '../services/songService';
 import { fetchRecentlyPlayedApi } from '../services/historyService';
 import { fetchPersonalizedFeedApi } from '../services/personalizedFeedService';
-import { fetchCollaborativeRecommendationsApi } from '../services/recommendationService';
+import {
+  fetchCollaborativeRecommendationsApi,
+  fetchHybridRecommendationsApi,
+} from '../services/recommendationService';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { usePlayerStore } from '../store/usePlayerStore';
 
@@ -18,8 +21,8 @@ export const HomePage: React.FC = () => {
   const playSong = usePlayerStore((state) => state.playSong);
 
   const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
+  const [hybridSongs, setHybridSongs] = useState<Song[]>([]);
   const [collaborativeSongs, setCollaborativeSongs] = useState<Song[]>([]);
-  const [basedOnTaste, setBasedOnTaste] = useState<Song[]>([]);
   const [favoriteGenreTracks, setFavoriteGenreTracks] = useState<Song[]>([]);
   const [suggestedArtists, setSuggestedArtists] = useState<Artist[]>([]);
 
@@ -29,6 +32,7 @@ export const HomePage: React.FC = () => {
   const [featuredArtists, setFeaturedArtists] = useState<Artist[]>([]);
 
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState<boolean>(false);
+  const [loadingHybrid, setLoadingHybrid] = useState<boolean>(false);
   const [loadingCollaborative, setLoadingCollaborative] = useState<boolean>(false);
   const [loadingPersonalized, setLoadingPersonalized] = useState<boolean>(false);
   const [loadingTrending, setLoadingTrending] = useState<boolean>(true);
@@ -46,6 +50,16 @@ export const HomePage: React.FC = () => {
       setLoadingRecentlyPlayed(false);
     };
 
+    const loadHybridRecommendations = async () => {
+      if (!isAuthenticated) return;
+      setLoadingHybrid(true);
+      const res = await fetchHybridRecommendationsApi(10);
+      if (res.songs && res.songs.length > 0) {
+        setHybridSongs(res.songs);
+      }
+      setLoadingHybrid(false);
+    };
+
     const loadCollaborativeRecommendations = async () => {
       if (!isAuthenticated) return;
       setLoadingCollaborative(true);
@@ -61,7 +75,6 @@ export const HomePage: React.FC = () => {
       setLoadingPersonalized(true);
       const res = await fetchPersonalizedFeedApi();
       if (res.feed) {
-        setBasedOnTaste(res.feed.basedOnTaste || []);
         setFavoriteGenreTracks(res.feed.favoriteGenreTracks || []);
         setSuggestedArtists(res.feed.suggestedArtists || []);
       }
@@ -91,6 +104,7 @@ export const HomePage: React.FC = () => {
     };
 
     loadRecentlyPlayed();
+    loadHybridRecommendations();
     loadCollaborativeRecommendations();
     loadPersonalizedFeed();
     loadTrending();
@@ -160,7 +174,20 @@ export const HomePage: React.FC = () => {
         />
       )}
 
-      {/* 2. Collaborative Recommendations Carousel ("Listeners Like You Enjoy") */}
+      {/* 2. Hybrid Personalized Recommendations ("Recommended For You") */}
+      {(hybridSongs.length > 0 || loadingHybrid) && (
+        <MediaCarousel
+          title="Recommended For You"
+          subtitle="AI-curated hybrid recommendations combining acoustics, community taste, and recency"
+          seeAllLink="/library"
+          type="song"
+          items={hybridSongs}
+          loading={loadingHybrid}
+          onPlaySong={(song) => handlePlaySong(song, hybridSongs)}
+        />
+      )}
+
+      {/* 3. Collaborative Recommendations Carousel ("Listeners Like You Enjoy") */}
       {(collaborativeSongs.length > 0 || loadingCollaborative) && (
         <MediaCarousel
           title="Listeners Like You Enjoy"
@@ -170,19 +197,6 @@ export const HomePage: React.FC = () => {
           items={collaborativeSongs}
           loading={loadingCollaborative}
           onPlaySong={(song) => handlePlaySong(song, collaborativeSongs)}
-        />
-      )}
-
-      {/* 3. "Based on Your Taste" Carousel (Personalized Feed) */}
-      {(basedOnTaste.length > 0 || loadingPersonalized) && (
-        <MediaCarousel
-          title="Based on Your Taste"
-          subtitle="Tailored to your favorite performers and listening history"
-          seeAllLink="/preferences"
-          type="song"
-          items={basedOnTaste}
-          loading={loadingPersonalized}
-          onPlaySong={(song) => handlePlaySong(song, basedOnTaste)}
         />
       )}
 
