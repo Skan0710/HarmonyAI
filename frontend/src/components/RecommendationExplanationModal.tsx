@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Song } from '../types/music';
+import { submitRecommendationFeedbackApi } from '../services/recommendationTrackingService';
 
 export interface ExplanationFactor {
   label: string;
@@ -19,11 +20,15 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
   isOpen,
   onClose,
 }) => {
+  const [activeFeedback, setActiveFeedback] = useState<'thumbs_up' | 'thumbs_down' | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   if (!isOpen) return null;
 
   const rawComponentScores = (song as any).componentScores;
   const rawSources: string[] = (song as any).sources || [];
   const rawExplanation = (song as any).explanation;
+  const recommendationSource = rawSources[0] || 'hybrid';
 
   const factors: ExplanationFactor[] = [];
 
@@ -90,6 +95,14 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
       return song.artist.name;
     }
     return String(song.artist);
+  };
+
+  const handleFeedback = async (feedback: 'thumbs_up' | 'thumbs_down') => {
+    if (!song._id || submitting) return;
+    setSubmitting(true);
+    setActiveFeedback(feedback);
+    await submitRecommendationFeedbackApi(song._id, feedback, recommendationSource);
+    setSubmitting(false);
   };
 
   return (
@@ -178,6 +191,36 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
               </p>
             </div>
           )}
+        </div>
+
+        {/* Thumbs Up / Thumbs Down Feedback Section */}
+        <div className="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between">
+          <span className="text-xs font-medium text-slate-300">Was this recommendation helpful?</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleFeedback('thumbs_up')}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                activeFeedback === 'thumbs_up'
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-md shadow-emerald-500/10'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-emerald-500/40 hover:text-white'
+              }`}
+              title="Helpful recommendation"
+            >
+              👍 Thumbs Up
+            </button>
+
+            <button
+              onClick={() => handleFeedback('thumbs_down')}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                activeFeedback === 'thumbs_down'
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-md shadow-rose-500/10'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-rose-500/40 hover:text-white'
+              }`}
+              title="Not helpful"
+            >
+              👎 Thumbs Down
+            </button>
+          </div>
         </div>
 
         {/* Footer */}

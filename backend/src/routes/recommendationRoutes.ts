@@ -7,6 +7,8 @@ import {
 import {
   trackInteraction,
   trackBulkImpressions,
+  submitFeedback,
+  getUserFeedback,
 } from '../controllers/recommendationInteractionController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
@@ -20,6 +22,12 @@ router.get('/collaborative', protect, getCollaborativeRecommendations);
 
 // GET /api/recommendations/similar/:songId?limit=10
 router.get('/similar/:songId', getSimilarSongs);
+
+// GET /api/recommendations/feedback?limit=50 (Protected JWT)
+router.get('/feedback', protect, getUserFeedback);
+
+// POST /api/recommendations/feedback (Protected JWT - thumbs_up / thumbs_down)
+router.post('/feedback', protect, submitFeedback);
 
 // POST /api/recommendations/interactions (Protected JWT)
 router.post('/interactions', protect, trackInteraction);

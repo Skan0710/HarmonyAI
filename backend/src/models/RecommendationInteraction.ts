@@ -1,6 +1,13 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-export type RecommendationActionType = 'impression' | 'click' | 'play' | 'like' | 'skip';
+export type RecommendationActionType =
+  | 'impression'
+  | 'click'
+  | 'play'
+  | 'like'
+  | 'skip'
+  | 'thumbs_up'
+  | 'thumbs_down';
 
 export type RecommendationSourceType = 'content' | 'collaborative' | 'hybrid' | 'trending' | 'personalized_feed' | string;
 
@@ -34,7 +41,7 @@ const recommendationInteractionSchema = new Schema<IRecommendationInteraction>(
     },
     action: {
       type: String,
-      enum: ['impression', 'click', 'play', 'like', 'skip'],
+      enum: ['impression', 'click', 'play', 'like', 'skip', 'thumbs_up', 'thumbs_down'],
       required: true,
       index: true,
     },
@@ -49,7 +56,7 @@ const recommendationInteractionSchema = new Schema<IRecommendationInteraction>(
   }
 );
 
-// Compound index for fast user analytics and action tracking
+// Compound index for fast user analytics, feedback queries, and deduplication
 recommendationInteractionSchema.index({ user: 1, action: 1, timestamp: -1 });
 recommendationInteractionSchema.index({ user: 1, song: 1, action: 1 });
 
