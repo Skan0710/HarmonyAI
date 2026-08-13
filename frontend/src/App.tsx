@@ -14,6 +14,7 @@ import { HistoryPage } from './pages/HistoryPage';
 import { SongDetailPage } from './pages/SongDetailPage';
 import { ArtistDetailPage } from './pages/ArtistDetailPage';
 import { AlbumDetailPage } from './pages/AlbumDetailPage';
+import { RecommendationEvaluationDashboardPage } from './pages/RecommendationEvaluationDashboardPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -59,6 +60,8 @@ function App() {
             <Route path="/songs/:id" element={<SongDetailPage />} />
             <Route path="/artists/:id" element={<ArtistDetailPage />} />
             <Route path="/albums/:id" element={<AlbumDetailPage />} />
+            {/* Developer Diagnostic Dashboard */}
+            <Route path="/admin/recommendations" element={<RecommendationEvaluationDashboardPage />} />
             {/* Catch-all 404 Route */}
             <Route path="*" element={<NotFoundPage />} />
           </Route>
