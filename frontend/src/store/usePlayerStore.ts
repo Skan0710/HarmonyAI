@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Song } from '../types/music';
 import { recordSongPlay } from '../services/songService';
 import { recordPlaybackApi } from '../services/historyService';
+import { trackRecommendationInteraction } from '../services/recommendationTrackingService';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -232,8 +233,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   nextSong: () => {
-    const { queue, queueIndex, isShuffle } = get();
+    const { queue, queueIndex, currentSong, currentTime, duration, isShuffle } = get();
     if (queue.length === 0) return;
+
+    // Track skip action if skipped early (< 50% played) on a recommended track
+    if (currentSong && currentSong._id && duration > 0 && currentTime / duration < 0.5) {
+      const hasRec =
+        Boolean((currentSong as any).componentScores) ||
+        Boolean((currentSong as any).hybridScore) ||
+        Boolean((currentSong as any).recommendationScore);
+      if (hasRec) {
+        const source = ((currentSong as any).sources && (currentSong as any).sources[0]) || 'hybrid';
+        trackRecommendationInteraction(currentSong._id, 'skip', source);
+      }
+    }
 
     let nextIdx: number;
 

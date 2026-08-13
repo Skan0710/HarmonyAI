@@ -4,6 +4,7 @@ import type { Song, Artist, Album } from '../types/music';
 import { SongCard } from './SongCard';
 import { ArtistCard } from './ArtistCard';
 import { AlbumCard } from './AlbumCard';
+import { trackRecommendationBulkImpressions } from '../services/recommendationTrackingService';
 
 export type CarouselItemType = 'song' | 'album' | 'artist';
 
@@ -51,13 +52,29 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = ({
       el.addEventListener('scroll', checkScrollState, { passive: true });
       window.addEventListener('resize', checkScrollState);
     }
+
+    // Trigger non-blocking recommendation bulk impression tracking when recommended song items render
+    if (type === 'song' && !loading && items && items.length > 0) {
+      const recSongs = (items as Song[]).filter(
+        (s) =>
+          Boolean((s as any).componentScores) ||
+          Boolean((s as any).hybridScore) ||
+          Boolean((s as any).recommendationScore)
+      );
+      if (recSongs.length > 0) {
+        const songIds = recSongs.map((s) => s._id).filter(Boolean);
+        const source = ((recSongs[0] as any).sources && (recSongs[0] as any).sources[0]) || 'hybrid';
+        trackRecommendationBulkImpressions(songIds, source);
+      }
+    }
+
     return () => {
       if (el) {
         el.removeEventListener('scroll', checkScrollState);
       }
       window.removeEventListener('resize', checkScrollState);
     };
-  }, [items, loading, checkScrollState]);
+  }, [items, loading, type, checkScrollState]);
 
   const handleScroll = (direction: 'left' | 'right') => {
     const el = scrollRef.current;

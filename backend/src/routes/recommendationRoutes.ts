@@ -4,6 +4,10 @@ import {
   getCollaborativeRecommendations,
   getHybridRecommendations,
 } from '../controllers/recommendationController.js';
+import {
+  trackInteraction,
+  trackBulkImpressions,
+} from '../controllers/recommendationInteractionController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
 const router = Router();
@@ -16,5 +20,11 @@ router.get('/collaborative', protect, getCollaborativeRecommendations);
 
 // GET /api/recommendations/similar/:songId?limit=10
 router.get('/similar/:songId', getSimilarSongs);
+
+// POST /api/recommendations/interactions (Protected JWT)
+router.post('/interactions', protect, trackInteraction);
+
+// POST /api/recommendations/interactions/bulk-impressions (Protected JWT)
+router.post('/interactions/bulk-impressions', protect, trackBulkImpressions);
 
 export default router;

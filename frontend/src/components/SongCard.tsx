@@ -5,6 +5,7 @@ import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { AddToPlaylistModal } from './AddToPlaylistModal';
 import { RecommendationExplanationModal } from './RecommendationExplanationModal';
+import { trackRecommendationInteraction } from '../services/recommendationTrackingService';
 import { formatTime, formatCount } from '../utils/formatters';
 
 interface SongCardProps {
@@ -32,6 +33,8 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
     Boolean((song as any).explanation) ||
     Boolean((song as any).hybridScore) ||
     Boolean((song as any).recommendationScore);
+
+  const recommendationSource = ((song as any).sources && (song as any).sources[0]) || 'hybrid';
 
   const isCurrentTrackPlaying =
     isPlaying !== undefined
@@ -68,6 +71,9 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
   const coverUrl = imgError || !song.coverImage ? fallbackCover : song.coverImage;
 
   const handleCardClick = () => {
+    if (hasRecommendationInfo && song._id) {
+      trackRecommendationInteraction(song._id, 'click', recommendationSource);
+    }
     if (song._id) {
       navigate(`/songs/${song._id}`);
     }
@@ -75,6 +81,9 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (hasRecommendationInfo && song._id) {
+      trackRecommendationInteraction(song._id, 'play', recommendationSource);
+    }
     if (onPlay) {
       onPlay(song);
     } else {
@@ -88,6 +97,9 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
 
   const handleLikeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (hasRecommendationInfo && song._id && !isLiked) {
+      trackRecommendationInteraction(song._id, 'like', recommendationSource);
+    }
     toggleLikeSong(song);
   };
 
