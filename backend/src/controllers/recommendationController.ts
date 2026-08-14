@@ -128,7 +128,7 @@ export const getHybridRecommendations = async (
       return;
     }
 
-    const recommendations = await HybridRecommendationService.getHybridRecommendations({
+    const result = await HybridRecommendationService.getHybridRecommendations({
       userId: req.user._id.toString(),
       seedSongId,
       limit: parsedLimit,
@@ -136,12 +136,20 @@ export const getHybridRecommendations = async (
 
     res.status(200).json({
       success: true,
-      data: recommendations || [],
+      strategyUsed: result.strategyUsed,
+      userClassification: result.userClassification,
+      count: result.recommendations.length,
+      data: result.recommendations || [],
     });
   } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch hybrid recommendations',
+    // Never crash recommendation API for users with insufficient data
+    res.status(200).json({
+      success: true,
+      strategyUsed: 'COLD_START',
+      userClassification: 'NEW',
+      count: 0,
+      data: [],
+      message: error.message || 'Failed to fetch hybrid recommendations safely',
     });
   }
 };

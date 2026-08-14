@@ -83,7 +83,7 @@ export const evaluateRecommendationStrategy = async (
         seedSongId,
         limit: k,
       });
-      recommendedSongDocs = (hybridRes || []).map((item) => item.song).filter(Boolean);
+      recommendedSongDocs = (hybridRes?.recommendations || []).map((item) => item.song).filter(Boolean);
     }
 
     const recommendedSongIds = recommendedSongDocs
