@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { User } from '../models/User.js';
 import { ListeningHistory } from '../models/ListeningHistory.js';
+import { getRecencyConfig } from '../config/recommendationConfig.js';
 
 export interface GenreAffinity {
   genreId: string;
@@ -30,21 +31,46 @@ export interface UserTasteProfile {
 
 export class UserTasteProfileService {
   /**
+   * Calculates exponential recency decay weight based on interaction age and half-life.
+   * W(t) = baseWeight * (0.5 ^ (ageInDays / halfLifeDays))
+   */
+  static calculateRecencyWeight(
+    interactionTimestamp: Date,
+    baseWeight: number,
+    halfLifeDaysOverride?: number
+  ): number {
+    const config = getRecencyConfig();
+    const halfLife = halfLifeDaysOverride || config.halfLifeDays || 30;
+
+    const ageInMs = Math.max(0, Date.now() - new Date(interactionTimestamp).getTime());
+    const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
+
+    // Exponential half-life decay formula
+    const decayedRatio = Math.pow(0.5, ageInDays / Math.max(1, halfLife));
+    const finalWeight = baseWeight * decayedRatio;
+
+    return Math.max(config.minWeightFloor * baseWeight, finalWeight);
+  }
+
+  /**
    * Analyzes user likes and listening history to calculate normalized genre and artist affinity scores,
-   * separating long-term and recent (30-day) behavior into a reusable UserTasteProfile.
+   * applying exponential recency decay weighting consistently to recent vs long-term listening behavior.
    * 
    * @param userId Target user ObjectId string
-   * @param options Configurable parameters (recentDays default = 30)
+   * @param options Configurable parameters (recentDays, halfLifeDays)
    */
   static async generateTasteProfile(
     userId: string,
-    options: { recentDays?: number } = {}
+    options: { recentDays?: number; halfLifeDays?: number } = {}
   ): Promise<UserTasteProfile> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new Error('Invalid user ID');
     }
 
-    const recentDays = options.recentDays || 30;
+    const config = getRecencyConfig();
+    const recentDays = options.recentDays || config.halfLifeDays || 30;
+    const halfLifeDays = options.halfLifeDays || config.halfLifeDays || 30;
+
     const userObjectId = new Types.ObjectId(userId);
     const now = new Date();
     const recentCutoff = new Date(now.getTime() - recentDays * 24 * 60 * 60 * 1000);
@@ -119,20 +145,22 @@ export class UserTasteProfileService {
     for (const song of (userDoc.likedSongs as any[]) || []) {
       if (!song) continue;
 
+      const likedWeight = 5;
+
       if (song.genre) {
         const gId = typeof song.genre === 'object' ? song.genre._id.toString() : song.genre.toString();
         const gName = typeof song.genre === 'object' ? song.genre.name : undefined;
         const gAcc = getOrCreateGenre(gId, gName);
-        gAcc.longTerm += 5;
-        gAcc.recent += 5;
+        gAcc.longTerm += likedWeight;
+        gAcc.recent += likedWeight;
       }
 
       if (song.artist) {
         const aId = typeof song.artist === 'object' ? song.artist._id.toString() : song.artist.toString();
         const aName = typeof song.artist === 'object' ? song.artist.name : undefined;
         const aAcc = getOrCreateArtist(aId, aName);
-        aAcc.longTerm += 5;
-        aAcc.recent += 5;
+        aAcc.longTerm += likedWeight;
+        aAcc.recent += likedWeight;
       }
 
       if (song.language) {
@@ -143,15 +171,19 @@ export class UserTasteProfileService {
       }
     }
 
-    // Process Listening History Records (Differentiating Recent vs Long-Term)
+    // Process Listening History Records with Exponential Recency Decay Weighting
     for (const rec of historyRecords) {
       if (!rec.song || typeof rec.song !== 'object') continue;
       const song = rec.song as any;
-      const isRecent = new Date(rec.playedAt) >= recentCutoff;
+      const playedAt = rec.playedAt || now;
+      const isRecent = new Date(playedAt) >= recentCutoff;
 
-      let eventWeight = 4; // Default completed play weight
-      if (rec.skipped) eventWeight = -2;
-      else if (rec.completed === false) eventWeight = 2;
+      let baseWeight = 4; // Default completed play weight
+      if (rec.skipped) baseWeight = -2;
+      else if (rec.completed === false) baseWeight = 2;
+
+      // Apply exponential recency decay weighting
+      const decayedWeight = this.calculateRecencyWeight(playedAt, baseWeight, halfLifeDays);
 
       // Genre Accumulation
       if (song.genre) {
@@ -159,9 +191,9 @@ export class UserTasteProfileService {
         const gName = typeof song.genre === 'object' ? song.genre.name : undefined;
         const gAcc = getOrCreateGenre(gId, gName);
 
-        gAcc.longTerm += eventWeight;
+        gAcc.longTerm += decayedWeight;
         if (isRecent) {
-          gAcc.recent += eventWeight;
+          gAcc.recent += decayedWeight;
         }
       }
 
@@ -171,9 +203,9 @@ export class UserTasteProfileService {
         const aName = typeof song.artist === 'object' ? song.artist.name : undefined;
         const aAcc = getOrCreateArtist(aId, aName);
 
-        aAcc.longTerm += eventWeight;
+        aAcc.longTerm += decayedWeight;
         if (isRecent) {
-          aAcc.recent += eventWeight;
+          aAcc.recent += decayedWeight;
         }
       }
 
