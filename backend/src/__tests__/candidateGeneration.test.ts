@@ -21,6 +21,7 @@ export function runCandidateGenerationTests() {
           songDoc,
           contentScore: 0,
           collaborativeScore: 0,
+          userTasteAffinityScore: 0,
           popularitySignal: songDoc.playCount || 0,
           recencySignal: 0.8,
           sources: [],
@@ -28,12 +29,14 @@ export function runCandidateGenerationTests() {
         candidateMap.set(songId, existing);
       }
 
-      if (!existing.sources.includes(source)) {
-        existing.sources.push(source);
+      const currentItem = candidateMap.get(songId)!;
+
+      if (!currentItem.sources.includes(source)) {
+        currentItem.sources.push(source);
       }
 
-      if (source === 'content') existing.contentScore = rawScore;
-      if (source === 'collaborative') existing.collaborativeScore = rawScore;
+      if (source === 'content') currentItem.contentScore = rawScore;
+      if (source === 'collaborative') currentItem.collaborativeScore = rawScore;
     };
 
     const mockSong = { _id: 'song_track_1', title: 'Starlight', playCount: 420 };
