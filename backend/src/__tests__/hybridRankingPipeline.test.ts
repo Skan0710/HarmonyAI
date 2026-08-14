@@ -13,6 +13,7 @@ export function runHybridRankingPipelineTests() {
         songDoc: { title: 'Medium Track' },
         contentScore: 0.5,
         collaborativeScore: 0.5,
+        userTasteAffinityScore: 0.5,
         popularitySignal: 100,
         recencySignal: 0.5,
         sources: ['content'],
@@ -22,6 +23,7 @@ export function runHybridRankingPipelineTests() {
         songDoc: { title: 'Top Recommended Track' },
         contentScore: 0.95,
         collaborativeScore: 0.9,
+        userTasteAffinityScore: 0.95,
         popularitySignal: 500,
         recencySignal: 0.95,
         sources: ['content', 'collaborative'],
@@ -31,6 +33,7 @@ export function runHybridRankingPipelineTests() {
         songDoc: { title: 'Low Track' },
         contentScore: 0.1,
         collaborativeScore: 0.1,
+        userTasteAffinityScore: 0.1,
         popularitySignal: 10,
         recencySignal: 0.1,
         sources: ['trending'],
@@ -48,6 +51,7 @@ export function runHybridRankingPipelineTests() {
     // Individual component scores returned
     assert.ok(results[0].componentScores.contentScore > 0, 'contentScore present');
     assert.ok(results[0].componentScores.collaborativeScore > 0, 'collaborativeScore present');
+    assert.ok(results[0].componentScores.userTasteAffinityScore > 0, 'userTasteAffinityScore present');
     assert.ok(results[0].componentScores.popularityScore > 0, 'popularityScore present');
     assert.ok(results[0].componentScores.recencyScore > 0, 'recencyScore present');
 
@@ -61,6 +65,7 @@ export function runHybridRankingPipelineTests() {
       songDoc: { title: `Track ${i}` },
       contentScore: (i + 1) * 0.05,
       collaborativeScore: (i + 1) * 0.05,
+      userTasteAffinityScore: (i + 1) * 0.05,
       popularitySignal: (i + 1) * 10,
       recencySignal: 0.5,
       sources: ['content'],
@@ -79,6 +84,7 @@ export function runHybridRankingPipelineTests() {
         songDoc: { title: 'Missing Scores Track' },
         contentScore: NaN,
         collaborativeScore: undefined as any,
+        userTasteAffinityScore: 0,
         popularitySignal: 50,
         recencySignal: 0.5,
         sources: ['trending'],

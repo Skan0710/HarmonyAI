@@ -10,6 +10,7 @@ export interface HybridRankedResult {
   componentScores: {
     contentScore: number;
     collaborativeScore: number;
+    userTasteAffinityScore: number;
     popularityScore: number;
     recencyScore: number;
   };
@@ -19,7 +20,8 @@ export interface HybridRankedResult {
 export class HybridRankingPipeline {
   /**
    * Evaluates a candidate pool, applies Min-Max normalization across feature components,
-   * calculates final weighted hybrid recommendation scores, ranks candidates descending,
+   * calculates final weighted hybrid recommendation scores (incorporating content, collaborative,
+   * user taste profile affinity, popularity, and recency signals), ranks candidates descending,
    * and returns top items up to configurable limit.
    * 
    * @param candidates Pool of merged hybrid candidate tracks
@@ -49,6 +51,10 @@ export class HybridRankingPipeline {
       ...candidates.map((c) => (isNaN(c.collaborativeScore) ? 0 : c.collaborativeScore || 0)),
       0.0001
     );
+    const maxTaste = Math.max(
+      ...candidates.map((c) => (isNaN(c.userTasteAffinityScore) ? 0 : c.userTasteAffinityScore || 0)),
+      0.0001
+    );
     const maxPop = Math.max(
       ...candidates.map((c) => (isNaN(c.popularitySignal) ? 0 : c.popularitySignal || 0)),
       1
@@ -61,6 +67,7 @@ export class HybridRankingPipeline {
     const totalWeightSum =
       weights.contentSimilarityWeight +
       weights.collaborativeWeight +
+      weights.userTasteAffinityWeight +
       weights.popularityWeight +
       weights.recencyWeight;
 
@@ -68,17 +75,20 @@ export class HybridRankingPipeline {
     const scoredItems: HybridRankedResult[] = candidates.map((cand) => {
       const rawContent = isNaN(cand.contentScore) ? 0 : cand.contentScore || 0;
       const rawCollab = isNaN(cand.collaborativeScore) ? 0 : cand.collaborativeScore || 0;
+      const rawTaste = isNaN(cand.userTasteAffinityScore) ? 0 : cand.userTasteAffinityScore || 0;
       const rawPop = isNaN(cand.popularitySignal) ? 0 : cand.popularitySignal || 0;
       const rawRec = isNaN(cand.recencySignal) ? 0 : cand.recencySignal || 0;
 
       const normContent = rawContent / maxContent;
       const normCollab = rawCollab / maxCollab;
+      const normTaste = rawTaste / maxTaste;
       const normPop = rawPop / maxPop;
       const normRec = rawRec / maxRec;
 
       const weightedScoreSum =
         normContent * weights.contentSimilarityWeight +
         normCollab * weights.collaborativeWeight +
+        normTaste * weights.userTasteAffinityWeight +
         normPop * weights.popularityWeight +
         normRec * weights.recencyWeight;
 
@@ -91,6 +101,7 @@ export class HybridRankingPipeline {
         componentScores: {
           contentScore: Number(normContent.toFixed(4)),
           collaborativeScore: Number(normCollab.toFixed(4)),
+          userTasteAffinityScore: Number(normTaste.toFixed(4)),
           popularityScore: Number(normPop.toFixed(4)),
           recencyScore: Number(normRec.toFixed(4)),
         },

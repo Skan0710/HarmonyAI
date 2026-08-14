@@ -1,15 +1,17 @@
 export interface HybridScoringWeights {
-  contentSimilarityWeight: number; // default: 0.35
-  collaborativeWeight: number;     // default: 0.35
-  popularityWeight: number;        // default: 0.15
-  recencyWeight: number;           // default: 0.15
+  contentSimilarityWeight: number; // default: 0.25
+  collaborativeWeight: number;     // default: 0.25
+  userTasteAffinityWeight: number; // default: 0.25 (User Taste Profile signal)
+  popularityWeight: number;        // default: 0.125
+  recencyWeight: number;           // default: 0.125
 }
 
 export const DEFAULT_HYBRID_WEIGHTS: HybridScoringWeights = {
-  contentSimilarityWeight: 0.35,
-  collaborativeWeight: 0.35,
-  popularityWeight: 0.15,
-  recencyWeight: 0.15,
+  contentSimilarityWeight: 0.25,
+  collaborativeWeight: 0.25,
+  userTasteAffinityWeight: 0.25,
+  popularityWeight: 0.125,
+  recencyWeight: 0.125,
 };
 
 let currentHybridWeights: HybridScoringWeights = { ...DEFAULT_HYBRID_WEIGHTS };
