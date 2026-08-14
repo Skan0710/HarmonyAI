@@ -6,26 +6,31 @@ import { getRecencyConfig } from '../config/recommendationConfig.js';
 export interface GenreAffinity {
   genreId: string;
   name?: string;
-  affinityScore: number; // Combined normalized score (0-1)
-  recentAffinityScore: number; // Normalized recent 30-day score (0-1)
-  longTermAffinityScore: number; // Normalized long-term score (0-1)
+  affinityScore: number; // Normalized score (0-1)
 }
 
 export interface ArtistAffinity {
   artistId: string;
   name?: string;
-  affinityScore: number; // Combined normalized score (0-1)
-  recentAffinityScore: number; // Normalized recent 30-day score (0-1)
-  longTermAffinityScore: number; // Normalized long-term score (0-1)
+  affinityScore: number; // Normalized score (0-1)
 }
 
-export interface UserTasteProfile {
-  userId: string;
+export interface SingleTimeframeProfile {
+  timeframeDays: number;
   genres: GenreAffinity[];
   artists: ArtistAffinity[];
   preferredLanguages: string[];
   preferredMoods: string[];
-  recentBehaviorWindowDays: number;
+}
+
+export interface UserTasteProfile {
+  userId: string;
+  shortTermProfile: SingleTimeframeProfile;
+  longTermProfile: SingleTimeframeProfile;
+  combinedGenres: GenreAffinity[];
+  combinedArtists: ArtistAffinity[];
+  preferredLanguages: string[];
+  preferredMoods: string[];
   updatedAt: Date;
 }
 
@@ -45,7 +50,6 @@ export class UserTasteProfileService {
     const ageInMs = Math.max(0, Date.now() - new Date(interactionTimestamp).getTime());
     const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
 
-    // Exponential half-life decay formula
     const decayedRatio = Math.pow(0.5, ageInDays / Math.max(1, halfLife));
     const finalWeight = baseWeight * decayedRatio;
 
@@ -53,27 +57,29 @@ export class UserTasteProfileService {
   }
 
   /**
-   * Analyzes user likes and listening history to calculate normalized genre and artist affinity scores,
-   * applying exponential recency decay weighting consistently to recent vs long-term listening behavior.
+   * Analyzes user likes and listening history to calculate separate short-term and long-term
+   * genre and artist affinity scores, combining them into a structured UserTasteProfile response.
    * 
    * @param userId Target user ObjectId string
-   * @param options Configurable parameters (recentDays, halfLifeDays)
+   * @param options Configurable shortTermDays (default 14) and longTermDays (default 180)
    */
   static async generateTasteProfile(
     userId: string,
-    options: { recentDays?: number; halfLifeDays?: number } = {}
+    options: { shortTermDays?: number; longTermDays?: number; halfLifeDays?: number } = {}
   ): Promise<UserTasteProfile> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new Error('Invalid user ID');
     }
 
     const config = getRecencyConfig();
-    const recentDays = options.recentDays || config.halfLifeDays || 30;
+    const shortTermDays = options.shortTermDays || 14;
+    const longTermDays = options.longTermDays || 180;
     const halfLifeDays = options.halfLifeDays || config.halfLifeDays || 30;
 
     const userObjectId = new Types.ObjectId(userId);
     const now = new Date();
-    const recentCutoff = new Date(now.getTime() - recentDays * 24 * 60 * 60 * 1000);
+    const shortTermCutoff = new Date(now.getTime() - shortTermDays * 24 * 60 * 60 * 1000);
+    const longTermCutoff = new Date(now.getTime() - longTermDays * 24 * 60 * 60 * 1000);
 
     // 1. Fetch User Document with populated liked songs & preferences
     const userDoc = await User.findById(userObjectId)
@@ -93,7 +99,10 @@ export class UserTasteProfileService {
     }
 
     // 2. Fetch User Listening History
-    const historyRecords = await ListeningHistory.find({ user: userObjectId })
+    const historyRecords = await ListeningHistory.find({
+      user: userObjectId,
+      playedAt: { $gte: longTermCutoff },
+    })
       .populate({
         path: 'song',
         populate: [
@@ -104,22 +113,25 @@ export class UserTasteProfileService {
       .sort({ playedAt: -1 })
       .lean();
 
-    // Intermediate accumulation maps: ID -> { recent: number, longTerm: number, name?: string }
-    const genreRawScores = new Map<string, { recent: number; longTerm: number; name?: string }>();
-    const artistRawScores = new Map<string, { recent: number; longTerm: number; name?: string }>();
-    const languageCounts = new Map<string, number>();
-    const moodCounts = new Map<string, number>();
+    // Intermediate accumulation maps: ID -> { shortTerm: number, longTerm: number, name?: string }
+    const genreRawScores = new Map<string, { shortTerm: number; longTerm: number; name?: string }>();
+    const artistRawScores = new Map<string, { shortTerm: number; longTerm: number; name?: string }>();
+
+    const shortTermLang = new Map<string, number>();
+    const longTermLang = new Map<string, number>();
+    const shortTermMood = new Map<string, number>();
+    const longTermMood = new Map<string, number>();
 
     const getOrCreateGenre = (id: string, name?: string) => {
       if (!genreRawScores.has(id)) {
-        genreRawScores.set(id, { recent: 0, longTerm: 0, name });
+        genreRawScores.set(id, { shortTerm: 0, longTerm: 0, name });
       }
       return genreRawScores.get(id)!;
     };
 
     const getOrCreateArtist = (id: string, name?: string) => {
       if (!artistRawScores.has(id)) {
-        artistRawScores.set(id, { recent: 0, longTerm: 0, name });
+        artistRawScores.set(id, { shortTerm: 0, longTerm: 0, name });
       }
       return artistRawScores.get(id)!;
     };
@@ -130,7 +142,7 @@ export class UserTasteProfileService {
       const gId = fg._id ? fg._id.toString() : fg.toString();
       const gAcc = getOrCreateGenre(gId, fg.name);
       gAcc.longTerm += 10;
-      gAcc.recent += 10;
+      gAcc.shortTerm += 10;
     }
 
     for (const fa of (userDoc.favoriteArtists as any[]) || []) {
@@ -138,7 +150,7 @@ export class UserTasteProfileService {
       const aId = fa._id ? fa._id.toString() : fa.toString();
       const aAcc = getOrCreateArtist(aId, fa.name);
       aAcc.longTerm += 10;
-      aAcc.recent += 10;
+      aAcc.shortTerm += 10;
     }
 
     // Process Liked Songs (Base weight +5 per liked track)
@@ -152,7 +164,7 @@ export class UserTasteProfileService {
         const gName = typeof song.genre === 'object' ? song.genre.name : undefined;
         const gAcc = getOrCreateGenre(gId, gName);
         gAcc.longTerm += likedWeight;
-        gAcc.recent += likedWeight;
+        gAcc.shortTerm += likedWeight;
       }
 
       if (song.artist) {
@@ -160,23 +172,25 @@ export class UserTasteProfileService {
         const aName = typeof song.artist === 'object' ? song.artist.name : undefined;
         const aAcc = getOrCreateArtist(aId, aName);
         aAcc.longTerm += likedWeight;
-        aAcc.recent += likedWeight;
+        aAcc.shortTerm += likedWeight;
       }
 
       if (song.language) {
-        languageCounts.set(song.language, (languageCounts.get(song.language) || 0) + 1);
+        shortTermLang.set(song.language, (shortTermLang.get(song.language) || 0) + 1);
+        longTermLang.set(song.language, (longTermLang.get(song.language) || 0) + 1);
       }
       if (song.mood) {
-        moodCounts.set(song.mood, (moodCounts.get(song.mood) || 0) + 1);
+        shortTermMood.set(song.mood, (shortTermMood.get(song.mood) || 0) + 1);
+        longTermMood.set(song.mood, (longTermMood.get(song.mood) || 0) + 1);
       }
     }
 
-    // Process Listening History Records with Exponential Recency Decay Weighting
+    // Process Listening History Records with Short-Term vs Long-Term Recency Decay
     for (const rec of historyRecords) {
       if (!rec.song || typeof rec.song !== 'object') continue;
       const song = rec.song as any;
       const playedAt = rec.playedAt || now;
-      const isRecent = new Date(playedAt) >= recentCutoff;
+      const isShortTerm = new Date(playedAt) >= shortTermCutoff;
 
       let baseWeight = 4; // Default completed play weight
       if (rec.skipped) baseWeight = -2;
@@ -192,8 +206,8 @@ export class UserTasteProfileService {
         const gAcc = getOrCreateGenre(gId, gName);
 
         gAcc.longTerm += decayedWeight;
-        if (isRecent) {
-          gAcc.recent += decayedWeight;
+        if (isShortTerm) {
+          gAcc.shortTerm += baseWeight * 1.5; // Un-decayed / boosted short-term weight
         }
       }
 
@@ -204,81 +218,118 @@ export class UserTasteProfileService {
         const aAcc = getOrCreateArtist(aId, aName);
 
         aAcc.longTerm += decayedWeight;
-        if (isRecent) {
-          aAcc.recent += decayedWeight;
+        if (isShortTerm) {
+          aAcc.shortTerm += baseWeight * 1.5;
         }
       }
 
       if (song.language) {
-        languageCounts.set(song.language, (languageCounts.get(song.language) || 0) + 1);
+        longTermLang.set(song.language, (longTermLang.get(song.language) || 0) + 1);
+        if (isShortTerm) {
+          shortTermLang.set(song.language, (shortTermLang.get(song.language) || 0) + 1);
+        }
       }
+
       if (song.mood) {
-        moodCounts.set(song.mood, (moodCounts.get(song.mood) || 0) + 1);
+        longTermMood.set(song.mood, (longTermMood.get(song.mood) || 0) + 1);
+        if (isShortTerm) {
+          shortTermMood.set(song.mood, (shortTermMood.get(song.mood) || 0) + 1);
+        }
       }
     }
 
-    // 3. Normalize Affinity Scores to [0.0, 1.0] Range
+    // 3. Normalize Short-Term and Long-Term Profiles
     const normalizeScale = (raw: number, maxVal: number) => {
       if (maxVal <= 0) return 0;
       return Number(Math.max(0, Math.min(1, raw / maxVal)).toFixed(4));
     };
 
-    // Genre Normalization
+    const maxGenreShort = Math.max(...Array.from(genreRawScores.values()).map((v) => v.shortTerm), 1);
     const maxGenreLong = Math.max(...Array.from(genreRawScores.values()).map((v) => v.longTerm), 1);
-    const maxGenreRecent = Math.max(...Array.from(genreRawScores.values()).map((v) => v.recent), 1);
 
-    const genres: GenreAffinity[] = Array.from(genreRawScores.entries()).map(([genreId, val]) => {
-      const longTermNorm = normalizeScale(val.longTerm, maxGenreLong);
-      const recentNorm = normalizeScale(val.recent, maxGenreRecent);
-      // Fused affinity score: 60% recent behavior + 40% long-term foundation
-      const combined = Number((0.6 * recentNorm + 0.4 * longTermNorm).toFixed(4));
+    const shortTermGenres: GenreAffinity[] = [];
+    const longTermGenres: GenreAffinity[] = [];
+    const combinedGenres: GenreAffinity[] = [];
 
-      return {
-        genreId,
-        name: val.name,
-        affinityScore: Math.max(0, Math.min(1, combined)),
-        recentAffinityScore: recentNorm,
-        longTermAffinityScore: longTermNorm,
-      };
-    });
+    for (const [gId, val] of genreRawScores.entries()) {
+      const stNorm = normalizeScale(val.shortTerm, maxGenreShort);
+      const ltNorm = normalizeScale(val.longTerm, maxGenreLong);
+      const combinedNorm = Number((0.6 * stNorm + 0.4 * ltNorm).toFixed(4));
 
-    genres.sort((a, b) => b.affinityScore - a.affinityScore);
+      if (stNorm > 0) {
+        shortTermGenres.push({ genreId: gId, name: val.name, affinityScore: stNorm });
+      }
+      if (ltNorm > 0) {
+        longTermGenres.push({ genreId: gId, name: val.name, affinityScore: ltNorm });
+      }
+      combinedGenres.push({ genreId: gId, name: val.name, affinityScore: combinedNorm });
+    }
 
-    // Artist Normalization
+    shortTermGenres.sort((a, b) => b.affinityScore - a.affinityScore);
+    longTermGenres.sort((a, b) => b.affinityScore - a.affinityScore);
+    combinedGenres.sort((a, b) => b.affinityScore - a.affinityScore);
+
+    const maxArtistShort = Math.max(...Array.from(artistRawScores.values()).map((v) => v.shortTerm), 1);
     const maxArtistLong = Math.max(...Array.from(artistRawScores.values()).map((v) => v.longTerm), 1);
-    const maxArtistRecent = Math.max(...Array.from(artistRawScores.values()).map((v) => v.recent), 1);
 
-    const artists: ArtistAffinity[] = Array.from(artistRawScores.entries()).map(([artistId, val]) => {
-      const longTermNorm = normalizeScale(val.longTerm, maxArtistLong);
-      const recentNorm = normalizeScale(val.recent, maxArtistRecent);
-      const combined = Number((0.6 * recentNorm + 0.4 * longTermNorm).toFixed(4));
+    const shortTermArtists: ArtistAffinity[] = [];
+    const longTermArtists: ArtistAffinity[] = [];
+    const combinedArtists: ArtistAffinity[] = [];
 
-      return {
-        artistId,
-        name: val.name,
-        affinityScore: Math.max(0, Math.min(1, combined)),
-        recentAffinityScore: recentNorm,
-        longTermAffinityScore: longTermNorm,
-      };
-    });
+    for (const [aId, val] of artistRawScores.entries()) {
+      const stNorm = normalizeScale(val.shortTerm, maxArtistShort);
+      const ltNorm = normalizeScale(val.longTerm, maxArtistLong);
+      const combinedNorm = Number((0.6 * stNorm + 0.4 * ltNorm).toFixed(4));
 
-    artists.sort((a, b) => b.affinityScore - a.affinityScore);
+      if (stNorm > 0) {
+        shortTermArtists.push({ artistId: aId, name: val.name, affinityScore: stNorm });
+      }
+      if (ltNorm > 0) {
+        longTermArtists.push({ artistId: aId, name: val.name, affinityScore: ltNorm });
+      }
+      combinedArtists.push({ artistId: aId, name: val.name, affinityScore: combinedNorm });
+    }
 
-    const preferredLanguages = Array.from(languageCounts.entries())
+    shortTermArtists.sort((a, b) => b.affinityScore - a.affinityScore);
+    longTermArtists.sort((a, b) => b.affinityScore - a.affinityScore);
+    combinedArtists.sort((a, b) => b.affinityScore - a.affinityScore);
+
+    const topShortTermLanguages = Array.from(shortTermLang.entries())
       .sort((a, b) => b[1] - a[1])
-      .map((entry) => entry[0]);
+      .map((e) => e[0]);
 
-    const preferredMoods = Array.from(moodCounts.entries())
+    const topLongTermLanguages = Array.from(longTermLang.entries())
       .sort((a, b) => b[1] - a[1])
-      .map((entry) => entry[0]);
+      .map((e) => e[0]);
+
+    const topShortTermMoods = Array.from(shortTermMood.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map((e) => e[0]);
+
+    const topLongTermMoods = Array.from(longTermMood.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map((e) => e[0]);
 
     return {
       userId,
-      genres,
-      artists,
-      preferredLanguages,
-      preferredMoods,
-      recentBehaviorWindowDays: recentDays,
+      shortTermProfile: {
+        timeframeDays: shortTermDays,
+        genres: shortTermGenres,
+        artists: shortTermArtists,
+        preferredLanguages: topShortTermLanguages,
+        preferredMoods: topShortTermMoods,
+      },
+      longTermProfile: {
+        timeframeDays: longTermDays,
+        genres: longTermGenres,
+        artists: longTermArtists,
+        preferredLanguages: topLongTermLanguages,
+        preferredMoods: topLongTermMoods,
+      },
+      combinedGenres,
+      combinedArtists,
+      preferredLanguages: topLongTermLanguages,
+      preferredMoods: topLongTermMoods,
       updatedAt: now,
     };
   }
