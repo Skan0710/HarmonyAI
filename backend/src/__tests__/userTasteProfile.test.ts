@@ -1,7 +1,5 @@
 import assert from 'node:assert';
 import {
-  GenreAffinity,
-  ArtistAffinity,
   UserTasteProfile,
 } from '../services/userTasteProfileService.js';
 
@@ -49,35 +47,68 @@ export function runUserTasteProfileTests() {
   {
     const mockProfile: UserTasteProfile = {
       userId: '507f1f77bcf86cd799439011',
-      genres: [
+      shortTermProfile: {
+        timeframeDays: 14,
+        genres: [
+          {
+            genreId: 'genre_synthwave',
+            name: 'Synthwave',
+            affinityScore: 1.0,
+          },
+        ],
+        artists: [
+          {
+            artistId: 'artist_m83',
+            name: 'M83',
+            affinityScore: 0.85,
+          },
+        ],
+        preferredLanguages: ['English'],
+        preferredMoods: ['Electronic'],
+      },
+      longTermProfile: {
+        timeframeDays: 180,
+        genres: [
+          {
+            genreId: 'genre_synthwave',
+            name: 'Synthwave',
+            affinityScore: 0.875,
+          },
+        ],
+        artists: [
+          {
+            artistId: 'artist_m83',
+            name: 'M83',
+            affinityScore: 0.975,
+          },
+        ],
+        preferredLanguages: ['English'],
+        preferredMoods: ['Electronic'],
+      },
+      combinedGenres: [
         {
           genreId: 'genre_synthwave',
           name: 'Synthwave',
           affinityScore: 0.95,
-          recentAffinityScore: 1.0,
-          longTermAffinityScore: 0.875,
         },
       ],
-      artists: [
+      combinedArtists: [
         {
           artistId: 'artist_m83',
           name: 'M83',
           affinityScore: 0.9,
-          recentAffinityScore: 0.85,
-          longTermAffinityScore: 0.975,
         },
       ],
       preferredLanguages: ['English', 'French'],
       preferredMoods: ['Electronic', 'Chill'],
-      recentBehaviorWindowDays: 30,
       updatedAt: new Date(),
     };
 
-    assert.strictEqual(mockProfile.genres.length, 1);
-    assert.strictEqual(mockProfile.artists.length, 1);
-    assert.strictEqual(mockProfile.recentBehaviorWindowDays, 30);
-    assert.ok(mockProfile.genres[0].affinityScore <= 1.0);
-    assert.ok(mockProfile.artists[0].affinityScore <= 1.0);
+    assert.strictEqual(mockProfile.shortTermProfile.genres.length, 1);
+    assert.strictEqual(mockProfile.longTermProfile.artists.length, 1);
+    assert.strictEqual(mockProfile.shortTermProfile.timeframeDays, 14);
+    assert.ok(mockProfile.combinedGenres[0].affinityScore <= 1.0);
+    assert.ok(mockProfile.combinedArtists[0].affinityScore <= 1.0);
 
     console.log('✓ Test 3 Passed: User taste profile structure verified.');
   }
