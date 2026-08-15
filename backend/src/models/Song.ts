@@ -32,7 +32,11 @@ export interface ISong extends Document {
   explicit: boolean;
   lyrics?: string;
   isPublished: boolean;
+  // Vector Embedding Storage & Metadata for Semantic Vector Search
   vectorEmbedding?: number[];
+  embeddingGeneratedAt?: Date;
+  embeddingProvider?: string;
+  embeddingDimension?: number;
   recommendationMetadata?: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;
@@ -143,8 +147,22 @@ const songSchema = new Schema<ISong>(
       type: Boolean,
       default: true,
     },
+    // Optional Numeric Vector Embedding Field for Vector Similarity Search
     vectorEmbedding: {
       type: [Number],
+      default: undefined,
+    },
+    // Metadata indicating when & how the vector embedding was generated
+    embeddingGeneratedAt: {
+      type: Date,
+      default: undefined,
+    },
+    embeddingProvider: {
+      type: String,
+      default: undefined,
+    },
+    embeddingDimension: {
+      type: Number,
       default: undefined,
     },
     recommendationMetadata: {
