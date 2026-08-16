@@ -1,21 +1,16 @@
 import dotenv from 'dotenv';
+import {
+  AIPlaylistPreference,
+  validateAndSanitizePlaylistPreference,
+} from '../schemas/aiPlaylistPreferenceSchema.js';
+
 dotenv.config();
 
-export interface ParsedPlaylistConcept {
-  title: string;
-  description: string;
-  targetMood?: string;
-  targetGenres?: string[];
-  desiredTempoBpm?: number;
-  desiredEnergy?: number;
-  desiredValence?: number;
-  searchKeywords: string[];
-  suggestedTrackCount: number;
-}
+export { AIPlaylistPreference as ParsedPlaylistConcept };
 
 export interface ILLMPlaylistInterpreter {
   name: string;
-  interpretPrompt(userPrompt: string): Promise<ParsedPlaylistConcept>;
+  interpretPrompt(userPrompt: string): Promise<AIPlaylistPreference>;
 }
 
 /**
@@ -25,7 +20,7 @@ export interface ILLMPlaylistInterpreter {
 export class RuleBasedFallbackLLMInterpreter implements ILLMPlaylistInterpreter {
   name = 'rule_based_fallback';
 
-  async interpretPrompt(userPrompt: string): Promise<ParsedPlaylistConcept> {
+  async interpretPrompt(userPrompt: string): Promise<AIPlaylistPreference> {
     const cleanPrompt = (userPrompt || '').trim().toLowerCase();
 
     let targetMood = 'Chill';
@@ -80,17 +75,19 @@ export class RuleBasedFallbackLLMInterpreter implements ILLMPlaylistInterpreter 
       ? `${titleWords.charAt(0).toUpperCase() + titleWords.slice(1)} Mix`
       : 'Custom AI Playlist';
 
-    return {
+    const rawConcept = {
       title,
       description: `AI-curated mix matching "${userPrompt.trim()}"`,
-      targetMood,
-      targetGenres: genres.length > 0 ? genres : ['Music'],
+      requestedMood: targetMood,
+      genres: genres.length > 0 ? genres : ['Music'],
       desiredTempoBpm: bpm,
-      desiredEnergy: energy,
+      energyLevel: energy,
       desiredValence: valence,
       searchKeywords: keywords.length > 0 ? keywords : [cleanPrompt],
-      suggestedTrackCount: 12,
+      requestedSongCount: 12,
     };
+
+    return validateAndSanitizePlaylistPreference(rawConcept);
   }
 }
 
@@ -107,7 +104,7 @@ export class GeminiLLMInterpreter implements ILLMPlaylistInterpreter {
     this.modelName = process.env.LLM_MODEL || 'gemini-1.5-flash';
   }
 
-  async interpretPrompt(userPrompt: string): Promise<ParsedPlaylistConcept> {
+  async interpretPrompt(userPrompt: string): Promise<AIPlaylistPreference> {
     if (!this.apiKey) {
       throw new Error('GEMINI_API_KEY environment variable is not configured');
     }
@@ -116,13 +113,18 @@ export class GeminiLLMInterpreter implements ILLMPlaylistInterpreter {
 {
   "title": "Creative Playlist Title",
   "description": "Engaging description",
-  "targetMood": "Chill|Energetic|Melancholic|Upbeat|Focus",
-  "targetGenres": ["Genre1", "Genre2"],
-  "desiredTempoBpm": 120,
-  "desiredEnergy": 0.5,
-  "desiredValence": 0.5,
-  "searchKeywords": ["keyword1", "keyword2"],
-  "suggestedTrackCount": 10
+  "requestedMood": "Chill|Energetic|Melancholic|Upbeat|Focus",
+  "genres": ["Genre1", "Genre2"],
+  "artists": ["Artist1"],
+  "language": "English",
+  "energyLevel": 0.85,
+  "tempoPreference": "fast",
+  "acousticPreference": 0.2,
+  "instrumentalPreference": 0.1,
+  "requestedSongCount": 12,
+  "excludedArtists": [],
+  "excludedGenres": [],
+  "searchKeywords": ["keyword1", "keyword2"]
 }`;
 
     try {
@@ -159,21 +161,11 @@ export class GeminiLLMInterpreter implements ILLMPlaylistInterpreter {
       const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
 
-      if (!parsed || typeof parsed !== 'object' || !parsed.title) {
+      if (!parsed || typeof parsed !== 'object') {
         throw new Error('Invalid JSON structure returned by Gemini API');
       }
 
-      return {
-        title: String(parsed.title || 'AI Playlist').trim(),
-        description: String(parsed.description || `Mix for "${userPrompt}"`).trim(),
-        targetMood: parsed.targetMood ? String(parsed.targetMood) : undefined,
-        targetGenres: Array.isArray(parsed.targetGenres) ? parsed.targetGenres.map(String) : undefined,
-        desiredTempoBpm: typeof parsed.desiredTempoBpm === 'number' ? parsed.desiredTempoBpm : 120,
-        desiredEnergy: typeof parsed.desiredEnergy === 'number' ? parsed.desiredEnergy : 0.5,
-        desiredValence: typeof parsed.desiredValence === 'number' ? parsed.desiredValence : 0.5,
-        searchKeywords: Array.isArray(parsed.searchKeywords) ? parsed.searchKeywords.map(String) : [userPrompt],
-        suggestedTrackCount: typeof parsed.suggestedTrackCount === 'number' ? parsed.suggestedTrackCount : 10,
-      };
+      return validateAndSanitizePlaylistPreference(parsed);
     } catch (err: any) {
       throw new Error(`LLM playlist interpretation failed: ${err.message}`);
     }
@@ -218,22 +210,24 @@ export class AIPlaylistGenerationService {
   }
 
   /**
-   * Interprets a natural-language playlist request prompt into a structured playlist concept.
+   * Interprets a natural-language playlist request prompt into a validated AIPlaylistPreference object.
    * Catches API errors and invalid responses safely, falling back to rule-based interpretation.
    * Does NOT create playlists or modify the database yet.
    */
-  static async interpretPlaylistPrompt(userPrompt: string): Promise<ParsedPlaylistConcept> {
+  static async interpretPlaylistPrompt(userPrompt: string): Promise<AIPlaylistPreference> {
     if (!userPrompt || !userPrompt.trim()) {
       throw new Error('User prompt is required for AI playlist interpretation');
     }
 
     try {
       const interpreter = this.getInterpreter();
-      return await interpreter.interpretPrompt(userPrompt.trim());
+      const rawConcept = await interpreter.interpretPrompt(userPrompt.trim());
+      return validateAndSanitizePlaylistPreference(rawConcept);
     } catch (error: any) {
       console.warn(`[AIPlaylistGenerationService Warning]: LLM interpretation failed. Falling back to rule-based interpreter. Error: ${error.message}`);
       const fallback = new RuleBasedFallbackLLMInterpreter();
-      return await fallback.interpretPrompt(userPrompt.trim());
+      const rawFallback = await fallback.interpretPrompt(userPrompt.trim());
+      return validateAndSanitizePlaylistPreference(rawFallback);
     }
   }
 }
