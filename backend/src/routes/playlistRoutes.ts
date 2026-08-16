@@ -7,10 +7,14 @@ import {
   deletePlaylist,
   addSongToPlaylist,
   removeSongFromPlaylist,
+  generateAIPlaylistEndpoint,
 } from '../controllers/playlistController.js';
 import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// AI Playlist Generation Endpoint (In-memory pipeline, does not save to DB)
+router.post('/ai-generate', optionalAuth, generateAIPlaylistEndpoint);
 
 // Protected & Public Playlist Routes
 router.post('/', protect, createPlaylist);

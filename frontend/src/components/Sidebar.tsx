@@ -23,6 +23,25 @@ export const Sidebar: React.FC = () => {
         </NavLink>
 
         <NavLink
+          to="/ai-playlist"
+          className={({ isActive }) =>
+            `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
+              isActive
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-md shadow-indigo-600/30'
+                : 'hover:bg-slate-700/60 text-indigo-300 hover:text-white'
+            }`
+          }
+        >
+          <svg className="w-4 h-4 text-purple-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span className="flex-1">AI Generator</span>
+          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            AI
+          </span>
+        </NavLink>
+
+        <NavLink
           to="/search"
           className={({ isActive }) =>
             `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PlaylistService } from '../services/playlistService.js';
+import { AIPlaylistPipelineService } from '../services/aiPlaylistPipelineService.js';
 
 export const createPlaylist = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -190,6 +191,40 @@ export const removeSongFromPlaylist = async (req: Request, res: Response): Promi
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to remove song from playlist',
+    });
+  }
+};
+
+export const generateAIPlaylistEndpoint = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { prompt, count } = req.body;
+
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      res.status(400).json({
+        success: false,
+        message: 'Prompt is required for AI playlist generation',
+      });
+      return;
+    }
+
+    const userId = req.user?._id?.toString();
+    const parsedCount = count && !isNaN(parseInt(String(count), 10)) ? parseInt(String(count), 10) : undefined;
+
+    const result = await AIPlaylistPipelineService.generateAIPlaylist({
+      prompt: prompt.trim(),
+      userId,
+      count: parsedCount,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'AI Playlist generated successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate AI playlist',
     });
   }
 };

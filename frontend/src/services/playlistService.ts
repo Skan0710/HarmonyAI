@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { Playlist } from '../types/music';
+import type { Playlist, Song } from '../types/music';
 
 export interface PlaylistsApiResponse {
   success: boolean;
@@ -20,6 +20,42 @@ export interface CreatePlaylistParams {
   description?: string;
   coverImage?: string;
   visibility?: 'public' | 'private';
+}
+
+export interface AIPlaylistPreferenceDTO {
+  title: string;
+  description: string;
+  requestedMood?: string;
+  genres: string[];
+  artists: string[];
+  language?: string;
+  energyLevel: number;
+  tempoPreference: string | number;
+  acousticPreference: number;
+  instrumentalPreference: number;
+  requestedSongCount: number;
+  excludedArtists: string[];
+  excludedGenres: string[];
+  searchKeywords: string[];
+}
+
+export interface AIPlaylistGenerationData {
+  preferences: AIPlaylistPreferenceDTO;
+  songs: Song[];
+  candidatesEvaluated: number;
+  selectedCount: number;
+  metadata: {
+    prompt: string;
+    generatedAt: string;
+    strategy: string;
+    userId?: string;
+  };
+}
+
+export interface AIPlaylistApiResponse {
+  success: boolean;
+  message?: string;
+  data?: AIPlaylistGenerationData;
 }
 
 export const fetchUserPlaylistsApi = async (): Promise<{ playlists: Playlist[] | null; error: string | null }> => {
@@ -140,4 +176,24 @@ export const removeSongFromPlaylistApi = async (
   }
 
   return { playlist: null, error: response.data?.message || 'Failed to remove song from playlist' };
+};
+
+export const generateAIPlaylistApi = async (
+  prompt: string,
+  count?: number
+): Promise<{ result: AIPlaylistGenerationData | null; error: string | null }> => {
+  const response = await apiClient<AIPlaylistApiResponse>('/playlists/ai-generate', {
+    method: 'POST',
+    body: JSON.stringify({ prompt, count }),
+  });
+
+  if (response.error) {
+    return { result: null, error: response.error };
+  }
+
+  if (response.data && response.data.success && response.data.data) {
+    return { result: response.data.data, error: null };
+  }
+
+  return { result: null, error: response.data?.message || 'Failed to generate AI playlist' };
 };
