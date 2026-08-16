@@ -109,7 +109,7 @@ export class GeminiLLMInterpreter implements ILLMPlaylistInterpreter {
       throw new Error('GEMINI_API_KEY environment variable is not configured');
     }
 
-    const systemPrompt = `You are a professional music curator. Interpret the user's natural-language playlist request into a valid JSON object matching this schema strictly without markdown or extra text:
+    const systemPrompt = `You are a professional music curator. Interpret the user's natural-language playlist request into a valid JSON object matching this schema strictly without generating specific song track names or extra text:
 {
   "title": "Creative Playlist Title",
   "description": "Engaging description",
@@ -125,7 +125,8 @@ export class GeminiLLMInterpreter implements ILLMPlaylistInterpreter {
   "excludedArtists": [],
   "excludedGenres": [],
   "searchKeywords": ["keyword1", "keyword2"]
-}`;
+}
+DO NOT include specific song track titles in the output. Extract only playlist preferences and metadata.`;
 
     try {
       const response = await fetch(
@@ -159,10 +160,16 @@ export class GeminiLLMInterpreter implements ILLMPlaylistInterpreter {
 
       // Clean Markdown JSON wrapping if present (e.g. ```json ... ```)
       const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
+      
+      let parsed: any;
+      try {
+        parsed = JSON.parse(cleanJson);
+      } catch (parseError: any) {
+        throw new Error(`Malformed JSON response from LLM: ${parseError.message}`);
+      }
 
       if (!parsed || typeof parsed !== 'object') {
-        throw new Error('Invalid JSON structure returned by Gemini API');
+        throw new Error('Invalid non-object payload returned by Gemini API');
       }
 
       return validateAndSanitizePlaylistPreference(parsed);
@@ -174,6 +181,7 @@ export class GeminiLLMInterpreter implements ILLMPlaylistInterpreter {
 
 export class AIPlaylistGenerationService {
   private static activeInterpreter: ILLMPlaylistInterpreter;
+  public static readonly MAX_PROMPT_LENGTH = 500;
 
   /**
    * Resolves active LLM playlist interpreter based on process.env.LLM_PROVIDER and GEMINI_API_KEY
@@ -210,24 +218,37 @@ export class AIPlaylistGenerationService {
   }
 
   /**
-   * Interprets a natural-language playlist request prompt into a validated AIPlaylistPreference object.
-   * Catches API errors and invalid responses safely, falling back to rule-based interpretation.
-   * Does NOT create playlists or modify the database yet.
+   * Accepts a user's natural-language playlist request text, enforces a maximum prompt length limit (500 chars),
+   * requests structured JSON preferences matching AIPlaylistPreference, validates the response, handles malformed AI responses
+   * gracefully, and returns ONLY structured playlist preferences without generating song names.
    */
-  static async interpretPlaylistPrompt(userPrompt: string): Promise<AIPlaylistPreference> {
+  static async extractPlaylistPreferences(
+    userPrompt: string,
+    maxPromptLength: number = AIPlaylistGenerationService.MAX_PROMPT_LENGTH
+  ): Promise<AIPlaylistPreference> {
     if (!userPrompt || !userPrompt.trim()) {
-      throw new Error('User prompt is required for AI playlist interpretation');
+      throw new Error('Playlist request prompt cannot be empty');
     }
+
+    // Limit prompt length to prevent unnecessarily large prompts
+    const sanitizedPrompt = userPrompt.trim().slice(0, maxPromptLength);
 
     try {
       const interpreter = this.getInterpreter();
-      const rawConcept = await interpreter.interpretPrompt(userPrompt.trim());
+      const rawConcept = await interpreter.interpretPrompt(sanitizedPrompt);
       return validateAndSanitizePlaylistPreference(rawConcept);
     } catch (error: any) {
-      console.warn(`[AIPlaylistGenerationService Warning]: LLM interpretation failed. Falling back to rule-based interpreter. Error: ${error.message}`);
+      console.warn(`[AIPlaylistGenerationService Warning]: LLM extraction failed. Falling back gracefully to rule-based interpreter. Details: ${error.message}`);
       const fallback = new RuleBasedFallbackLLMInterpreter();
-      const rawFallback = await fallback.interpretPrompt(userPrompt.trim());
+      const rawFallback = await fallback.interpretPrompt(sanitizedPrompt);
       return validateAndSanitizePlaylistPreference(rawFallback);
     }
+  }
+
+  /**
+   * Legacy alias for extractPlaylistPreferences.
+   */
+  static async interpretPlaylistPrompt(userPrompt: string): Promise<AIPlaylistPreference> {
+    return this.extractPlaylistPreferences(userPrompt);
   }
 }
