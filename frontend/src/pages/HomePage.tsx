@@ -14,6 +14,7 @@ import {
   fetchHybridRecommendationsApi,
 } from '../services/recommendationService';
 import { MediaCarousel } from '../components/MediaCarousel';
+import { MoodActivityDiscoverySection } from '../components/MoodActivityDiscoverySection';
 import { usePlayerStore } from '../store/usePlayerStore';
 
 export const HomePage: React.FC = () => {
@@ -160,6 +161,9 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Dedicated Mood & Activity Discovery Section */}
+      <MoodActivityDiscoverySection onPlaySong={handlePlaySong} />
 
       {/* 1. Recently Played Carousel (Rendered if user has playback history) */}
       {(recentlyPlayed.length > 0 || loadingRecentlyPlayed) && (
