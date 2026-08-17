@@ -4,6 +4,7 @@ import { ContentRecommendationService } from '../services/recommendationService.
 import { CollaborativeFilteringService } from '../services/collaborativeFilteringService.js';
 import { HybridRecommendationService } from '../services/hybridRecommendationService.js';
 import { ContextAwareRecommendationService } from '../services/contextAwareRecommendationService.js';
+import { ContextualAssistantService } from '../services/contextualAssistantService.js';
 
 export const getSimilarSongs = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -207,6 +208,43 @@ export const getContextualRecommendations = async (
       count: 0,
       data: [],
       message: error.message || 'Contextual recommendations generated fallback response',
+    });
+  }
+};
+
+export const processContextualAssistantRequest = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { prompt, limit } = req.body;
+
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      res.status(400).json({
+        success: false,
+        message: 'Prompt string is required',
+      });
+      return;
+    }
+
+    const parsedLimit = limit && !isNaN(parseInt(String(limit), 10)) ? parseInt(String(limit), 10) : 10;
+    const userId = req.user?._id?.toString();
+
+    const result = await ContextualAssistantService.processAssistantRequest({
+      userPrompt: prompt.trim(),
+      userId,
+      limit: parsedLimit,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Contextual assistant request processed successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to process contextual assistant request',
     });
   }
 };

@@ -4,6 +4,7 @@ import {
   getCollaborativeRecommendations,
   getHybridRecommendations,
   getContextualRecommendations,
+  processContextualAssistantRequest,
 } from '../controllers/recommendationController.js';
 import {
   trackInteraction,
@@ -14,6 +15,9 @@ import {
 import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// POST /api/recommendations/assistant (Optional Auth - Natural-Language Context Assistant)
+router.post('/assistant', optionalAuth, processContextualAssistantRequest);
 
 // GET /api/recommendations/contextual?mood=...&activity=...&energy=...&duration=... (Optional Auth)
 router.get('/contextual', optionalAuth, getContextualRecommendations);
