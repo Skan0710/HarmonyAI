@@ -1,5 +1,6 @@
 export enum ContextMood {
   Chill = 'Chill',
+  Calm = 'Calm',
   Energetic = 'Energetic',
   Melancholic = 'Melancholic',
   Upbeat = 'Upbeat',
