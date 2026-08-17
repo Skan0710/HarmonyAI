@@ -3,6 +3,7 @@ import {
   getSimilarSongs,
   getCollaborativeRecommendations,
   getHybridRecommendations,
+  getContextualRecommendations,
 } from '../controllers/recommendationController.js';
 import {
   trackInteraction,
@@ -10,9 +11,12 @@ import {
   submitFeedback,
   getUserFeedback,
 } from '../controllers/recommendationInteractionController.js';
-import { protect } from '../middlewares/authMiddleware.js';
+import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// GET /api/recommendations/contextual?mood=...&activity=...&energy=...&duration=... (Optional Auth)
+router.get('/contextual', optionalAuth, getContextualRecommendations);
 
 // GET /api/recommendations/hybrid?limit=10&seedSongId=... (Protected JWT)
 router.get('/hybrid', protect, getHybridRecommendations);

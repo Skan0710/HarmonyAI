@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { ContentRecommendationService } from '../services/recommendationService.js';
 import { CollaborativeFilteringService } from '../services/collaborativeFilteringService.js';
 import { HybridRecommendationService } from '../services/hybridRecommendationService.js';
+import { ContextAwareRecommendationService } from '../services/contextAwareRecommendationService.js';
 
 export const getSimilarSongs = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -150,6 +151,62 @@ export const getHybridRecommendations = async (
       count: 0,
       data: [],
       message: error.message || 'Failed to fetch hybrid recommendations safely',
+    });
+  }
+};
+
+export const getContextualRecommendations = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
+    const parsedLimit = isNaN(limit) || limit < 1 ? 10 : Math.min(50, limit);
+
+    const mood = req.query.mood ? String(req.query.mood) : undefined;
+    const activity = req.query.activity ? String(req.query.activity) : undefined;
+
+    const energyParam = req.query.energy || req.query.energyLevel;
+    const energyLevel =
+      energyParam && !isNaN(parseFloat(String(energyParam)))
+        ? parseFloat(String(energyParam))
+        : undefined;
+
+    const durationParam =
+      req.query.duration || req.query.durationMinutes || req.query.preferredDurationMinutes;
+    const durationMinutes =
+      durationParam && !isNaN(parseInt(String(durationParam), 10))
+        ? parseInt(String(durationParam), 10)
+        : undefined;
+
+    const userId = req.user?._id?.toString();
+
+    const result = await ContextAwareRecommendationService.getContextualRecommendations({
+      userId,
+      mood,
+      activity,
+      energyLevel,
+      durationMinutes,
+      limit: parsedLimit,
+    });
+
+    res.status(200).json({
+      success: true,
+      strategyUsed: result.strategyUsed,
+      userClassification: result.userClassification,
+      detectedContext: result.detectedContext,
+      count: result.count,
+      data: result.data || [],
+    });
+  } catch (error: any) {
+    res.status(200).json({
+      success: true,
+      strategyUsed: 'COLD_START',
+      userClassification: 'NEW',
+      detectedContext: {},
+      count: 0,
+      data: [],
+      message: error.message || 'Contextual recommendations generated fallback response',
     });
   }
 };
