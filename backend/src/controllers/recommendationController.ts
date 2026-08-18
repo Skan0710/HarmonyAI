@@ -5,6 +5,7 @@ import { CollaborativeFilteringService } from '../services/collaborativeFilterin
 import { HybridRecommendationService } from '../services/hybridRecommendationService.js';
 import { ContextAwareRecommendationService } from '../services/contextAwareRecommendationService.js';
 import { ContextualAssistantService } from '../services/contextualAssistantService.js';
+import { SessionRecommendationService } from '../services/sessionRecommendationService.js';
 
 export const getSimilarSongs = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -245,6 +246,48 @@ export const processContextualAssistantRequest = async (
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to process contextual assistant request',
+    });
+  }
+};
+
+export const getSessionRecommendations = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized access. Authentication token required.',
+      });
+      return;
+    }
+
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
+    const parsedLimit = isNaN(limit) || limit < 1 ? 10 : Math.min(50, limit);
+
+    const result = await SessionRecommendationService.getSessionRecommendations({
+      userId: req.user._id.toString(),
+      limit: parsedLimit,
+    });
+
+    res.status(200).json({
+      success: true,
+      hasActiveSession: result.hasActiveSession,
+      strategyUsed: result.strategyUsed,
+      sessionId: result.sessionId,
+      songCountInSession: result.songCountInSession,
+      count: result.count,
+      data: result.data || [],
+    });
+  } catch (error: any) {
+    res.status(200).json({
+      success: true,
+      hasActiveSession: false,
+      strategyUsed: 'COLD_START_FALLBACK',
+      count: 0,
+      data: [],
+      message: error.message || 'Session recommendations generated fallback response',
     });
   }
 };
