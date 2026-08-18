@@ -56,6 +56,28 @@ export interface ContextualApiResponse {
   message?: string;
 }
 
+export interface SessionItemResponse {
+  song: Song;
+  sessionScore: number;
+  contributingFactors: {
+    contentSimilarityScore: number;
+    sessionProfileAffinity: number;
+    seedSongId?: string;
+  };
+  source: string;
+}
+
+export interface SessionApiResponse {
+  success: boolean;
+  hasActiveSession?: boolean;
+  strategyUsed?: string;
+  sessionId?: string;
+  songCountInSession?: number;
+  count?: number;
+  data?: SessionItemResponse[];
+  message?: string;
+}
+
 export const fetchCollaborativeRecommendationsApi = async (
   limit = 10
 ): Promise<{ songs: Song[]; error: string | null }> => {
@@ -151,5 +173,41 @@ export const fetchContextualRecommendationsApi = async (params: {
     songs: [],
     rawItems: [],
     error: response.data?.message || 'Failed to fetch contextual recommendations',
+  };
+};
+
+export const fetchSessionRecommendationsApi = async (
+  limit = 10
+): Promise<{
+  songs: Song[];
+  rawItems: SessionItemResponse[];
+  hasActiveSession: boolean;
+  error: string | null;
+}> => {
+  const response = await apiClient<SessionApiResponse>(
+    `/recommendations/session?limit=${limit}`,
+    { method: 'GET' }
+  );
+
+  if (response.error) {
+    return { songs: [], rawItems: [], hasActiveSession: false, error: response.error };
+  }
+
+  if (response.data && response.data.success && Array.isArray(response.data.data)) {
+    const rawItems = response.data.data;
+    const songs = rawItems.filter((item) => Boolean(item.song)).map((item) => item.song);
+    return {
+      songs,
+      rawItems,
+      hasActiveSession: Boolean(response.data.hasActiveSession),
+      error: null,
+    };
+  }
+
+  return {
+    songs: [],
+    rawItems: [],
+    hasActiveSession: false,
+    error: response.data?.message || 'Failed to fetch session recommendations',
   };
 };
