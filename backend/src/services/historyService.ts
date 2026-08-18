@@ -1,5 +1,6 @@
 import { ListeningHistory } from '../models/ListeningHistory.js';
 import { Song } from '../models/Song.js';
+import { ListeningSessionService } from './listeningSessionService.js';
 import { Types } from 'mongoose';
 
 export class HistoryService {
@@ -7,6 +8,7 @@ export class HistoryService {
    * Records a playback event for a user.
    * If the same song was recorded within the last 60 seconds, updates the timestamp
    * to avoid duplicate clutter while keeping accurate playback history.
+   * Lightweight non-blocking integration with active ListeningSession tracking.
    */
   static async recordPlayback(userId: string, songId: string): Promise<any> {
     if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(songId)) {
@@ -17,6 +19,13 @@ export class HistoryService {
     if (!songExists) {
       throw new Error('Song not found');
     }
+
+    // Lightweight non-blocking listening session playback association
+    ListeningSessionService.recordSongPlayInSession({ userId, songId }).catch((err) => {
+      console.warn(
+        `[HistoryService Warning]: Non-blocking listening session tracking failed: ${err.message}`
+      );
+    });
 
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
 
