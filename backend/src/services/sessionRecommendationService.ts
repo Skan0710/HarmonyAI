@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { ListeningSessionService } from './listeningSessionService.js';
 import { SessionCandidateGenerationService, SessionCandidateResult } from './sessionCandidateGenerationService.js';
 import { ColdStartRecommendationService } from './coldStartRecommendationService.js';
+import { SessionProfileService } from './sessionProfileService.js';
 import { ISong } from '../models/Song.js';
 
 export interface SessionRankedItem {
@@ -15,6 +16,15 @@ export interface SessionRankedItem {
   source: string;
 }
 
+export interface SessionRecommendationDiagnostics {
+  isDebugEnabled: boolean;
+  sessionLength: number;
+  candidateCount: number;
+  dominantSessionGenre: string;
+  dominantSessionArtist: string;
+  recommendationCount: number;
+}
+
 export interface SessionRecommendationResponse {
   hasActiveSession: boolean;
   strategyUsed: 'SESSION_REALTIME' | 'COLD_START_FALLBACK';
@@ -22,6 +32,7 @@ export interface SessionRecommendationResponse {
   songCountInSession?: number;
   count: number;
   data: SessionRankedItem[];
+  diagnostics?: SessionRecommendationDiagnostics;
 }
 
 export class SessionRecommendationService {
@@ -30,12 +41,14 @@ export class SessionRecommendationService {
    * - Uses active listening session behavior if present.
    * - Gracefully falls back to cold-start / popular recommendations if user has no active session.
    * - Returns session relevance score and contributing factors for each song.
+   * - Provides development-only diagnostics when isDebugMode=true and NODE_ENV !== 'production'.
    */
   static async getSessionRecommendations(params: {
     userId: string;
     limit?: number;
+    isDebugMode?: boolean;
   }): Promise<SessionRecommendationResponse> {
-    const { userId, limit = 10 } = params;
+    const { userId, limit = 10, isDebugMode = false } = params;
 
     if (!userId || !Types.ObjectId.isValid(userId)) {
       throw new Error('Invalid user ID provided for session recommendations');
@@ -57,13 +70,30 @@ export class SessionRecommendationService {
         source: 'cold_start_fallback',
       }));
 
+      const isDebugEnabled = isDebugMode && process.env.NODE_ENV !== 'production';
+
       return {
         hasActiveSession: false,
         strategyUsed: 'COLD_START_FALLBACK',
         count: fallbackData.length,
         data: fallbackData,
+        ...(isDebugEnabled
+          ? {
+              diagnostics: {
+                isDebugEnabled: true,
+                sessionLength: 0,
+                candidateCount: fallbackRes.songs.length,
+                dominantSessionGenre: 'None',
+                dominantSessionArtist: 'None',
+                recommendationCount: fallbackData.length,
+              },
+            }
+          : {}),
       };
     }
+
+    // Calculate temporary session profile for diagnostics & ranking
+    const sessionProfile = await SessionProfileService.calculateSessionProfileFromSession(activeSession);
 
     // Generate candidates based on active session
     const candidates: SessionCandidateResult[] =
@@ -85,6 +115,8 @@ export class SessionRecommendationService {
         source: 'catalog_fallback',
       }));
 
+      const isDebugEnabled = isDebugMode && process.env.NODE_ENV !== 'production';
+
       return {
         hasActiveSession: true,
         strategyUsed: 'COLD_START_FALLBACK',
@@ -92,6 +124,18 @@ export class SessionRecommendationService {
         songCountInSession: activeSession.songsPlayed.length,
         count: fallbackData.length,
         data: fallbackData,
+        ...(isDebugEnabled
+          ? {
+              diagnostics: {
+                isDebugEnabled: true,
+                sessionLength: activeSession.songsPlayed.length,
+                candidateCount: 0,
+                dominantSessionGenre: sessionProfile?.dominantGenres[0]?.genre || 'None',
+                dominantSessionArtist: sessionProfile?.dominantArtists[0]?.name || 'None',
+                recommendationCount: fallbackData.length,
+              },
+            }
+          : {}),
       };
     }
 
@@ -106,6 +150,8 @@ export class SessionRecommendationService {
       source: c.source,
     }));
 
+    const isDebugEnabled = isDebugMode && process.env.NODE_ENV !== 'production';
+
     return {
       hasActiveSession: true,
       strategyUsed: 'SESSION_REALTIME',
@@ -113,6 +159,18 @@ export class SessionRecommendationService {
       songCountInSession: activeSession.songsPlayed.length,
       count: formattedData.length,
       data: formattedData,
+      ...(isDebugEnabled
+        ? {
+            diagnostics: {
+              isDebugEnabled: true,
+              sessionLength: activeSession.songsPlayed.length,
+              candidateCount: candidates.length,
+              dominantSessionGenre: sessionProfile?.dominantGenres[0]?.genre || 'None',
+              dominantSessionArtist: sessionProfile?.dominantArtists[0]?.name || 'None',
+              recommendationCount: formattedData.length,
+            },
+          }
+        : {}),
     };
   }
 }

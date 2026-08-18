@@ -266,9 +266,14 @@ export const getSessionRecommendations = async (
     const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
     const parsedLimit = isNaN(limit) || limit < 1 ? 10 : Math.min(50, limit);
 
+    // Enable debugging only when debug=true query parameter is passed AND not in production
+    const isDebugMode =
+      req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
+
     const result = await SessionRecommendationService.getSessionRecommendations({
       userId: req.user._id.toString(),
       limit: parsedLimit,
+      isDebugMode,
     });
 
     res.status(200).json({
@@ -279,6 +284,7 @@ export const getSessionRecommendations = async (
       songCountInSession: result.songCountInSession,
       count: result.count,
       data: result.data || [],
+      ...(isDebugMode && result.diagnostics ? { diagnostics: result.diagnostics } : {}),
     });
   } catch (error: any) {
     res.status(200).json({
