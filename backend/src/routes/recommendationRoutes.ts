@@ -5,6 +5,7 @@ import {
   getHybridRecommendations,
   getContextualRecommendations,
   processContextualAssistantRequest,
+  getSessionRecommendations,
 } from '../controllers/recommendationController.js';
 import {
   trackInteraction,
@@ -15,6 +16,9 @@ import {
 import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// GET /api/recommendations/session?limit=10 (Protected JWT)
+router.get('/session', protect, getSessionRecommendations);
 
 // POST /api/recommendations/assistant (Optional Auth - Natural-Language Context Assistant)
 router.post('/assistant', optionalAuth, processContextualAssistantRequest);
