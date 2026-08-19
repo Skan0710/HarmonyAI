@@ -12,6 +12,8 @@ export const usePlayer = () => {
   const isShuffle = usePlayerStore((state) => state.isShuffle);
   const repeatMode = usePlayerStore((state) => state.repeatMode);
   const isQueueOpen = usePlayerStore((state) => state.isQueueOpen);
+  const isAutoplayEnabled = usePlayerStore((state) => state.isAutoplayEnabled);
+  const isAutoplayLoading = usePlayerStore((state) => state.isAutoplayLoading);
 
   const playSong = usePlayerStore((state) => state.playSong);
   const togglePlay = usePlayerStore((state) => state.togglePlay);
@@ -24,6 +26,8 @@ export const usePlayer = () => {
   const toggleMute = usePlayerStore((state) => state.toggleMute);
   const toggleShuffle = usePlayerStore((state) => state.toggleShuffle);
   const toggleRepeatMode = usePlayerStore((state) => state.toggleRepeatMode);
+  const toggleAutoplay = usePlayerStore((state) => state.toggleAutoplay);
+  const setAutoplayEnabled = usePlayerStore((state) => state.setAutoplayEnabled);
   const addToQueue = usePlayerStore((state) => state.addToQueue);
   const removeFromQueue = usePlayerStore((state) => state.removeFromQueue);
   const clearQueue = usePlayerStore((state) => state.clearQueue);
@@ -47,6 +51,8 @@ export const usePlayer = () => {
     isShuffle,
     repeatMode,
     isQueueOpen,
+    isAutoplayEnabled,
+    isAutoplayLoading,
 
     playSong,
     togglePlay,
@@ -59,6 +65,8 @@ export const usePlayer = () => {
     toggleMute,
     toggleShuffle,
     toggleRepeatMode,
+    toggleAutoplay,
+    setAutoplayEnabled,
     addToQueue,
     removeFromQueue,
     clearQueue,
