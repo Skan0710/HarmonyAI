@@ -3,11 +3,20 @@ import { ContextPreference } from '../schemas/contextPreferenceSchema.js';
 
 export type SessionStatus = 'active' | 'paused' | 'ended';
 
+export type SessionActionType = 'play' | 'skip' | 'like' | 'replay' | 'queue_add' | 'complete';
+
 export interface ISessionPlayedSong {
   song: Types.ObjectId;
   playedAt: Date;
   playDurationSeconds?: number;
   completed?: boolean;
+}
+
+export interface ISessionEvent {
+  song: Types.ObjectId;
+  action: SessionActionType;
+  timestamp: Date;
+  metadata?: Record<string, any>;
 }
 
 export interface IListeningSession extends Document {
@@ -16,6 +25,7 @@ export interface IListeningSession extends Document {
   startTime: Date;
   lastActivityTime: Date;
   songsPlayed: ISessionPlayedSong[];
+  sessionEvents: ISessionEvent[];
   currentSong?: Types.ObjectId;
   status: SessionStatus;
   contextSnapshot?: ContextPreference;
@@ -46,6 +56,30 @@ const SessionPlayedSongSchema = new Schema<ISessionPlayedSong>(
   { _id: false }
 );
 
+const SessionEventSchema = new Schema<ISessionEvent>(
+  {
+    song: {
+      type: Schema.Types.ObjectId,
+      ref: 'Song',
+      required: true,
+    },
+    action: {
+      type: String,
+      enum: ['play', 'skip', 'like', 'replay', 'queue_add', 'complete'],
+      required: true,
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now,
+      required: true,
+    },
+    metadata: {
+      type: Schema.Types.Mixed,
+    },
+  },
+  { _id: false }
+);
+
 const ListeningSessionSchema = new Schema<IListeningSession>(
   {
     user: {
@@ -66,6 +100,10 @@ const ListeningSessionSchema = new Schema<IListeningSession>(
     },
     songsPlayed: {
       type: [SessionPlayedSongSchema],
+      default: [],
+    },
+    sessionEvents: {
+      type: [SessionEventSchema],
       default: [],
     },
     currentSong: {

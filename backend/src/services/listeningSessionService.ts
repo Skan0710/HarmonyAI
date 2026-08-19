@@ -1,6 +1,12 @@
 import { Types } from 'mongoose';
-import { ListeningSession, IListeningSession, SessionStatus } from '../models/ListeningSession.js';
+import {
+  ListeningSession,
+  IListeningSession,
+  SessionStatus,
+  SessionActionType,
+} from '../models/ListeningSession.js';
 import { ContextPreference } from '../schemas/contextPreferenceSchema.js';
+import { RecommendationInteractionTrackingService } from './recommendationInteractionTrackingService.js';
 
 export const SESSION_INACTIVITY_TIMEOUT_MINUTES = 30;
 
@@ -127,6 +133,64 @@ export class ListeningSessionService {
 
     if (contextSnapshot) {
       session.contextSnapshot = contextSnapshot;
+    }
+
+    return await session.save();
+  }
+
+  /**
+   * Records a real-time session interaction event (play, skip, like, replay, queue_add, complete)
+   * for an active listening session. Creates a new active session if none exists.
+   * Reuses recommendation interaction tracking where appropriate in a non-blocking call.
+   */
+  static async recordSessionEvent(params: {
+    userId: string;
+    songId: string;
+    action: SessionActionType;
+    metadata?: Record<string, any>;
+  }): Promise<IListeningSession> {
+    const { userId, songId, action, metadata } = params;
+
+    if (!userId || !Types.ObjectId.isValid(userId)) {
+      throw new Error('Invalid user ID');
+    }
+    if (!songId || !Types.ObjectId.isValid(songId)) {
+      throw new Error('Invalid song ID');
+    }
+
+    const validActions: SessionActionType[] = ['play', 'skip', 'like', 'replay', 'queue_add', 'complete'];
+    if (!validActions.includes(action)) {
+      throw new Error(`Invalid session action: ${action}`);
+    }
+
+    let session = await this.getActiveSession(userId);
+    if (!session) {
+      session = await this.createSession({ userId, initialSongId: songId });
+    }
+
+    const songObjectId = new Types.ObjectId(songId);
+    const now = new Date();
+
+    session.lastActivityTime = now;
+    if (action === 'play' || action === 'replay') {
+      session.currentSong = songObjectId;
+    }
+
+    session.sessionEvents.push({
+      song: songObjectId,
+      action,
+      timestamp: now,
+      metadata,
+    });
+
+    // Reuse existing recommendation interaction tracking where appropriate (non-blocking call)
+    if (action === 'play' || action === 'skip' || action === 'like') {
+      RecommendationInteractionTrackingService.recordInteraction({
+        userId,
+        songId,
+        action: action === 'play' ? 'play' : action === 'skip' ? 'skip' : 'like',
+        recommendationSource: (metadata?.recommendationSource as any) || 'session',
+      }).catch(() => {});
     }
 
     return await session.save();
