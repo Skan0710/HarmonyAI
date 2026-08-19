@@ -318,18 +318,24 @@ export const getSmartAutoplayCandidates = async (
     const lastPlayedArtistId = req.query.lastPlayedArtistId ? String(req.query.lastPlayedArtistId) : undefined;
     const excludeQueueParam = req.query.excludeQueue ? String(req.query.excludeQueue).split(',') : [];
 
+    // Enable debugging only when debug=true query parameter is passed AND not in production
+    const isDebugMode =
+      req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
+
     const result = await SmartAutoplayService.generateAutoplayCandidates({
       userId: req.user._id.toString(),
       limit: parsedLimit,
       lastPlayedArtistId,
       currentQueueSongIds: excludeQueueParam,
+      isDebugMode,
     });
 
     res.status(200).json({
       success: true,
       strategyUsed: 'SMART_AUTOPLAY',
-      count: result.length,
-      data: result,
+      count: result.candidates.length,
+      data: result.candidates,
+      ...(isDebugMode && result.diagnostics ? { diagnostics: result.diagnostics } : {}),
     });
   } catch (error: any) {
     res.status(200).json({
