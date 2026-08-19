@@ -3,6 +3,7 @@ import type { Song } from '../types/music';
 import { recordSongPlay } from '../services/songService';
 import { recordPlaybackApi } from '../services/historyService';
 import { trackRecommendationInteraction } from '../services/recommendationTrackingService';
+import { fetchSmartAutoplayApi } from '../services/recommendationService';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -38,6 +39,8 @@ interface PlayerState {
   isShuffle: boolean;
   repeatMode: RepeatMode;
   isQueueOpen: boolean;
+  isAutoplayLoading: boolean;
+  lastAutoplaySeedKey: string | null;
 
   // Actions / Functions
   playSong: (song: Song, queue?: Song[]) => void;
@@ -59,6 +62,7 @@ interface PlayerState {
   nextSong: () => void;
   previousSong: () => void;
   handleSongEnd: () => void;
+  triggerSmartAutoplay: () => Promise<boolean>;
   toggleQueueOpen: () => void;
   setQueueOpen: (isOpen: boolean) => void;
 }
@@ -75,6 +79,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isShuffle: false,
   repeatMode: 'off',
   isQueueOpen: false,
+  isAutoplayLoading: false,
+  lastAutoplaySeedKey: null,
 
   playSong: (song, queue) => {
     const currentQueue = queue && queue.length > 0 ? queue : get().queue.length > 0 ? get().queue : [song];
@@ -86,6 +92,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       currentTime: 0,
       queue: currentQueue,
       queueIndex: index >= 0 ? index : 0,
+      lastAutoplaySeedKey: null,
     });
 
     notifyTrackPlay(song._id);
@@ -169,6 +176,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         currentSong: null,
         isPlaying: false,
         currentTime: 0,
+        lastAutoplaySeedKey: null,
       });
       return;
     }
@@ -199,6 +207,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       currentSong: null,
       isPlaying: false,
       currentTime: 0,
+      lastAutoplaySeedKey: null,
     });
   },
 
@@ -212,6 +221,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       currentSong: song,
       isPlaying: !!song,
       currentTime: 0,
+      lastAutoplaySeedKey: null,
     });
 
     notifyTrackPlay(song?._id);
@@ -232,8 +242,65 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     notifyTrackPlay(targetSong?._id);
   },
 
-  nextSong: () => {
-    const { queue, queueIndex, currentSong, currentTime, duration, isShuffle } = get();
+  triggerSmartAutoplay: async (): Promise<boolean> => {
+    const { currentSong, queue, isAutoplayLoading, lastAutoplaySeedKey } = get();
+
+    if (!currentSong || isAutoplayLoading) {
+      return false;
+    }
+
+    const stateKey = `${currentSong._id}_${queue.length}`;
+    if (lastAutoplaySeedKey === stateKey) {
+      return false;
+    }
+
+    set({ isAutoplayLoading: true, lastAutoplaySeedKey: stateKey });
+
+    try {
+      const lastArtistId =
+        typeof currentSong.artist === 'object' && currentSong.artist && '_id' in currentSong.artist
+          ? String(currentSong.artist._id)
+          : String(currentSong.artist || '');
+
+      const excludeQueueIds = queue.map((s) => s._id);
+
+      const { songs } = await fetchSmartAutoplayApi({
+        limit: 5,
+        lastPlayedArtistId: lastArtistId,
+        excludeQueue: excludeQueueIds,
+      });
+
+      if (songs && songs.length > 0) {
+        const currentQueue = get().queue;
+        const currentIdx = get().queueIndex;
+
+        // Automatically append recommendations to the queue without overwriting manually queued tracks
+        const updatedQueue = [...currentQueue, ...songs];
+        const nextIdx = currentIdx + 1;
+        const nextSongItem = updatedQueue[nextIdx];
+
+        set({
+          queue: updatedQueue,
+          queueIndex: nextIdx,
+          currentSong: nextSongItem,
+          isPlaying: true,
+          currentTime: 0,
+          isAutoplayLoading: false,
+        });
+
+        notifyTrackPlay(nextSongItem?._id);
+        return true;
+      }
+    } catch (err) {
+      // Handled gracefully below
+    }
+
+    set({ isAutoplayLoading: false });
+    return false;
+  },
+
+  nextSong: async () => {
+    const { queue, queueIndex, currentSong, currentTime, duration, isShuffle, repeatMode } = get();
     if (queue.length === 0) return;
 
     // Track skip action if skipped early (< 50% played) on a recommended track
@@ -248,27 +315,54 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       }
     }
 
-    let nextIdx: number;
-
     if (isShuffle && queue.length > 1) {
+      let nextIdx: number;
       do {
         nextIdx = Math.floor(Math.random() * queue.length);
       } while (nextIdx === queueIndex);
-    } else {
-      nextIdx = (queueIndex + 1) % queue.length;
+
+      const nextSongItem = queue[nextIdx];
+      if (nextSongItem) {
+        set({
+          queueIndex: nextIdx,
+          currentSong: nextSongItem,
+          isPlaying: true,
+          currentTime: 0,
+        });
+        notifyTrackPlay(nextSongItem._id);
+      }
+      return;
     }
 
-    const nextSongItem = queue[nextIdx];
-
-    if (nextSongItem) {
-      set({
-        queueIndex: nextIdx,
-        currentSong: nextSongItem,
-        isPlaying: true,
-        currentTime: 0,
-      });
-
-      notifyTrackPlay(nextSongItem._id);
+    if (queueIndex + 1 < queue.length) {
+      const nextIdx = queueIndex + 1;
+      const nextSongItem = queue[nextIdx];
+      if (nextSongItem) {
+        set({
+          queueIndex: nextIdx,
+          currentSong: nextSongItem,
+          isPlaying: true,
+          currentTime: 0,
+        });
+        notifyTrackPlay(nextSongItem._id);
+      }
+    } else if (repeatMode === 'all') {
+      const nextSongItem = queue[0];
+      if (nextSongItem) {
+        set({
+          queueIndex: 0,
+          currentSong: nextSongItem,
+          isPlaying: true,
+          currentTime: 0,
+        });
+        notifyTrackPlay(nextSongItem._id);
+      }
+    } else {
+      // Reached end of queue: Attempt Smart Autoplay
+      const autoplayStarted = await get().triggerSmartAutoplay();
+      if (!autoplayStarted) {
+        set({ isPlaying: false, currentTime: 0 });
+      }
     }
   },
 
@@ -305,7 +399,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
   },
 
-  handleSongEnd: () => {
+  handleSongEnd: async () => {
     const { repeatMode, queue, queueIndex } = get();
 
     if (repeatMode === 'one') {
@@ -321,7 +415,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (queueIndex + 1 < queue.length) {
       get().nextSong();
     } else {
-      set({ isPlaying: false, currentTime: 0 });
+      // Current queue reached its end: Trigger Smart Autoplay
+      const autoplayStarted = await get().triggerSmartAutoplay();
+      if (!autoplayStarted) {
+        set({ isPlaying: false, currentTime: 0 });
+      }
     }
   },
 
