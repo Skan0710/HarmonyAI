@@ -7,6 +7,7 @@ import {
 } from '../models/ListeningSession.js';
 import { ContextPreference } from '../schemas/contextPreferenceSchema.js';
 import { RecommendationInteractionTrackingService } from './recommendationInteractionTrackingService.js';
+import { SessionPreferenceUpdateService } from './sessionPreferenceUpdateService.js';
 
 export const SESSION_INACTIVITY_TIMEOUT_MINUTES = 30;
 
@@ -142,6 +143,7 @@ export class ListeningSessionService {
    * Records a real-time session interaction event (play, skip, like, replay, queue_add, complete)
    * for an active listening session. Creates a new active session if none exists.
    * Reuses recommendation interaction tracking where appropriate in a non-blocking call.
+   * Triggers real-time session preference profile updates.
    */
   static async recordSessionEvent(params: {
     userId: string;
@@ -193,7 +195,14 @@ export class ListeningSessionService {
       }).catch(() => {});
     }
 
-    return await session.save();
+    const savedSession = await session.save();
+
+    // Trigger non-blocking real-time session profile update
+    SessionPreferenceUpdateService.updateSessionProfileFromInteractions(savedSession).catch((err) => {
+      console.warn(`[ListeningSessionService Warning]: Session preference update failed: ${err.message}`);
+    });
+
+    return savedSession;
   }
 
   /**
