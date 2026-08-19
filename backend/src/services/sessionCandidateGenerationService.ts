@@ -4,75 +4,29 @@ import { IListeningSession } from '../models/ListeningSession.js';
 import { ListeningSessionService } from './listeningSessionService.js';
 import { SessionProfileService, TemporarySessionProfile } from './sessionProfileService.js';
 import { ContentRecommendationService } from './recommendationService.js';
+import { AdaptiveSessionScoringService } from './adaptiveSessionScoringService.js';
+import { AdaptiveSessionScoringWeights } from '../config/recommendationConfig.js';
 
 export interface SessionCandidateResult {
   song: ISong;
   sessionRelevanceScore: number;
   contentSimilarityScore: number;
   sessionProfileAffinity: number;
+  interactionFeedbackScore?: number;
+  positiveFeedbackBoost?: number;
+  negativeFeedbackPenalty?: number;
   seedSongId?: string;
   source: 'session_content_similarity' | 'session_profile_affinity';
 }
 
 export class SessionCandidateGenerationService {
   /**
-   * Calculates candidate affinity score (0.0 to 1.0) against temporary session profile.
-   */
-  private static calculateProfileAffinity(
-    candidateSong: any,
-    sessionProfile: TemporarySessionProfile
-  ): number {
-    if (!candidateSong || !sessionProfile) return 0.5;
-
-    // 1. Genre Match Score (35% Weight)
-    let genreScore = 0.3;
-    const songGenre =
-      typeof candidateSong.genre === 'object' && candidateSong.genre && 'name' in candidateSong.genre
-        ? String(candidateSong.genre.name)
-        : String(candidateSong.genre || '');
-
-    const matchingGenreItem = sessionProfile.dominantGenres.find(
-      (g) => g.genre.toLowerCase() === songGenre.toLowerCase()
-    );
-    if (matchingGenreItem) {
-      genreScore = 0.5 + matchingGenreItem.score * 0.5;
-    }
-
-    // 2. Artist Match Score (25% Weight)
-    let artistScore = 0.3;
-    const songArtistId =
-      typeof candidateSong.artist === 'object' && candidateSong.artist && '_id' in candidateSong.artist
-        ? String(candidateSong.artist._id)
-        : String(candidateSong.artist || '');
-
-    const matchingArtistItem = sessionProfile.dominantArtists.find((a) => a.artistId === songArtistId);
-    if (matchingArtistItem) {
-      artistScore = 0.6 + matchingArtistItem.score * 0.4;
-    }
-
-    // 3. Audio Features Alignment (Energy & Tempo) (25% Weight)
-    let audioScore = 0.5;
-    if (candidateSong.audioFeatures) {
-      const energyDiff = Math.abs((candidateSong.audioFeatures.energy || 0.5) - sessionProfile.averageEnergy);
-      const energyScore = 1.0 - Math.min(1, energyDiff);
-      audioScore = energyScore;
-    }
-
-    // 4. Mood Alignment (15% Weight)
-    let moodScore = 0.4;
-    const songMood = String(candidateSong.mood || 'Chill');
-    if (sessionProfile.moodDistribution && sessionProfile.moodDistribution[songMood]) {
-      moodScore = 0.5 + sessionProfile.moodDistribution[songMood] * 0.5;
-    }
-
-    const affinity = genreScore * 0.35 + artistScore * 0.25 + audioScore * 0.25 + moodScore * 0.15;
-    return Number(Math.max(0.0, Math.min(1.0, affinity)).toFixed(4));
-  }
-
-  /**
-   * Generates ranked session-based candidate songs.
+   * Generates ranked session-based candidate songs using adaptive session recommendation scoring.
    * - Uses recently played session tracks as primary seed signals.
-   * - Fuses content similarity with temporary session profile alignment.
+   * - Boosts scores for songs similar to recently liked/replayed tracks.
+   * - Reduces scores for songs similar to recently skipped tracks.
+   * - Considers genre, artist, mood, energy, and tempo preferences.
+   * - Gives higher weight to recent interactions with configurable weights.
    * - Excludes tracks already played in current session.
    * - Enforces artist diversity (max 2 songs per artist).
    * - Does not modify existing hybrid recommendation engine.
@@ -83,8 +37,9 @@ export class SessionCandidateGenerationService {
     limit?: number;
     excludePlayed?: boolean;
     maxPerArtist?: number;
+    customWeights?: Partial<AdaptiveSessionScoringWeights>;
   }): Promise<SessionCandidateResult[]> {
-    const { userId, limit = 10, excludePlayed = true, maxPerArtist = 2 } = params;
+    const { userId, limit = 10, excludePlayed = true, maxPerArtist = 2, customWeights } = params;
 
     let session = params.sessionDoc;
     if (!session) {
@@ -144,7 +99,6 @@ export class SessionCandidateGenerationService {
 
     // 2. Supplementary Session Profile Matching Catalog Songs if candidates are sparse
     if (candidateMap.size < limit * 2 && sessionProfile.dominantGenres.length > 0) {
-      const topGenre = sessionProfile.dominantGenres[0].genre;
       const genreMatches = await Song.find({
         _id: { $nin: Array.from(playedSongIdsSet) },
       })
@@ -164,7 +118,18 @@ export class SessionCandidateGenerationService {
       });
     }
 
-    // 3. Score Fusion (Content Similarity + Temporary Session Profile Affinity)
+    // Build map of event songs for interaction feedback scoring
+    const sessionEvents = session.sessionEvents || [];
+    const eventSongIds = sessionEvents.map((ev) => ev.song);
+    const eventSongs = await Song.find({ _id: { $in: eventSongIds } })
+      .populate('artist', 'name')
+      .populate('genre', 'name')
+      .lean();
+
+    const eventSongMap = new Map<string, any>();
+    eventSongs.forEach((s) => eventSongMap.set(s._id.toString(), s));
+
+    // 3. Adaptive Score Fusion
     const candidates: SessionCandidateResult[] = [];
     const artistCounts = new Map<string, number>();
 
@@ -181,19 +146,23 @@ export class SessionCandidateGenerationService {
         continue;
       }
 
-      const contentScore = item.contentScore;
-      const profileAffinity = this.calculateProfileAffinity(songDoc, sessionProfile);
-
-      // Weighted session relevance score (50% content similarity, 50% session profile affinity)
-      const sessionRelevanceScore = Number(
-        (contentScore * 0.5 + profileAffinity * 0.5).toFixed(4)
-      );
+      const scoreBreakdown = AdaptiveSessionScoringService.computeAdaptiveScore({
+        candidateSong: songDoc,
+        contentSimilarityScore: item.contentScore,
+        sessionProfile,
+        sessionEvents,
+        songMap: eventSongMap,
+        customWeights,
+      });
 
       candidates.push({
         song: songDoc as ISong,
-        sessionRelevanceScore,
-        contentSimilarityScore: contentScore,
-        sessionProfileAffinity: profileAffinity,
+        sessionRelevanceScore: scoreBreakdown.adaptiveScore,
+        contentSimilarityScore: scoreBreakdown.contentSimilarityScore,
+        sessionProfileAffinity: scoreBreakdown.sessionProfileAffinity,
+        interactionFeedbackScore: scoreBreakdown.interactionFeedbackScore,
+        positiveFeedbackBoost: scoreBreakdown.positiveFeedbackBoost,
+        negativeFeedbackPenalty: scoreBreakdown.negativeFeedbackPenalty,
         seedSongId: item.seedId,
         source: item.seedId ? 'session_content_similarity' : 'session_profile_affinity',
       });

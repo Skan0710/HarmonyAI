@@ -97,3 +97,43 @@ export const resetRecencyConfig = (): TasteProfileRecencyConfig => {
   currentRecencyConfig = { ...DEFAULT_RECENCY_CONFIG };
   return { ...currentRecencyConfig };
 };
+
+export interface AdaptiveSessionScoringWeights {
+  contentSimilarityWeight: number;       // default: 0.35
+  sessionProfileAffinityWeight: number;   // default: 0.35
+  interactionFeedbackWeight: number;      // default: 0.30
+  likeInteractionMultiplier: number;      // default: 1.5
+  replayInteractionMultiplier: number;    // default: 1.3
+  completeInteractionMultiplier: number;  // default: 1.1
+  skipInteractionMultiplier: number;      // default: -1.2
+  recencyDecayLambda: number;             // default: 0.20
+}
+
+export const DEFAULT_ADAPTIVE_SESSION_WEIGHTS: AdaptiveSessionScoringWeights = {
+  contentSimilarityWeight: 0.35,
+  sessionProfileAffinityWeight: 0.35,
+  interactionFeedbackWeight: 0.30,
+  likeInteractionMultiplier: 1.5,
+  replayInteractionMultiplier: 1.3,
+  completeInteractionMultiplier: 1.1,
+  skipInteractionMultiplier: -1.2,
+  recencyDecayLambda: 0.20,
+};
+
+let currentAdaptiveSessionWeights: AdaptiveSessionScoringWeights = { ...DEFAULT_ADAPTIVE_SESSION_WEIGHTS };
+
+export const getAdaptiveSessionWeights = (): AdaptiveSessionScoringWeights => {
+  return { ...currentAdaptiveSessionWeights };
+};
+
+export const updateAdaptiveSessionWeights = (
+  newWeights: Partial<AdaptiveSessionScoringWeights>
+): AdaptiveSessionScoringWeights => {
+  currentAdaptiveSessionWeights = { ...currentAdaptiveSessionWeights, ...newWeights };
+  return { ...currentAdaptiveSessionWeights };
+};
+
+export const resetAdaptiveSessionWeights = (): AdaptiveSessionScoringWeights => {
+  currentAdaptiveSessionWeights = { ...DEFAULT_ADAPTIVE_SESSION_WEIGHTS };
+  return { ...currentAdaptiveSessionWeights };
+};

@@ -11,6 +11,9 @@ export interface SessionRankedItem {
   contributingFactors: {
     contentSimilarityScore: number;
     sessionProfileAffinity: number;
+    interactionFeedbackScore?: number;
+    positiveFeedbackBoost?: number;
+    negativeFeedbackPenalty?: number;
     seedSongId?: string;
   };
   source: string;
@@ -66,6 +69,7 @@ export class SessionRecommendationService {
         contributingFactors: {
           contentSimilarityScore: 0.5,
           sessionProfileAffinity: 0.5,
+          interactionFeedbackScore: 0.5,
         },
         source: 'cold_start_fallback',
       }));
@@ -95,7 +99,7 @@ export class SessionRecommendationService {
     // Calculate temporary session profile for diagnostics & ranking
     const sessionProfile = await SessionProfileService.calculateSessionProfileFromSession(activeSession);
 
-    // Generate candidates based on active session
+    // Generate candidates based on active session with adaptive scoring
     const candidates: SessionCandidateResult[] =
       await SessionCandidateGenerationService.generateSessionCandidates({
         userId,
@@ -111,6 +115,7 @@ export class SessionRecommendationService {
         contributingFactors: {
           contentSimilarityScore: 0.4,
           sessionProfileAffinity: 0.4,
+          interactionFeedbackScore: 0.5,
         },
         source: 'catalog_fallback',
       }));
@@ -145,6 +150,9 @@ export class SessionRecommendationService {
       contributingFactors: {
         contentSimilarityScore: c.contentSimilarityScore,
         sessionProfileAffinity: c.sessionProfileAffinity,
+        interactionFeedbackScore: c.interactionFeedbackScore,
+        positiveFeedbackBoost: c.positiveFeedbackBoost,
+        negativeFeedbackPenalty: c.negativeFeedbackPenalty,
         seedSongId: c.seedSongId,
       },
       source: c.source,
