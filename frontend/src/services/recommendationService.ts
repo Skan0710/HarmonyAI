@@ -62,6 +62,9 @@ export interface SessionItemResponse {
   contributingFactors: {
     contentSimilarityScore: number;
     sessionProfileAffinity: number;
+    interactionFeedbackScore?: number;
+    positiveFeedbackBoost?: number;
+    negativeFeedbackPenalty?: number;
     seedSongId?: string;
   };
   source: string;
@@ -75,6 +78,23 @@ export interface SessionApiResponse {
   songCountInSession?: number;
   count?: number;
   data?: SessionItemResponse[];
+  message?: string;
+}
+
+export interface AutoplayCandidateResponse {
+  song: Song;
+  autoplayScore: number;
+  sessionRelevanceScore: number;
+  artistId: string;
+  genre: string;
+  reason: string;
+}
+
+export interface AutoplayApiResponse {
+  success: boolean;
+  strategyUsed?: string;
+  count?: number;
+  data?: AutoplayCandidateResponse[];
   message?: string;
 }
 
@@ -209,5 +229,43 @@ export const fetchSessionRecommendationsApi = async (
     rawItems: [],
     hasActiveSession: false,
     error: response.data?.message || 'Failed to fetch session recommendations',
+  };
+};
+
+export const fetchSmartAutoplayApi = async (params: {
+  limit?: number;
+  lastPlayedArtistId?: string;
+  excludeQueue?: string[];
+}): Promise<{
+  songs: Song[];
+  rawCandidates: AutoplayCandidateResponse[];
+  error: string | null;
+}> => {
+  const queryParams = new URLSearchParams();
+  if (params.limit) queryParams.append('limit', String(params.limit));
+  if (params.lastPlayedArtistId) queryParams.append('lastPlayedArtistId', params.lastPlayedArtistId);
+  if (params.excludeQueue && params.excludeQueue.length > 0) {
+    queryParams.append('excludeQueue', params.excludeQueue.join(','));
+  }
+
+  const response = await apiClient<AutoplayApiResponse>(
+    `/recommendations/autoplay?${queryParams.toString()}`,
+    { method: 'GET' }
+  );
+
+  if (response.error) {
+    return { songs: [], rawCandidates: [], error: response.error };
+  }
+
+  if (response.data && response.data.success && Array.isArray(response.data.data)) {
+    const rawCandidates = response.data.data;
+    const songs = rawCandidates.filter((item) => Boolean(item.song)).map((item) => item.song);
+    return { songs, rawCandidates, error: null };
+  }
+
+  return {
+    songs: [],
+    rawCandidates: [],
+    error: response.data?.message || 'Failed to fetch autoplay candidates',
   };
 };
