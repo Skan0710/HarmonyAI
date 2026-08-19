@@ -14,6 +14,23 @@ export interface AutoplayCandidateResult {
   reason: string;
 }
 
+export interface AutoplayDiagnostics {
+  isDebugEnabled: boolean;
+  sessionEventsCount: number;
+  evaluatedCandidatesCount: number;
+  filteredSkippedCount: number;
+  filteredQueueCount: number;
+  penalizedPlayedCount: number;
+  diversityFilteredCount: number;
+  selectedCount: number;
+  lastPlayedArtistSuppressed: boolean;
+}
+
+export interface SmartAutoplayResult {
+  candidates: AutoplayCandidateResult[];
+  diagnostics?: AutoplayDiagnostics;
+}
+
 export class SmartAutoplayService {
   /**
    * Generates smart autoplay candidate songs for continuous playback:
@@ -23,7 +40,7 @@ export class SmartAutoplayService {
    * - Avoids excessive repetition of songs already played in current session.
    * - Applies diversity filtering to prevent consecutive songs from the same artist.
    * - Keeps the user's manual queue untouched by excluding existing queued track IDs.
-   * - Returns a configurable number of autoplay candidates.
+   * - Returns development-only diagnostics for autoplay decision tracking when isDebugMode=true.
    */
   static async generateAutoplayCandidates(params: {
     userId: string;
@@ -31,12 +48,14 @@ export class SmartAutoplayService {
     limit?: number;
     currentQueueSongIds?: string[];
     lastPlayedArtistId?: string;
-  }): Promise<AutoplayCandidateResult[]> {
+    isDebugMode?: boolean;
+  }): Promise<SmartAutoplayResult> {
     const {
       userId,
       limit = 5,
       currentQueueSongIds = [],
       lastPlayedArtistId,
+      isDebugMode = false,
     } = params;
 
     if (!userId || !Types.ObjectId.isValid(userId)) {
@@ -52,8 +71,10 @@ export class SmartAutoplayService {
     const skippedSongIdsSet = new Set<string>();
     const playedSongIdsSet = new Set<string>();
 
+    let sessionEventsCount = 0;
     if (session) {
       if (session.sessionEvents) {
+        sessionEventsCount = session.sessionEvents.length;
         session.sessionEvents.forEach((ev) => {
           if (ev.action === 'skip') {
             skippedSongIdsSet.add(ev.song.toString());
@@ -72,7 +93,7 @@ export class SmartAutoplayService {
       userId,
       sessionDoc: session,
       limit: Math.max(15, limit * 3),
-      excludePlayed: false, // Handle nuanced filtering here
+      excludePlayed: false,
       maxPerArtist: 3,
     });
 
@@ -92,17 +113,25 @@ export class SmartAutoplayService {
       }));
     }
 
+    let filteredSkippedCount = 0;
+    let filteredQueueCount = 0;
+    let penalizedPlayedCount = 0;
+    let diversityFilteredCount = 0;
+    let lastPlayedArtistSuppressed = false;
+
     // 2. Filter Out Skipped Songs & Songs Currently in Manual Queue
     const eligiblePool = rawCandidates.filter((cand) => {
       const songId = cand.song._id.toString();
 
       // Rule A: Avoid songs recently skipped during current session
       if (skippedSongIdsSet.has(songId)) {
+        filteredSkippedCount++;
         return false;
       }
 
       // Rule B: Avoid songs currently in manual queue (keeps queue untouched)
       if (queueSongIdsSet.has(songId)) {
+        filteredQueueCount++;
         return false;
       }
 
@@ -114,8 +143,8 @@ export class SmartAutoplayService {
       const songId = cand.song._id.toString();
       let score = cand.sessionRelevanceScore;
 
-      // Penalize recently played songs (reduce score by 40% if already played)
       if (playedSongIdsSet.has(songId)) {
+        penalizedPlayedCount++;
         score = Number((score * 0.6).toFixed(4));
       }
 
@@ -149,12 +178,17 @@ export class SmartAutoplayService {
 
       // Prevent consecutive songs from the same artist
       if (artistId === previousArtistId && scoredPool.length > limit) {
+        diversityFilteredCount++;
+        if (artistId === lastPlayedArtistId) {
+          lastPlayedArtistSuppressed = true;
+        }
         continue;
       }
 
       // Cap total songs per artist in the autoplay selection (max 2)
       const currentCount = artistUsageCount.get(artistId) || 0;
       if (currentCount >= 2 && scoredPool.length > limit) {
+        diversityFilteredCount++;
         continue;
       }
 
@@ -200,12 +234,32 @@ export class SmartAutoplayService {
             sessionRelevanceScore: cand.sessionRelevanceScore,
             artistId,
             genre: genreName,
-            reason: 'Autoplay track selected based on active session session',
+            reason: 'Autoplay track selected based on active session',
           });
         }
       }
     }
 
-    return selectedAutoplay.slice(0, limit);
+    const finalCandidates = selectedAutoplay.slice(0, limit);
+    const isDebugEnabled = isDebugMode && process.env.NODE_ENV !== 'production';
+
+    return {
+      candidates: finalCandidates,
+      ...(isDebugEnabled
+        ? {
+            diagnostics: {
+              isDebugEnabled: true,
+              sessionEventsCount,
+              evaluatedCandidatesCount: rawCandidates.length,
+              filteredSkippedCount,
+              filteredQueueCount,
+              penalizedPlayedCount,
+              diversityFilteredCount,
+              selectedCount: finalCandidates.length,
+              lastPlayedArtistSuppressed,
+            },
+          }
+        : {}),
+    };
   }
 }
