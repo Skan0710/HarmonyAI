@@ -23,6 +23,8 @@ export const MiniPlayer: React.FC = () => {
     isShuffle,
     repeatMode,
     isQueueOpen,
+    isAutoplayEnabled,
+    isAutoplayLoading,
     togglePlay,
     pause,
     stop,
@@ -32,6 +34,7 @@ export const MiniPlayer: React.FC = () => {
     toggleMute,
     toggleShuffle,
     toggleRepeatMode,
+    toggleAutoplay,
     nextSong,
     previousSong,
     handleSongEnd,
@@ -192,7 +195,7 @@ export const MiniPlayer: React.FC = () => {
 
         {/* 2. Controls & Seek Bar */}
         <div className="flex flex-col items-center gap-1.5 w-full sm:w-2/4">
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {/* Shuffle Button */}
             <button
               onClick={toggleShuffle}
@@ -245,7 +248,7 @@ export const MiniPlayer: React.FC = () => {
             {/* Next Track */}
             <button
               onClick={nextSong}
-              disabled={queue.length <= 1}
+              disabled={queue.length <= 1 && !isAutoplayEnabled}
               className="text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors p-1"
               aria-label="Next Song (Right Arrow)"
               title="Next Track (Right Arrow)"
@@ -278,6 +281,29 @@ export const MiniPlayer: React.FC = () => {
               {repeatMode === 'one' && (
                 <span className="text-[9px] font-extrabold leading-none -ml-1 text-indigo-300">1</span>
               )}
+            </button>
+
+            {/* Smart Autoplay Control Toggle */}
+            <button
+              onClick={toggleAutoplay}
+              className={`p-1.5 rounded-lg transition-all relative flex items-center gap-1 group ${
+                isAutoplayEnabled
+                  ? 'text-purple-300 bg-purple-500/20 border border-purple-500/40 shadow-sm shadow-purple-900/40'
+                  : 'text-slate-500 hover:text-slate-300 bg-slate-800/40 border border-slate-700/40'
+              }`}
+              title={
+                isAutoplayEnabled
+                  ? 'Smart Autoplay: Enabled (Plays matching songs when queue ends)'
+                  : 'Smart Autoplay: Disabled (Playback stops when queue ends)'
+              }
+              aria-label="Toggle Smart Autoplay"
+            >
+              <svg className={`w-4 h-4 ${isAutoplayLoading ? 'animate-spin text-purple-400' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span className="hidden md:inline text-[10px] font-bold uppercase tracking-wider">
+                {isAutoplayEnabled ? 'Autoplay' : 'Autoplay Off'}
+              </span>
             </button>
           </div>
 

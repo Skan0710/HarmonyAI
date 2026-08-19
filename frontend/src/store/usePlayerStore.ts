@@ -20,6 +20,16 @@ const getInitialVolume = (): number => {
   return 0.8;
 };
 
+const getInitialAutoplay = (): boolean => {
+  try {
+    const saved = sessionStorage.getItem('harmony_autoplay');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+  } catch {}
+  return true;
+};
+
 const notifyTrackPlay = (songId?: string) => {
   if (!songId) return;
   recordSongPlay(songId).catch(() => {});
@@ -39,6 +49,7 @@ interface PlayerState {
   isShuffle: boolean;
   repeatMode: RepeatMode;
   isQueueOpen: boolean;
+  isAutoplayEnabled: boolean;
   isAutoplayLoading: boolean;
   lastAutoplaySeedKey: string | null;
 
@@ -54,6 +65,8 @@ interface PlayerState {
   toggleMute: () => void;
   toggleShuffle: () => void;
   toggleRepeatMode: () => void;
+  toggleAutoplay: () => void;
+  setAutoplayEnabled: (enabled: boolean) => void;
   addToQueue: (song: Song) => void;
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
@@ -79,6 +92,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isShuffle: false,
   repeatMode: 'off',
   isQueueOpen: false,
+  isAutoplayEnabled: getInitialAutoplay(),
   isAutoplayLoading: false,
   lastAutoplaySeedKey: null,
 
@@ -152,6 +166,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const current = get().repeatMode;
     const next: RepeatMode = current === 'off' ? 'all' : current === 'all' ? 'one' : 'off';
     set({ repeatMode: next });
+  },
+
+  toggleAutoplay: () => {
+    const nextState = !get().isAutoplayEnabled;
+    try {
+      sessionStorage.setItem('harmony_autoplay', String(nextState));
+    } catch {}
+    set({ isAutoplayEnabled: nextState });
+  },
+
+  setAutoplayEnabled: (enabled) => {
+    try {
+      sessionStorage.setItem('harmony_autoplay', String(enabled));
+    } catch {}
+    set({ isAutoplayEnabled: enabled });
   },
 
   addToQueue: (song) => {
@@ -243,9 +272,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   triggerSmartAutoplay: async (): Promise<boolean> => {
-    const { currentSong, queue, isAutoplayLoading, lastAutoplaySeedKey } = get();
+    const { currentSong, queue, isAutoplayLoading, lastAutoplaySeedKey, isAutoplayEnabled } = get();
 
-    if (!currentSong || isAutoplayLoading) {
+    // When autoplay is disabled by user, do not generate new songs
+    if (!isAutoplayEnabled || !currentSong || isAutoplayLoading) {
       return false;
     }
 
@@ -300,7 +330,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   nextSong: async () => {
-    const { queue, queueIndex, currentSong, currentTime, duration, isShuffle, repeatMode } = get();
+    const { queue, queueIndex, currentSong, currentTime, duration, isShuffle, repeatMode, isAutoplayEnabled } = get();
     if (queue.length === 0) return;
 
     // Track skip action if skipped early (< 50% played) on a recommended track
@@ -357,12 +387,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         });
         notifyTrackPlay(nextSongItem._id);
       }
-    } else {
+    } else if (isAutoplayEnabled) {
       // Reached end of queue: Attempt Smart Autoplay
       const autoplayStarted = await get().triggerSmartAutoplay();
       if (!autoplayStarted) {
         set({ isPlaying: false, currentTime: 0 });
       }
+    } else {
+      set({ isPlaying: false, currentTime: 0 });
     }
   },
 
@@ -400,7 +432,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   handleSongEnd: async () => {
-    const { repeatMode, queue, queueIndex } = get();
+    const { repeatMode, queue, queueIndex, isAutoplayEnabled } = get();
 
     if (repeatMode === 'one') {
       set({ currentTime: 0, isPlaying: true });
@@ -414,12 +446,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     if (queueIndex + 1 < queue.length) {
       get().nextSong();
-    } else {
+    } else if (isAutoplayEnabled) {
       // Current queue reached its end: Trigger Smart Autoplay
       const autoplayStarted = await get().triggerSmartAutoplay();
       if (!autoplayStarted) {
         set({ isPlaying: false, currentTime: 0 });
       }
+    } else {
+      set({ isPlaying: false, currentTime: 0 });
     }
   },
 

@@ -11,6 +11,8 @@ export const QueueDrawer: React.FC = () => {
     queue,
     queueIndex,
     isQueueOpen,
+    isAutoplayEnabled,
+    toggleAutoplay,
     setQueueOpen,
     playQueueIndex,
     removeFromQueue,
@@ -111,8 +113,55 @@ export const QueueDrawer: React.FC = () => {
           </div>
         </div>
 
-        {/* Scrollable Container for Current Queue + Up Next Recommendations */}
+        {/* Scrollable Container for Current Queue + Smart Autoplay Control + Up Next Recommendations */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-slate-700">
+          {/* Smart Autoplay Control Card & Explanation */}
+          <div className="bg-slate-950/60 border border-purple-500/30 rounded-2xl p-3.5 space-y-2.5 shadow-md shadow-purple-950/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    Smart Autoplay
+                    <span
+                      className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold uppercase ${
+                        isAutoplayEnabled
+                          ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                          : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      }`}
+                    >
+                      {isAutoplayEnabled ? 'ON' : 'OFF'}
+                    </span>
+                  </h4>
+                </div>
+              </div>
+
+              {/* Toggle Switch */}
+              <button
+                onClick={toggleAutoplay}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                  isAutoplayEnabled ? 'bg-purple-600' : 'bg-slate-700'
+                }`}
+                aria-label="Toggle Smart Autoplay"
+                title={isAutoplayEnabled ? 'Disable Smart Autoplay' : 'Enable Smart Autoplay'}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    isAutoplayEnabled ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              When enabled, Smart Autoplay keeps music going with fresh songs tailored to your active session vibe once the queue ends.
+            </p>
+          </div>
+
           {/* SECTION 1: Current Active Queue */}
           <div className="space-y-2.5">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
