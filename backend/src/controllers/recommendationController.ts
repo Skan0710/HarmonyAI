@@ -6,6 +6,7 @@ import { HybridRecommendationService } from '../services/hybridRecommendationSer
 import { ContextAwareRecommendationService } from '../services/contextAwareRecommendationService.js';
 import { ContextualAssistantService } from '../services/contextualAssistantService.js';
 import { SessionRecommendationService } from '../services/sessionRecommendationService.js';
+import { SmartAutoplayService } from '../services/smartAutoplayService.js';
 
 export const getSimilarSongs = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -294,6 +295,49 @@ export const getSessionRecommendations = async (
       count: 0,
       data: [],
       message: error.message || 'Session recommendations generated fallback response',
+    });
+  }
+};
+
+export const getSmartAutoplayCandidates = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized access. Authentication token required.',
+      });
+      return;
+    }
+
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 5;
+    const parsedLimit = isNaN(limit) || limit < 1 ? 5 : Math.min(25, limit);
+
+    const lastPlayedArtistId = req.query.lastPlayedArtistId ? String(req.query.lastPlayedArtistId) : undefined;
+    const excludeQueueParam = req.query.excludeQueue ? String(req.query.excludeQueue).split(',') : [];
+
+    const result = await SmartAutoplayService.generateAutoplayCandidates({
+      userId: req.user._id.toString(),
+      limit: parsedLimit,
+      lastPlayedArtistId,
+      currentQueueSongIds: excludeQueueParam,
+    });
+
+    res.status(200).json({
+      success: true,
+      strategyUsed: 'SMART_AUTOPLAY',
+      count: result.length,
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(200).json({
+      success: true,
+      strategyUsed: 'SMART_AUTOPLAY_FALLBACK',
+      count: 0,
+      data: [],
+      message: error.message || 'Smart autoplay generated fallback response',
     });
   }
 };
