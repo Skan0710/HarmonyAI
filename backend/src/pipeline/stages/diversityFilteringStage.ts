@@ -1,9 +1,10 @@
 import { IDiversityFilteringStage, PipelineItem, RecommendationPipelineContext } from '../recommendationPipelineTypes.js';
+import { ArtistDiversityFilteringService } from '../../services/artistDiversityFilteringService.js';
 
 export class DiversityFilteringStage implements IDiversityFilteringStage {
   /**
-   * Applies diversity filtering across artist concentration, genre concentration,
-   * and consecutive artist suppression.
+   * Applies diversity filtering across artist concentration and consecutive artist suppression
+   * using the reusable ArtistDiversityFilteringService.
    */
   async filterDiversity(
     items: PipelineItem[],
@@ -13,44 +14,13 @@ export class DiversityFilteringStage implements IDiversityFilteringStage {
       return [];
     }
 
-    const maxPerArtist = 2;
-    const selected: PipelineItem[] = [];
-    const artistCounts = new Map<string, number>();
-    let prevArtistId = context.lastPlayedArtistId || '';
-
-    for (const item of items) {
-      const song = item.song;
-      const artistId =
-        typeof song?.artist === 'object' && song.artist && '_id' in song.artist
-          ? String(song.artist._id)
-          : String(song?.artist || 'unknown');
-
-      // Consecutive artist suppression
-      if (artistId === prevArtistId && items.length > (context.limit || 10)) {
-        continue;
-      }
-
-      // Max per artist limit
-      const currentCount = artistCounts.get(artistId) || 0;
-      if (currentCount >= maxPerArtist && items.length > (context.limit || 10)) {
-        continue;
-      }
-
-      selected.push(item);
-      artistCounts.set(artistId, currentCount + 1);
-      prevArtistId = artistId;
-    }
-
-    // If diversity filtering was too aggressive and returned fewer items than needed, fill back
-    if (selected.length < (context.limit || 10)) {
-      for (const item of items) {
-        if (!selected.some((s) => s.songId === item.songId)) {
-          selected.push(item);
-          if (selected.length >= (context.limit || 10)) break;
-        }
-      }
-    }
-
-    return selected;
+    return ArtistDiversityFilteringService.applyArtistDiversity<PipelineItem>({
+      items,
+      targetLimit: context.limit || 10,
+      maxSongsPerArtist: 2,
+      maxConsecutiveSameArtist: 1,
+      scoreExtractor: (item) => item.finalScore || 0,
+      artistExtractor: (item) => ArtistDiversityFilteringService.extractArtistId(item),
+    });
   }
 }
