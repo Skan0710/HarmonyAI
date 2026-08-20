@@ -1,8 +1,9 @@
 import { IPostRankingStage, PipelineItem, RecommendationPipelineContext } from '../recommendationPipelineTypes.js';
+import { RecommendationHistoryService } from '../../services/recommendationHistoryService.js';
 
 export class PostRankingStage implements IPostRankingStage {
   /**
-   * Applies final slicing, post-processing formatting, and diagnostic recording.
+   * Applies repetition control, final slicing, post-processing formatting, and diagnostic recording.
    */
   async processPostRanking(
     items: PipelineItem[],
@@ -13,7 +14,43 @@ export class PostRankingStage implements IPostRankingStage {
     }
 
     const targetLimit = Math.max(1, context.limit || 10);
-    const sliced = items.slice(0, targetLimit);
+
+    let repetitionControlled = items;
+
+    // Apply Repetition Control if valid user ID is present
+    if (context.userId) {
+      try {
+        const [recentlyRecommended, recentlySkipped] = await Promise.all([
+          RecommendationHistoryService.getRecentlyRecommendedMap(context.userId),
+          RecommendationHistoryService.getRecentlySkippedSongIds(context.userId),
+        ]);
+
+        const evaluated = RecommendationHistoryService.applyRepetitionControl<PipelineItem>({
+          items,
+          recentlyRecommended,
+          recentlySkipped,
+          targetLimit,
+          scoreExtractor: (i) => i.finalScore,
+          songIdExtractor: (i) => i.songId,
+        });
+
+        repetitionControlled = evaluated.map((e) => ({
+          ...e.item,
+          finalScore: e.adjustedScore,
+          metadata: {
+            ...e.item.metadata,
+            isRecentlyRecommended: e.isRecentlyRecommended,
+            isRecentlySkipped: e.isRecentlySkipped,
+            isReappearanceAllowed: e.isReappearanceAllowed,
+          },
+        }));
+      } catch (err) {
+        // Fallback gracefully without breaking recommendations
+        repetitionControlled = items.slice(0, targetLimit);
+      }
+    }
+
+    const sliced = repetitionControlled.slice(0, targetLimit);
 
     if (context.isDebugMode && process.env.NODE_ENV !== 'production') {
       context.diagnostics = {
