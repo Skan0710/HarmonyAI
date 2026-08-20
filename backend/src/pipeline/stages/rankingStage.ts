@@ -1,9 +1,10 @@
 import { IRankingStage, PipelineItem, RecommendationPipelineContext } from '../recommendationPipelineTypes.js';
 import { getHybridConfigWeights } from '../../config/recommendationConfig.js';
+import { NoveltyScoringService } from '../../services/noveltyScoringService.js';
 
 export class RankingStage implements IRankingStage {
   /**
-   * Fuses normalized component scores using weights and ranks items in descending order.
+   * Fuses normalized component scores with novelty-aware ranking and ranks items in descending order.
    */
   async rank(
     items: PipelineItem[],
@@ -39,13 +40,32 @@ export class RankingStage implements IRankingStage {
         (scores.popularityScore || 0) * weights.popWeight +
         (scores.recencyScore || 0) * weights.recWeight;
 
-      const finalScore = Number(
+      const baseScore = Number(
         (totalWeight > 0 ? weightedSum / totalWeight : weightedSum).toFixed(4)
+      );
+
+      // Compute Novelty Score
+      const catalogPlayCount = item.rawFeatures.popularitySignal || item.song?.playCount || 0;
+      const userEncountered = context.excludedSongIds?.has(item.songId) ? 3 : 0;
+
+      const rawNovelty = NoveltyScoringService.computeCompositeNovelty({
+        catalogPlayCount,
+        userPlayCount: userEncountered,
+      });
+
+      const { finalScore, gatedNoveltyScore } = NoveltyScoringService.combineNoveltyWithBaseScore(
+        baseScore,
+        rawNovelty,
+        context.customWeights
       );
 
       return {
         ...item,
-        finalScore: Math.max(0, Math.min(1, finalScore)),
+        finalScore,
+        normalizedScores: {
+          ...item.normalizedScores,
+          noveltyScore: gatedNoveltyScore,
+        },
       };
     });
 

@@ -169,3 +169,35 @@ export const resetGenreDiversityWeights = (): GenreDiversityWeights => {
   currentGenreDiversityWeights = { ...DEFAULT_GENRE_DIVERSITY_WEIGHTS };
   return { ...currentGenreDiversityWeights };
 };
+
+export interface NoveltyScoringWeights {
+  noveltyWeight: number;             // default: 0.15 (15% weight)
+  minRelevanceThreshold: number;     // default: 0.35 (below 0.35 base relevance, novelty boost is gated to 0)
+  maxCatalogPlayCount: number;       // default: 1000
+  userExposureDecayFactor: number;   // default: 0.20
+}
+
+export const DEFAULT_NOVELTY_WEIGHTS: NoveltyScoringWeights = {
+  noveltyWeight: 0.15,
+  minRelevanceThreshold: 0.35,
+  maxCatalogPlayCount: 1000,
+  userExposureDecayFactor: 0.20,
+};
+
+let currentNoveltyWeights: NoveltyScoringWeights = { ...DEFAULT_NOVELTY_WEIGHTS };
+
+export const getNoveltyConfigWeights = (): NoveltyScoringWeights => {
+  return { ...currentNoveltyWeights };
+};
+
+export const updateNoveltyConfigWeights = (
+  newWeights: Partial<NoveltyScoringWeights>
+): NoveltyScoringWeights => {
+  currentNoveltyWeights = { ...currentNoveltyWeights, ...newWeights };
+  return { ...currentNoveltyWeights };
+};
+
+export const resetNoveltyConfigWeights = (): NoveltyScoringWeights => {
+  currentNoveltyWeights = { ...DEFAULT_NOVELTY_WEIGHTS };
+  return { ...currentNoveltyWeights };
+};
