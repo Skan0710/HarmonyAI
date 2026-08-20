@@ -201,3 +201,37 @@ export const resetNoveltyConfigWeights = (): NoveltyScoringWeights => {
   currentNoveltyWeights = { ...DEFAULT_NOVELTY_WEIGHTS };
   return { ...currentNoveltyWeights };
 };
+
+export interface RecommendationRepetitionConfig {
+  cooldownWindowHours: number;             // default: 24 hours
+  skippedCooldownWindowHours: number;      // default: 72 hours
+  repetitionPenalty: number;               // default: 0.35
+  reappearanceRelevanceThreshold: number; // default: 0.85
+  maxRecentHistoryLookback: number;        // default: 200
+}
+
+export const DEFAULT_REPETITION_CONFIG: RecommendationRepetitionConfig = {
+  cooldownWindowHours: 24,
+  skippedCooldownWindowHours: 72,
+  repetitionPenalty: 0.35,
+  reappearanceRelevanceThreshold: 0.85,
+  maxRecentHistoryLookback: 200,
+};
+
+let currentRepetitionConfig: RecommendationRepetitionConfig = { ...DEFAULT_REPETITION_CONFIG };
+
+export const getRepetitionConfig = (): RecommendationRepetitionConfig => {
+  return { ...currentRepetitionConfig };
+};
+
+export const updateRepetitionConfig = (
+  newConfig: Partial<RecommendationRepetitionConfig>
+): RecommendationRepetitionConfig => {
+  currentRepetitionConfig = { ...currentRepetitionConfig, ...newConfig };
+  return { ...currentRepetitionConfig };
+};
+
+export const resetRepetitionConfig = (): RecommendationRepetitionConfig => {
+  currentRepetitionConfig = { ...DEFAULT_REPETITION_CONFIG };
+  return { ...currentRepetitionConfig };
+};
