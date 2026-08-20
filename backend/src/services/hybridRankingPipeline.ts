@@ -7,14 +7,19 @@ import {
 export interface HybridRankedResult {
   song: any;
   hybridScore: number;
+  originalScore?: number;
+  finalScore?: number;
   componentScores: {
     contentScore: number;
     collaborativeScore: number;
     userTasteAffinityScore: number;
     popularityScore: number;
     recencyScore: number;
+    noveltyScore?: number;
+    userPreferenceScore?: number;
   };
   sources: string[];
+  metadata?: Record<string, any>;
 }
 
 export class HybridRankingPipeline {
@@ -98,6 +103,8 @@ export class HybridRankingPipeline {
       return {
         song: cand.songDoc,
         hybridScore: finalHybridScore,
+        originalScore: finalHybridScore,
+        finalScore: finalHybridScore,
         componentScores: {
           contentScore: Number(normContent.toFixed(4)),
           collaborativeScore: Number(normCollab.toFixed(4)),
