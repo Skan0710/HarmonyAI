@@ -13,6 +13,29 @@ import {
   getRepetitionConfig,
 } from '../config/recommendationConfig.js';
 
+export interface PostRankingItemDiagnostics {
+  originalScore: number;
+  diversityAdjustment: number;
+  noveltyAdjustment: number;
+  repetitionPenalty: number;
+  finalScore: number;
+}
+
+export interface PostRankingPipelineDiagnostics {
+  isDebugEnabled: boolean;
+  totalEvaluatedCandidates: number;
+  finalCandidateCount: number;
+  itemsDiagnostics: {
+    songId: string;
+    title?: string;
+    originalScore: number;
+    diversityAdjustment: number;
+    noveltyAdjustment: number;
+    repetitionPenalty: number;
+    finalScore: number;
+  }[];
+}
+
 export interface PostRankedResult<T = any> {
   song: any;
   originalScore: number;
@@ -30,7 +53,13 @@ export interface PostRankedResult<T = any> {
     isReappearanceAllowed?: boolean;
     [key: string]: any;
   };
+  diagnostics?: PostRankingItemDiagnostics;
   item: T;
+}
+
+export interface PostRankingPipelineExecutionResult<T = any> {
+  results: PostRankedResult<T>[];
+  diagnostics?: PostRankingPipelineDiagnostics;
 }
 
 export interface PostRankingPipelineOptions<T = any> {
@@ -49,6 +78,7 @@ export interface PostRankingPipelineOptions<T = any> {
   customGenreWeights?: Partial<GenreDiversityWeights>;
   customRepetitionConfig?: Partial<RecommendationRepetitionConfig>;
   autoRecordImpressions?: boolean;
+  isDebugMode?: boolean;
 }
 
 export class RecommendationPostRankingPipeline {
@@ -86,6 +116,7 @@ export class RecommendationPostRankingPipeline {
    * 6. Artist Diversity Filtering (consecutive suppression and artist caps)
    * 
    * Returns both the original recommendation score and final post-ranking score.
+   * Includes development-only diagnostics tracking when isDebugMode=true (omitted in production).
    */
   static async executePostRanking<T = any>(
     options: PostRankingPipelineOptions<T>
@@ -105,12 +136,14 @@ export class RecommendationPostRankingPipeline {
       customGenreWeights,
       customRepetitionConfig,
       autoRecordImpressions = false,
+      isDebugMode = false,
     } = options;
 
     if (!Array.isArray(items) || items.length === 0) {
       return [];
     }
 
+    const isDebugEnabled = isDebugMode && process.env.NODE_ENV !== 'production';
     const safeLimit = Math.max(1, targetLimit);
 
     // 1. Fetch User Taste Profile if not explicitly provided
@@ -176,12 +209,15 @@ export class RecommendationPostRankingPipeline {
           noveltyConfig
         );
 
+      const noveltyAdjustment = Number((noveltyEnhancedScore - originalScore).toFixed(4));
+
       return {
         item: rawItem,
         song,
         songId,
         originalScore,
         currentScore: noveltyEnhancedScore,
+        noveltyAdjustment,
         userPreferenceScore,
         noveltyScore: gatedNoveltyScore,
         sources: sourcesExtractor(rawItem),
@@ -231,21 +267,39 @@ export class RecommendationPostRankingPipeline {
       artistExtractor: (i) => ArtistDiversityFilteringService.extractArtistId({ song: i.song }),
     });
 
-    // 7. Stage 5: Final Packaging & Impression Recording
-    const finalResults: PostRankedResult<T>[] = artistBalanced.map((item) => ({
-      song: item.song,
-      originalScore: item.originalScore,
-      finalScore: item.currentScore,
-      componentBreakdown: {
+    // 7. Stage 5: Final Packaging & Diagnostics Attachment
+    const finalResults: PostRankedResult<T>[] = artistBalanced.map((item) => {
+      const repPenalty = item.repetitionPenalty || 0;
+      const novAdj = item.noveltyAdjustment || 0;
+      const expectedScore = item.originalScore + novAdj - repPenalty;
+      const divAdj = Number((item.currentScore - expectedScore).toFixed(4));
+
+      const diagnostics: PostRankingItemDiagnostics | undefined = isDebugEnabled
+        ? {
+            originalScore: item.originalScore,
+            noveltyAdjustment: novAdj,
+            diversityAdjustment: divAdj,
+            repetitionPenalty: repPenalty,
+            finalScore: item.currentScore,
+          }
+        : undefined;
+
+      return {
+        song: item.song,
         originalScore: item.originalScore,
-        userPreferenceScore: item.userPreferenceScore,
-        noveltyScore: item.noveltyScore,
-        repetitionPenalty: item.repetitionPenalty || 0,
-      },
-      sources: item.sources || [],
-      metadata: item.metadata || {},
-      item: item.item,
-    }));
+        finalScore: item.currentScore,
+        componentBreakdown: {
+          originalScore: item.originalScore,
+          userPreferenceScore: item.userPreferenceScore,
+          noveltyScore: item.noveltyScore,
+          repetitionPenalty: repPenalty,
+        },
+        sources: item.sources || [],
+        metadata: item.metadata || {},
+        ...(diagnostics ? { diagnostics } : {}),
+        item: item.item,
+      };
+    });
 
     if (autoRecordImpressions && userId && Types.ObjectId.isValid(userId)) {
       const songIds = finalResults.map((r) => r.song?._id?.toString()).filter(Boolean);
