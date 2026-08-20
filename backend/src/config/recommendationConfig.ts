@@ -137,3 +137,35 @@ export const resetAdaptiveSessionWeights = (): AdaptiveSessionScoringWeights => 
   currentAdaptiveSessionWeights = { ...DEFAULT_ADAPTIVE_SESSION_WEIGHTS };
   return { ...currentAdaptiveSessionWeights };
 };
+
+export interface GenreDiversityWeights {
+  defaultMaxGenreConcentration: number;  // default: 0.40 (max 40% from a single genre)
+  userPreferredGenreThreshold: number;   // default: 0.30 (affinity >= 0.30 allows increased concentration)
+  userPreferredMaxConcentration: number;  // default: 0.70 (up to 70% if strongly preferred in user taste profile)
+  diversityPenaltyWeight: number;        // default: 0.15
+}
+
+export const DEFAULT_GENRE_DIVERSITY_WEIGHTS: GenreDiversityWeights = {
+  defaultMaxGenreConcentration: 0.40,
+  userPreferredGenreThreshold: 0.30,
+  userPreferredMaxConcentration: 0.70,
+  diversityPenaltyWeight: 0.15,
+};
+
+let currentGenreDiversityWeights: GenreDiversityWeights = { ...DEFAULT_GENRE_DIVERSITY_WEIGHTS };
+
+export const getGenreDiversityWeights = (): GenreDiversityWeights => {
+  return { ...currentGenreDiversityWeights };
+};
+
+export const updateGenreDiversityWeights = (
+  newWeights: Partial<GenreDiversityWeights>
+): GenreDiversityWeights => {
+  currentGenreDiversityWeights = { ...currentGenreDiversityWeights, ...newWeights };
+  return { ...currentGenreDiversityWeights };
+};
+
+export const resetGenreDiversityWeights = (): GenreDiversityWeights => {
+  currentGenreDiversityWeights = { ...DEFAULT_GENRE_DIVERSITY_WEIGHTS };
+  return { ...currentGenreDiversityWeights };
+};
