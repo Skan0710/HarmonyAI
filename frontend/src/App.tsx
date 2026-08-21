@@ -9,6 +9,7 @@ import { GenresPage } from './pages/GenresPage';
 import { PlaylistsPage } from './pages/PlaylistsPage';
 import { PlaylistDetailPage } from './pages/PlaylistDetailPage';
 import { AIPlaylistGeneratorPage } from './pages/AIPlaylistGeneratorPage';
+import { AssistantPage } from './pages/AssistantPage';
 import { PreferencesPage } from './pages/PreferencesPage';
 import { LikedSongsPage } from './pages/LikedSongsPage';
 import { HistoryPage } from './pages/HistoryPage';
@@ -50,6 +51,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/" element={<HomePage />} />
+            <Route path="/assistant" element={<AssistantPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/genres" element={<GenresPage />} />
             <Route path="/playlists" element={<PlaylistsPage />} />

@@ -15,6 +15,7 @@ import historyRoutes from './routes/historyRoutes.js';
 import playlistRoutes from './routes/playlistRoutes.js';
 import recommendationRoutes from './routes/recommendationRoutes.js';
 import adminRecommendationRoutes from './routes/adminRecommendationRoutes.js';
+import assistantRoutes from './routes/assistantRoutes.js';
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use('/api/history', historyRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/admin/recommendations', adminRecommendationRoutes);
+app.use('/api/assistant', assistantRoutes);
 
 const startServer = async (): Promise<void> => {
   await connectDB();
