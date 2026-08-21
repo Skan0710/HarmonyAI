@@ -23,6 +23,25 @@ export const Sidebar: React.FC = () => {
         </NavLink>
 
         <NavLink
+          to="/assistant"
+          className={({ isActive }) =>
+            `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
+              isActive
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 text-white font-semibold shadow-md shadow-purple-600/30'
+                : 'hover:bg-slate-700/60 text-purple-300 hover:text-white'
+            }`
+          }
+        >
+          <svg className="w-4 h-4 text-pink-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+          <span className="flex-1">AI Assistant</span>
+          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 border border-pink-500/30">
+            Chat
+          </span>
+        </NavLink>
+
+        <NavLink
           to="/ai-playlist"
           className={({ isActive }) =>
             `px-4 py-2.5 rounded-xl transition-all flex items-center gap-3 text-sm font-medium ${
