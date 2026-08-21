@@ -1,17 +1,17 @@
 import { AssistantTool, AssistantToolContext, ToolExecutionResult, ToolParameterSchema } from './toolTypes.js';
-import { Playlist } from '../models/Playlist.js';
+import { PlaylistService } from '../services/playlistService.js';
 import { Types } from 'mongoose';
 
 export interface PlaylistCreationInput {
   name: string;
   description?: string;
   songIds?: string[];
-  isPublic?: boolean;
+  visibility?: 'public' | 'private';
 }
 
 export class PlaylistCreationTool implements AssistantTool<PlaylistCreationInput> {
   name = 'create_playlist';
-  description = 'Create a new user playlist with a given name, description, and initial list of song IDs.';
+  description = 'Create a new user playlist with a given name, description, and optional initial list of song IDs.';
 
   parameters: ToolParameterSchema = {
     type: 'object',
@@ -29,9 +29,10 @@ export class PlaylistCreationTool implements AssistantTool<PlaylistCreationInput
         items: { type: 'string' },
         description: 'Array of song Object IDs to add to the playlist.',
       },
-      isPublic: {
-        type: 'boolean',
-        description: 'Whether the playlist should be publicly visible (default: false).',
+      visibility: {
+        type: 'string',
+        enum: ['public', 'private'],
+        description: 'Visibility of the playlist (default: "public").',
       },
     },
     required: ['name'],
@@ -56,13 +57,15 @@ export class PlaylistCreationTool implements AssistantTool<PlaylistCreationInput
       }
     }
 
+    const visibility = raw.visibility === 'private' ? 'private' : 'public';
+
     return {
       valid: true,
       data: {
         name: raw.name.trim(),
         description: typeof raw.description === 'string' ? raw.description.trim() : undefined,
         songIds: validSongIds,
-        isPublic: Boolean(raw.isPublic),
+        visibility,
       },
     };
   }
@@ -86,21 +89,32 @@ export class PlaylistCreationTool implements AssistantTool<PlaylistCreationInput
     }
 
     try {
-      const playlist = new Playlist({
+      const created = await PlaylistService.createPlaylist(context.userId, {
         name: validation.data.name,
         description: validation.data.description || 'Curated with HarmonyAI Assistant',
-        owner: new Types.ObjectId(context.userId),
-        songs: (validation.data.songIds || []).map((id) => new Types.ObjectId(id)),
-        visibility: validation.data.isPublic ? 'public' : 'private',
+        visibility: validation.data.visibility,
       });
 
-      await playlist.save();
-      const populated = await Playlist.findById(playlist._id).populate('songs').populate('owner', 'name username');
+      // Add initial songs if provided
+      let finalPlaylist: any = created;
+      if (validation.data.songIds && validation.data.songIds.length > 0) {
+        for (const sId of validation.data.songIds) {
+          try {
+            finalPlaylist = await PlaylistService.addSongToPlaylist(
+              created._id.toString(),
+              context.userId,
+              sId
+            );
+          } catch (e) {
+            // Continue adding remaining songs if individual song fails
+          }
+        }
+      }
 
       return {
         success: true,
         toolName: this.name,
-        data: populated,
+        data: finalPlaylist,
         message: `Successfully created playlist "${validation.data.name}" with ${validation.data.songIds?.length || 0} songs`,
       };
     } catch (error: any) {
