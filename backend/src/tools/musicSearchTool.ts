@@ -1,14 +1,24 @@
 import { AssistantTool, AssistantToolContext, ToolExecutionResult, ToolParameterSchema } from './toolTypes.js';
-import { searchCatalog } from '../services/searchService.js';
+import { Song, ISong } from '../models/Song.js';
+import { searchCatalog, GroupedSearchResults } from '../services/searchService.js';
 
 export interface MusicSearchInput {
   query: string;
+  genre?: string;
+  artist?: string;
   limit?: number;
 }
 
-export class MusicSearchTool implements AssistantTool<MusicSearchInput> {
+export interface MusicSearchResultData {
+  songs: ISong[];
+  groupedResults?: GroupedSearchResults;
+  total: number;
+  query: string;
+}
+
+export class MusicSearchTool implements AssistantTool<MusicSearchInput, MusicSearchResultData> {
   name = 'music_search';
-  description = 'Search catalog music, songs, artists, and albums using keywords, titles, or artist names.';
+  description = 'Search catalog music, songs, artists, and albums using keywords, titles, artist names, or genres. Returns verified database songs.';
 
   parameters: ToolParameterSchema = {
     type: 'object',
@@ -16,6 +26,14 @@ export class MusicSearchTool implements AssistantTool<MusicSearchInput> {
       query: {
         type: 'string',
         description: 'The search keyword, song title, artist name, or album name.',
+      },
+      genre: {
+        type: 'string',
+        description: 'Optional genre name to filter results (e.g. "Rock", "Synthwave", "Pop").',
+      },
+      artist: {
+        type: 'string',
+        description: 'Optional artist name to filter results.',
       },
       limit: {
         type: 'number',
@@ -40,12 +58,54 @@ export class MusicSearchTool implements AssistantTool<MusicSearchInput> {
       valid: true,
       data: {
         query: raw.query.trim(),
+        genre: typeof raw.genre === 'string' ? raw.genre.trim() : undefined,
+        artist: typeof raw.artist === 'string' ? raw.artist.trim() : undefined,
         limit,
       },
     };
   }
 
-  async execute(input: MusicSearchInput, _context: AssistantToolContext): Promise<ToolExecutionResult> {
+  /**
+   * Standalone music search execution method reusable outside the assistant framework.
+   */
+  static async searchMusic(input: MusicSearchInput): Promise<MusicSearchResultData> {
+    const { query, limit = 10 } = input;
+    const safeLimit = Math.max(1, Math.min(50, limit));
+
+    // Perform full catalog search across songs, artists, and albums
+    const catalogResults = await searchCatalog(query, safeLimit);
+
+    // If search returned songs, ensure full population from database
+    let songs: ISong[] = catalogResults.songs || [];
+
+    if (songs.length === 0) {
+      // Fallback partial text query on Song collection directly
+      const searchRegex = new RegExp(query.trim(), 'i');
+      songs = await Song.find({
+        isPublished: true,
+        $or: [
+          { title: searchRegex },
+          { tags: searchRegex },
+          { language: searchRegex },
+          { mood: searchRegex },
+        ],
+      })
+        .populate('artist', 'name profileImage avatar verified')
+        .populate('album', 'title coverImage releaseYear')
+        .populate('genre', 'name slug')
+        .limit(safeLimit)
+        .lean() as any;
+    }
+
+    return {
+      songs,
+      groupedResults: catalogResults,
+      total: songs.length,
+      query,
+    };
+  }
+
+  async execute(input: MusicSearchInput, _context: AssistantToolContext): Promise<ToolExecutionResult<MusicSearchResultData>> {
     const validation = this.validate(input);
     if (!validation.valid || !validation.data) {
       return {
@@ -56,22 +116,28 @@ export class MusicSearchTool implements AssistantTool<MusicSearchInput> {
     }
 
     try {
-      const results = await searchCatalog(
-        validation.data.query,
-        validation.data.limit
-      );
+      const results = await MusicSearchTool.searchMusic(validation.data);
+
+      if (results.total === 0) {
+        return {
+          success: true,
+          toolName: this.name,
+          data: results,
+          message: `No songs found matching query "${validation.data.query}"`,
+        };
+      }
 
       return {
         success: true,
         toolName: this.name,
         data: results,
-        message: `Found ${results.total} matching items for query "${validation.data.query}"`,
+        message: `Found ${results.total} matching songs for "${validation.data.query}"`,
       };
     } catch (error: any) {
       return {
         success: false,
         toolName: this.name,
-        error: error.message || 'Failed to perform music search',
+        error: error.message || 'Failed to execute music search',
       };
     }
   }
