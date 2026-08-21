@@ -3,7 +3,12 @@ import { MusicSearchTool } from './musicSearchTool.js';
 import { SemanticSearchTool } from './semanticSearchTool.js';
 import { RecommendationsTool } from './recommendationsTool.js';
 import { PlaylistCreationTool } from './playlistCreationTool.js';
+import { AddToPlaylistTool } from './addToPlaylistTool.js';
+import { RemoveFromPlaylistTool } from './removeFromPlaylistTool.js';
 import { PlaylistModificationTool } from './playlistModificationTool.js';
+import { AddToQueueTool } from './addToQueueTool.js';
+import { RemoveFromQueueTool } from './removeFromQueueTool.js';
+import { ClearQueueTool } from './clearQueueTool.js';
 import { QueueManagementTool } from './queueManagementTool.js';
 import { UserPreferenceRetrievalTool } from './userPreferenceRetrievalTool.js';
 
@@ -17,14 +22,23 @@ export class ToolRegistry {
   private static tools: Map<string, AssistantTool> = new Map();
 
   static {
-    // Register default core tools
+    // Register Discovery Tools
     this.registerTool(new MusicSearchTool());
     this.registerTool(new SemanticSearchTool());
     this.registerTool(new RecommendationsTool());
-    this.registerTool(new PlaylistCreationTool());
-    this.registerTool(new PlaylistModificationTool());
-    this.registerTool(new QueueManagementTool());
     this.registerTool(new UserPreferenceRetrievalTool());
+
+    // Register Playlist Tools
+    this.registerTool(new PlaylistCreationTool());
+    this.registerTool(new AddToPlaylistTool());
+    this.registerTool(new RemoveFromPlaylistTool());
+    this.registerTool(new PlaylistModificationTool());
+
+    // Register Queue Tools
+    this.registerTool(new AddToQueueTool());
+    this.registerTool(new RemoveFromQueueTool());
+    this.registerTool(new ClearQueueTool());
+    this.registerTool(new QueueManagementTool());
   }
 
   static registerTool(tool: AssistantTool): void {

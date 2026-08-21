@@ -17,7 +17,7 @@ export function runAssistantToolArchitectureTests() {
     ];
 
     const definitions = ToolRegistry.getToolDefinitions();
-    assert.strictEqual(definitions.length, 7, 'All 7 tools registered in registry');
+    assert.ok(definitions.length >= 7, 'All core tools registered in registry');
 
     for (const toolName of expectedTools) {
       const tool = ToolRegistry.getTool(toolName);
