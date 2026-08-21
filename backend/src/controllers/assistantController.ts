@@ -3,6 +3,8 @@ import { MultiStepAssistantService } from '../services/multiStepAssistantService
 import { AssistantIntentService } from '../services/assistantIntentService.js';
 import { AssistantToolContext } from '../tools/toolTypes.js';
 
+export const MAX_MESSAGE_LENGTH = 500;
+
 export const handleAssistantChat = async (req: Request, res: Response): Promise<void> => {
   try {
     const { prompt, sessionId } = req.body;
@@ -15,7 +17,15 @@ export const handleAssistantChat = async (req: Request, res: Response): Promise<
       return;
     }
 
-    const trimmedPrompt = prompt.trim().slice(0, 500);
+    if (prompt.length > MAX_MESSAGE_LENGTH) {
+      res.status(400).json({
+        success: false,
+        message: `Message exceeds maximum allowed length of ${MAX_MESSAGE_LENGTH} characters.`,
+      });
+      return;
+    }
+
+    const trimmedPrompt = prompt.trim();
     const userId = (req as any).user?.id || (req as any).user?._id?.toString();
 
     const context: AssistantToolContext = {
