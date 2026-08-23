@@ -51,7 +51,6 @@ export function runCollaborativeFilteringTests() {
     console.log('✓ Test 2 Passed: Users with partially overlapping preferences evaluated correctly.');
   }
 
-  // Test 3: Users with No Overlapping Songs
   {
     const userIds = ['user_x', 'user_y'];
     const songIds = ['song_jazz', 'song_metal'];
@@ -70,7 +69,6 @@ export function runCollaborativeFilteringTests() {
     console.log('✓ Test 3 Passed: Users with no overlapping songs return 0 similar users.');
   }
 
-  // Test 4: Users with No Listening History (Cold Start)
   {
     const userIds = ['user_newborn', 'user_active'];
     const songIds = ['song_1', 'song_2'];
@@ -86,7 +84,6 @@ export function runCollaborativeFilteringTests() {
     console.log('✓ Test 4 Passed: Users with no listening history handled safely.');
   }
 
-  // Test 5: Exclusion of Already-Liked Songs
   {
     const userIds = ['target_user', 'similar_user_1', 'similar_user_2'];
     const songIds = ['song_already_liked', 'song_candidate_alpha', 'song_candidate_beta'];
