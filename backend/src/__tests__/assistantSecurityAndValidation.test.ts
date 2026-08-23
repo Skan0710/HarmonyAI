@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { MusicSearchTool } from '../tools/musicSearchTool.js';
+import { SemanticSearchTool } from '../tools/semanticSearchTool.js';
 import { PlaylistCreationTool } from '../tools/playlistCreationTool.js';
 import { AddToPlaylistTool } from '../tools/addToPlaylistTool.js';
 import { RemoveFromPlaylistTool } from '../tools/removeFromPlaylistTool.js';
@@ -32,7 +33,29 @@ export function runAssistantSecurityAndValidationTests() {
     console.log('✓ Test 1 Passed: Music search input validation & limit capping verified.');
   }
 
-  // Test 2: Playlist Creation Validation & Authentication Enforcement
+  // Test 2: Semantic Search Input Validation & Bounds Checking
+  {
+    const semanticTool = new SemanticSearchTool();
+
+    // Rejection of empty prompt
+    const emptyPromptRes = semanticTool.validate({ prompt: '   ' });
+    assert.strictEqual(emptyPromptRes.valid, false);
+    assert.ok(emptyPromptRes.error?.includes('non-empty prompt'));
+
+    // Similarity bounds checking & safe clamping
+    const validSemantic = semanticTool.validate({
+      prompt: 'ambient space music with slow synth pads',
+      minSimilarity: 1.5, // Exceeds 1.0
+      limit: 100, // Exceeds 30
+    });
+    assert.strictEqual(validSemantic.valid, true);
+    assert.strictEqual(validSemantic.data?.minSimilarity, 1.0, 'Clamps minSimilarity to max 1.0');
+    assert.strictEqual(validSemantic.data?.limit, 30, 'Clamps semantic limit to max 30');
+
+    console.log('✓ Test 2 Passed: Semantic search input validation & bounds checking verified.');
+  }
+
+  // Test 3: Playlist Creation Validation & Authentication Enforcement
   {
     const createTool = new PlaylistCreationTool();
 
@@ -52,11 +75,11 @@ export function runAssistantSecurityAndValidationTests() {
     createTool.execute(mixedIdsRes.data!, {}).then((execRes) => {
       assert.strictEqual(execRes.success, false);
       assert.ok(execRes.error?.includes('Authentication required'));
-      console.log('✓ Test 2 Passed: Playlist creation validation & authentication enforcement verified.');
+      console.log('✓ Test 3 Passed: Playlist creation validation & authentication enforcement verified.');
     });
   }
 
-  // Test 3: Queue Modification Input Validation
+  // Test 4: Queue Modification Input Validation
   {
     const queueAdd = new AddToQueueTool();
 
@@ -75,10 +98,10 @@ export function runAssistantSecurityAndValidationTests() {
     assert.strictEqual(validQueue.valid, true);
     assert.strictEqual(validQueue.data?.position, 'end', 'Defaults unknown position safely to end');
 
-    console.log('✓ Test 3 Passed: Queue modification input validation verified.');
+    console.log('✓ Test 4 Passed: Queue modification input validation verified.');
   }
 
-  // Test 4: Unauthorized Playlist Access & Modification Defense
+  // Test 5: Unauthorized Playlist Access & Modification Defense
   {
     const addTool = new AddToPlaylistTool();
     const removeTool = new RemoveFromPlaylistTool();
@@ -96,12 +119,12 @@ export function runAssistantSecurityAndValidationTests() {
       removeTool.execute(validPayload, {}).then((unauthRemove) => {
         assert.strictEqual(unauthRemove.success, false);
         assert.ok(unauthRemove.error?.includes('Authentication required'));
-        console.log('✓ Test 4 Passed: Unauthorized playlist access & modification defense verified.');
+        console.log('✓ Test 5 Passed: Unauthorized playlist access & modification defense verified.');
       });
     });
   }
 
-  // Test 5: Invalid Tool Arguments Rejection Across Tool Registry
+  // Test 6: Invalid Tool Arguments Rejection Across Tool Registry
   {
     ToolRegistry.executeTool('music_search', { query: '' }, {}).then((res1) => {
       assert.strictEqual(res1.success, false);
@@ -110,12 +133,12 @@ export function runAssistantSecurityAndValidationTests() {
       ToolRegistry.executeTool('nonexistent_tool', {}, {}).then((res2) => {
         assert.strictEqual(res2.success, false);
         assert.ok(res2.error?.includes('not registered'));
-        console.log('✓ Test 5 Passed: Invalid tool arguments rejection across registry verified.');
+        console.log('✓ Test 6 Passed: Invalid tool arguments rejection across registry verified.');
       });
     });
   }
 
-  // Test 6: Multi-Step Tool Execution Validation & Chaining
+  // Test 7: Multi-Step Tool Execution Validation & Chaining
   {
     const isMulti = MultiStepAssistantService.isCompositeMultiStepRequest('Create a study playlist and add it to my library');
     assert.strictEqual(isMulti, true);
@@ -125,10 +148,10 @@ export function runAssistantSecurityAndValidationTests() {
     assert.strictEqual(plan[0].toolName, 'get_recommendations');
     assert.strictEqual(plan[1].toolName, 'create_playlist');
 
-    console.log('✓ Test 6 Passed: Multi-step tool execution validation & planning verified.');
+    console.log('✓ Test 7 Passed: Multi-step tool execution validation & planning verified.');
   }
 
-  // Test 7: Tool Failure Handling & Graceful Recovery
+  // Test 8: Tool Failure Handling & Graceful Recovery
   {
     MultiStepAssistantService.executeMultiStepAction(
       'Create a chill playlist and add it to my library',
@@ -138,11 +161,11 @@ export function runAssistantSecurityAndValidationTests() {
       assert.ok(result.responseMessage.length > 0);
       assert.strictEqual(result.stepsExecuted.some((s) => !s.success), true);
 
-      console.log('✓ Test 7 Passed: Tool failure handling & graceful recovery verified.');
+      console.log('✓ Test 8 Passed: Tool failure handling & graceful recovery verified.');
     });
   }
 
-  // Test 8: Maximum Message Length Enforcement
+  // Test 9: Maximum Message Length Enforcement
   {
     assert.strictEqual(MAX_MESSAGE_LENGTH, 500);
 
@@ -152,10 +175,10 @@ export function runAssistantSecurityAndValidationTests() {
     const oversizedPrompt = 'a'.repeat(501);
     assert.ok(oversizedPrompt.length > MAX_MESSAGE_LENGTH);
 
-    console.log('✓ Test 8 Passed: Maximum message length threshold (500 chars) verified.');
+    console.log('✓ Test 9 Passed: Maximum message length threshold (500 chars) verified.');
   }
 
-  // Test 9: Maximum Tool-Call Limit Enforcement
+  // Test 10: Maximum Tool-Call Limit Enforcement
   {
     MultiStepAssistantService.executeMultiStepAction(
       'Create a workout playlist and add it to my library',
@@ -163,7 +186,7 @@ export function runAssistantSecurityAndValidationTests() {
       { maxStepsPerRequest: 1 }
     ).then((result) => {
       assert.strictEqual(result.stepsExecuted.length, 1, 'Strictly limits tool execution to 1 step');
-      console.log('✓ Test 9 Passed: Maximum tool-call limit enforcement verified.');
+      console.log('✓ Test 10 Passed: Maximum tool-call limit enforcement verified.');
     });
   }
 
