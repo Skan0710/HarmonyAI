@@ -4,20 +4,21 @@ import { ToolRegistry } from '../tools/toolRegistry.js';
 export function runAssistantToolArchitectureTests() {
   console.log('[Assistant Tool Architecture Test Suite] Starting tests...');
 
-  // Test 1: Tool Registry Registration & Definition Completeness
+  // Test 1: Tool Registry Registration & Definition Completeness for All 8 Capabilities
   {
     const expectedTools = [
-      'music_search',
-      'semantic_search',
-      'get_recommendations',
-      'create_playlist',
-      'modify_playlist',
+      'keyword_music_search',
+      'semantic_music_search',
+      'personalized_recommendations',
+      'contextual_recommendations',
+      'playlist_creation',
+      'playlist_modification',
       'queue_management',
-      'get_user_preferences',
+      'user_taste_retrieval',
     ];
 
     const definitions = ToolRegistry.getToolDefinitions();
-    assert.ok(definitions.length >= 7, 'All core tools registered in registry');
+    assert.ok(definitions.length >= 8, 'All core tools registered in registry');
 
     for (const toolName of expectedTools) {
       const tool = ToolRegistry.getTool(toolName);
@@ -30,9 +31,9 @@ export function runAssistantToolArchitectureTests() {
     console.log('✓ Test 1 Passed: Tool registration & schema completeness verified.');
   }
 
-  // Test 2: Input Schema Validation - Music Search Tool
+  // Test 2: Input Schema Validation - Keyword Music Search Tool
   {
-    const musicSearch = ToolRegistry.getTool('music_search')!;
+    const musicSearch = ToolRegistry.getTool('keyword_music_search')!;
     const valid = musicSearch.validate({ query: 'Daft Punk', limit: 5 });
     assert.strictEqual(valid.valid, true);
     assert.strictEqual(valid.data?.query, 'Daft Punk');
@@ -42,12 +43,12 @@ export function runAssistantToolArchitectureTests() {
     assert.strictEqual(invalid.valid, false);
     assert.ok(invalid.error !== undefined);
 
-    console.log('✓ Test 2 Passed: Music search tool input validation verified.');
+    console.log('✓ Test 2 Passed: Keyword music search tool input validation verified.');
   }
 
-  // Test 3: Input Schema Validation - Semantic Search Tool
+  // Test 3: Input Schema Validation - Semantic Music Search Tool
   {
-    const semanticSearch = ToolRegistry.getTool('semantic_search')!;
+    const semanticSearch = ToolRegistry.getTool('semantic_music_search')!;
     const valid = semanticSearch.validate({ prompt: 'late night chill beats with soft piano', minSimilarity: 0.4 });
     assert.strictEqual(valid.valid, true);
     assert.strictEqual(valid.data?.prompt, 'late night chill beats with soft piano');
@@ -56,24 +57,28 @@ export function runAssistantToolArchitectureTests() {
     const invalid = semanticSearch.validate({});
     assert.strictEqual(invalid.valid, false);
 
-    console.log('✓ Test 3 Passed: Semantic search tool input validation verified.');
+    console.log('✓ Test 3 Passed: Semantic music search tool input validation verified.');
   }
 
-  // Test 4: Input Schema Validation - Recommendations Tool
+  // Test 4: Input Schema Validation - Personalized & Contextual Recommendations Tools
   {
-    const recsTool = ToolRegistry.getTool('get_recommendations')!;
-    const valid = recsTool.validate({ strategy: 'contextual', mood: 'Chill', activity: 'Coding', energyLevel: 0.5 });
-    assert.strictEqual(valid.valid, true);
-    assert.strictEqual(valid.data?.strategy, 'contextual');
-    assert.strictEqual(valid.data?.mood, 'Chill');
-    assert.strictEqual(valid.data?.energyLevel, 0.5);
+    const personalizedTool = ToolRegistry.getTool('personalized_recommendations')!;
+    const validPersonalized = personalizedTool.validate({ limit: 15 });
+    assert.strictEqual(validPersonalized.valid, true);
+    assert.strictEqual(validPersonalized.data?.limit, 15);
 
-    console.log('✓ Test 4 Passed: Recommendations tool input validation verified.');
+    const contextualTool = ToolRegistry.getTool('contextual_recommendations')!;
+    const validContextual = contextualTool.validate({ mood: 'Chill', activity: 'Coding', energyLevel: 0.5, limit: 10 });
+    assert.strictEqual(validContextual.valid, true);
+    assert.strictEqual(validContextual.data?.mood, 'Chill');
+    assert.strictEqual(validContextual.data?.activity, 'Coding');
+
+    console.log('✓ Test 4 Passed: Recommendations tools input validation verified.');
   }
 
   // Test 5: Input Schema Validation - Playlist Creation Tool
   {
-    const playlistCreate = ToolRegistry.getTool('create_playlist')!;
+    const playlistCreate = ToolRegistry.getTool('playlist_creation')!;
     const valid = playlistCreate.validate({ name: 'Summer Vibes 2026', description: 'Chill electronic tracks' });
     assert.strictEqual(valid.valid, true);
     assert.strictEqual(valid.data?.name, 'Summer Vibes 2026');
@@ -86,7 +91,7 @@ export function runAssistantToolArchitectureTests() {
 
   // Test 6: Input Schema Validation - Playlist Modification Tool
   {
-    const playlistModify = ToolRegistry.getTool('modify_playlist')!;
+    const playlistModify = ToolRegistry.getTool('playlist_modification')!;
     const valid = playlistModify.validate({
       playlistId: '507f1f77bcf86cd799439011',
       action: 'add_songs',
@@ -117,15 +122,15 @@ export function runAssistantToolArchitectureTests() {
     });
   }
 
-  // Test 8: Input Schema Validation - User Preference Retrieval Tool
+  // Test 8: Input Schema Validation - User Taste / Preference Retrieval Tool
   {
-    const prefTool = ToolRegistry.getTool('get_user_preferences')!;
+    const prefTool = ToolRegistry.getTool('user_taste_retrieval')!;
     const valid = prefTool.validate({ timeframe: 'short_term' });
     assert.strictEqual(valid.valid, true);
     assert.strictEqual(valid.data?.timeframe, 'short_term');
 
     // Unauthenticated execution rejection check
-    ToolRegistry.executeTool('get_user_preferences', { timeframe: 'combined' }, {}).then((result) => {
+    ToolRegistry.executeTool('user_taste_retrieval', { timeframe: 'combined' }, {}).then((result) => {
       assert.strictEqual(result.success, false);
       assert.ok(result.error?.includes('Authentication required'));
       console.log('✓ Test 8 Passed: User preference tool unauthenticated rejection verified.');
