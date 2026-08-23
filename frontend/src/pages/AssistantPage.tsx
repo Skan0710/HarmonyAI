@@ -7,7 +7,8 @@ const SUGGESTION_EXAMPLES = [
   'Find calm songs for studying',
   'Add these songs to my playlist',
   'Make my queue more energetic',
-  'Recommend late night synthwave tracks',
+  'Create a 15-song late-night playlist',
+  'Recommend something outside my usual taste',
   'What are my top music preferences?',
 ];
 
@@ -119,7 +120,7 @@ export const AssistantPage: React.FC = () => {
                   {/* Render Songs List */}
                   {Array.isArray(msg.data.songs || msg.data.recommendations) && (
                     <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                      {(msg.data.songs || msg.data.recommendations).slice(0, 6).map((item: any, idx: number) => {
+                      {(msg.data.songs || msg.data.recommendations).slice(0, 8).map((item: any, idx: number) => {
                         const song = item.song || item;
                         if (!song || !song._id) return null;
                         const isCurrent = currentSong?._id === song._id;
@@ -161,7 +162,7 @@ export const AssistantPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => addToQueue(song)}
-                              className="text-slate-400 hover:text-indigo-300 p-1 rounded hover:bg-slate-800 transition text-[11px] shrink-0"
+                              className="text-slate-400 hover:text-indigo-300 p-1 rounded hover:bg-slate-800 transition text-[11px] shrink-0 cursor-pointer"
                               title="Add to Queue"
                             >
                               + Queue
@@ -242,7 +243,7 @@ export const AssistantPage: React.FC = () => {
             onChange={(e) => setInputPrompt(e.target.value)}
             maxLength={500}
             disabled={isLoading}
-            placeholder="Ask HarmonyAI (e.g. 'Find calm songs for studying', 'Queue up energetic rock')..."
+            placeholder="Ask HarmonyAI (e.g. 'Find calm songs for studying', 'Create a 15-song late-night playlist')..."
             className="w-full bg-transparent px-4 py-3.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none disabled:opacity-60"
           />
 
