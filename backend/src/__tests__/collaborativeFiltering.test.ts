@@ -5,7 +5,6 @@ import { SparseInteractionMatrix } from '../services/interactionMatrixService.js
 export function runCollaborativeFilteringTests() {
   console.log('[Collaborative Filtering Test Suite] Starting tests...');
 
-  // Test 1: Users with Identical Preferences
   {
     const userIds = ['user_alpha', 'user_twin'];
     const songIds = ['song_synthwave_1', 'song_rock_2'];
@@ -29,7 +28,6 @@ export function runCollaborativeFilteringTests() {
     console.log('✓ Test 1 Passed: Users with identical preferences evaluated to 1.0 similarity.');
   }
 
-  // Test 2: Users with Partially Overlapping Preferences
   {
     const userIds = ['user_a', 'user_b'];
     const songIds = ['song_common', 'song_only_a', 'song_only_b'];
