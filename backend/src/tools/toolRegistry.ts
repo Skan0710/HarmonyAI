@@ -2,6 +2,8 @@ import { AssistantTool, AssistantToolContext, ToolExecutionResult, ToolParameter
 import { MusicSearchTool } from './musicSearchTool.js';
 import { SemanticSearchTool } from './semanticSearchTool.js';
 import { RecommendationsTool } from './recommendationsTool.js';
+import { PersonalizedRecommendationsTool } from './personalizedRecommendationsTool.js';
+import { ContextualRecommendationsTool } from './contextualRecommendationsTool.js';
 import { PlaylistCreationTool } from './playlistCreationTool.js';
 import { AddToPlaylistTool } from './addToPlaylistTool.js';
 import { RemoveFromPlaylistTool } from './removeFromPlaylistTool.js';
@@ -22,27 +24,63 @@ export class ToolRegistry {
   private static tools: Map<string, AssistantTool> = new Map();
 
   static {
-    // Register Discovery Tools
-    this.registerTool(new MusicSearchTool());
-    this.registerTool(new SemanticSearchTool());
-    this.registerTool(new RecommendationsTool());
-    this.registerTool(new UserPreferenceRetrievalTool());
+    // 1. Keyword Music Search
+    const musicSearch = new MusicSearchTool();
+    this.registerTool(musicSearch);
+    this.registerAlias('keyword_music_search', musicSearch);
 
-    // Register Playlist Tools
-    this.registerTool(new PlaylistCreationTool());
+    // 2. Semantic Music Search
+    const semanticSearch = new SemanticSearchTool();
+    this.registerTool(semanticSearch);
+    this.registerAlias('semantic_music_search', semanticSearch);
+
+    // 3. Personalized Recommendations
+    const personalizedRecs = new PersonalizedRecommendationsTool();
+    this.registerTool(personalizedRecs);
+
+    // 4. Contextual Recommendations
+    const contextualRecs = new ContextualRecommendationsTool();
+    this.registerTool(contextualRecs);
+    this.registerTool(new RecommendationsTool());
+
+    // 5. User Taste / Preference Retrieval
+    const userPrefTool = new UserPreferenceRetrievalTool();
+    this.registerTool(userPrefTool);
+    this.registerAlias('user_taste_retrieval', userPrefTool);
+
+    // 6. Playlist Creation
+    const playlistCreate = new PlaylistCreationTool();
+    this.registerTool(playlistCreate);
+    this.registerAlias('playlist_creation', playlistCreate);
+
+    // 7. Playlist Modification
+    const playlistMod = new PlaylistModificationTool();
+    this.registerTool(playlistMod);
+    this.registerAlias('playlist_modification', playlistMod);
     this.registerTool(new AddToPlaylistTool());
     this.registerTool(new RemoveFromPlaylistTool());
-    this.registerTool(new PlaylistModificationTool());
 
-    // Register Queue Tools
+    // 8. Queue Management
+    const queueMgmt = new QueueManagementTool();
+    this.registerTool(queueMgmt);
     this.registerTool(new AddToQueueTool());
     this.registerTool(new RemoveFromQueueTool());
     this.registerTool(new ClearQueueTool());
-    this.registerTool(new QueueManagementTool());
   }
 
   static registerTool(tool: AssistantTool): void {
     this.tools.set(tool.name, tool);
+  }
+
+  static registerAlias(aliasName: string, tool: AssistantTool): void {
+    const aliasWrapper: AssistantTool = {
+      name: aliasName,
+      description: tool.description,
+      parameters: tool.parameters,
+      validate: (input: unknown) => tool.validate(input),
+      execute: (input: any, context: AssistantToolContext) => tool.execute(input, context),
+    };
+    this.tools.set(aliasName, aliasWrapper);
   }
 
   static getTool(name: string): AssistantTool | undefined {
@@ -54,11 +92,18 @@ export class ToolRegistry {
   }
 
   static getToolDefinitions(): ToolDefinitionDTO[] {
-    return Array.from(this.tools.values()).map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-    }));
+    // Return unique definitions by primary tool name
+    const uniqueDefs = new Map<string, ToolDefinitionDTO>();
+    for (const tool of this.tools.values()) {
+      if (!uniqueDefs.has(tool.name)) {
+        uniqueDefs.set(tool.name, {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+        });
+      }
+    }
+    return Array.from(uniqueDefs.values());
   }
 
   /**
