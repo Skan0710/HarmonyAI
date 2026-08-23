@@ -18,6 +18,14 @@ export function runMultiStepAssistantServiceTests() {
     );
 
     assert.strictEqual(
+      MultiStepAssistantService.isCompositeMultiStepRequest(
+        'Create a playlist for late night coding and add 15 suitable songs'
+      ),
+      true,
+      'Detects create playlist for late night coding with 15 songs'
+    );
+
+    assert.strictEqual(
       MultiStepAssistantService.isCompositeMultiStepRequest('Find synthwave songs and queue them up'),
       true,
       'Detects find and queue composite request'
@@ -34,12 +42,17 @@ export function runMultiStepAssistantServiceTests() {
 
   // Test 2: Multi-Step Action Planning (Understand -> Recommend -> Create -> Add)
   {
-    const plan = MultiStepAssistantService.planMultiStepActions('Create a study playlist and add it to my library', {});
+    const plan = MultiStepAssistantService.planMultiStepActions(
+      'Create a playlist for late night coding and add 15 suitable songs',
+      {}
+    );
 
     assert.strictEqual(plan.length, 2, 'Generates 2-step plan');
     assert.strictEqual(plan[0].toolName, 'get_recommendations', 'Step 1 is recommendation discovery');
-    assert.strictEqual(plan[0].input.activity, 'Study');
+    assert.strictEqual(plan[0].input.activity, 'Coding');
+    assert.strictEqual(plan[0].input.limit, 15, 'Extracts requested count of 15 songs');
     assert.strictEqual(plan[1].toolName, 'create_playlist', 'Step 2 is playlist creation');
+    assert.strictEqual(plan[1].input.name, 'Late Night Coding');
 
     console.log('✓ Test 2 Passed: Multi-step action planning verified.');
   }
@@ -70,7 +83,8 @@ export function runMultiStepAssistantServiceTests() {
     // With maxStepsPerRequest=1, only 1 step should be executed even if plan has 2 steps
     MultiStepAssistantService.executeMultiStepAction(
       'Create a chill playlist and add it to my library',
-      {}
+      {},
+      { maxStepsPerRequest: 1 }
     ).then((result) => {
       assert.strictEqual(result.stepsExecuted.length, 1, 'Strictly limits tool calls to maxStepsPerRequest');
 

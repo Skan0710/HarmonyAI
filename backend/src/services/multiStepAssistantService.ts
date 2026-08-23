@@ -51,16 +51,25 @@ export const resetMultiStepConfig = (): MultiStepConfig => {
 export class MultiStepAssistantService {
   /**
    * Identifies if a user prompt implies a multi-step composite action.
-   * e.g., "Create a study playlist and add it to my library", "Find synthwave songs and queue them up"
+   * e.g., "Create a playlist for late night coding and add 15 suitable songs"
    */
   static isCompositeMultiStepRequest(prompt: string): boolean {
     const clean = prompt.trim().toLowerCase();
 
-    // Pattern 1: Create playlist with generated recommendations / vibes
+    // Pattern 1: Create playlist with generated recommendations / vibes / suitable songs
     if (
       (clean.includes('create') || clean.includes('make') || clean.includes('generate')) &&
       clean.includes('playlist') &&
-      (clean.includes('study') || clean.includes('workout') || clean.includes('chill') || clean.includes('focus') || clean.includes('recommend') || clean.includes('add'))
+      (clean.includes('study') ||
+        clean.includes('coding') ||
+        clean.includes('workout') ||
+        clean.includes('chill') ||
+        clean.includes('focus') ||
+        clean.includes('recommend') ||
+        clean.includes('add') ||
+        clean.includes('late night') ||
+        clean.includes('suitable songs') ||
+        clean.includes('tracks'))
     ) {
       return true;
     }
@@ -91,16 +100,24 @@ export class MultiStepAssistantService {
     const clean = prompt.trim().toLowerCase();
     const plan: { toolName: string; input: Record<string, any>; stepDescription: string }[] = [];
 
-    // Scenario A: Create Contextual/Genre Playlist (Recommend -> Create -> Add)
+    // Extract desired song count limit if specified (e.g. "add 15 suitable songs", "10 tracks")
+    const countMatch = clean.match(/(\d+)\s+(?:suitable\s+)?(?:songs|tracks|items)/i);
+    const requestedCount = countMatch ? parseInt(countMatch[1], 10) : 10;
+    const safeLimit = Math.max(1, Math.min(30, requestedCount));
+
+    // Scenario A: Create Playlist with Curated Recommendations (Recommend -> Create -> Add)
     if (
-      (clean.includes('create') || clean.includes('make')) &&
+      (clean.includes('create') || clean.includes('make') || clean.includes('generate')) &&
       clean.includes('playlist')
     ) {
       let mood: string | undefined;
       let activity: string | undefined;
       let playlistName = 'My Curated Playlist';
 
-      if (clean.includes('study') || clean.includes('focus')) {
+      if (clean.includes('late night coding') || clean.includes('coding')) {
+        activity = 'Coding';
+        playlistName = 'Late Night Coding';
+      } else if (clean.includes('study') || clean.includes('focus')) {
         activity = 'Study';
         playlistName = 'Study Focus Session';
       } else if (clean.includes('workout') || clean.includes('gym')) {
@@ -110,22 +127,22 @@ export class MultiStepAssistantService {
         mood = 'Chill';
         playlistName = 'Chill Vibes';
       } else {
-        const match = prompt.match(/(?:called|named|titled)\s+["']?([^"'\n\r]+?)["']?$/i);
+        const match = prompt.match(/(?:for|called|named|titled)\s+["']?([^"'\n\r,]+?)["']?(?:\s+and|$)/i);
         if (match && match[1]) {
           playlistName = match[1].trim();
         }
       }
 
-      // Step 1: Discover / Recommend matching songs
+      // Step 1: Generate Recommendations / Discover Songs
       plan.push({
         toolName: 'get_recommendations',
         input: {
           strategy: mood || activity ? 'contextual' : 'hybrid',
           mood,
           activity,
-          limit: 8,
+          limit: safeLimit,
         },
-        stepDescription: `Generate ${activity || mood || 'personalized'} recommendations`,
+        stepDescription: `Generate ${safeLimit} ${activity || mood || 'personalized'} recommendations`,
       });
 
       // Step 2: Create Playlist with the discovered songs
@@ -133,10 +150,10 @@ export class MultiStepAssistantService {
         toolName: 'create_playlist',
         input: {
           name: playlistName,
-          description: `AI-curated playlist for ${activity || mood || 'daily listening'}`,
+          description: `AI-curated playlist for ${activity || mood || 'daily listening'} (${safeLimit} tracks)`,
           songIds: [], // Populated dynamically from Step 1 output
         },
-        stepDescription: `Create playlist "${playlistName}"`,
+        stepDescription: `Create playlist "${playlistName}" and add songs`,
       });
 
       return plan;
@@ -149,13 +166,13 @@ export class MultiStepAssistantService {
       if (clean.includes('vibe') || clean.includes('late night') || clean.includes('feel') || clean.includes('lofi') || clean.includes('chill') || clean.includes('beats')) {
         plan.push({
           toolName: 'semantic_search',
-          input: { prompt, limit: 5 },
+          input: { prompt, limit: safeLimit },
           stepDescription: `Search music matching vibe "${prompt}"`,
         });
       } else {
         plan.push({
           toolName: 'music_search',
-          input: { query: prompt.replace(/and\s+(?:queue|play next).*/i, '').trim(), limit: 5 },
+          input: { query: prompt.replace(/and\s+(?:queue|play next).*/i, '').trim(), limit: safeLimit },
           stepDescription: 'Search catalog tracks',
         });
       }
