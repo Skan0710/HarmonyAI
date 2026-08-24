@@ -1,11 +1,15 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 
 export const ProtectedRoute: React.FC = () => {
   const { isAuthenticated, isInitializing } = useAuth();
+  const { isSignedIn, isLoaded } = useClerkAuth();
 
-  if (isInitializing) {
+  const isClerkConfigured = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+
+  if (isInitializing || (isClerkConfigured && !isLoaded)) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-950 text-slate-400">
         <div className="text-center">
@@ -16,7 +20,9 @@ export const ProtectedRoute: React.FC = () => {
     );
   }
 
-  if (!isAuthenticated) {
+  const authenticated = isAuthenticated || (isClerkConfigured && Boolean(isSignedIn));
+
+  if (!authenticated) {
     return <Navigate to="/login" replace />;
   }
 

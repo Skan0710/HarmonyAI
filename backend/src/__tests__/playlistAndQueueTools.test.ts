@@ -1,10 +1,7 @@
 import assert from 'node:assert';
 import { PlaylistCreationTool } from '../tools/playlistCreationTool.js';
-import { AddToPlaylistTool } from '../tools/addToPlaylistTool.js';
-import { RemoveFromPlaylistTool } from '../tools/removeFromPlaylistTool.js';
-import { AddToQueueTool } from '../tools/addToQueueTool.js';
-import { RemoveFromQueueTool } from '../tools/removeFromQueueTool.js';
-import { ClearQueueTool } from '../tools/clearQueueTool.js';
+import { PlaylistModificationTool } from '../tools/playlistModificationTool.js';
+import { QueueManagementTool } from '../tools/queueManagementTool.js';
 import { ToolRegistry } from '../tools/toolRegistry.js';
 
 export function runPlaylistAndQueueToolsTests() {
@@ -40,109 +37,112 @@ export function runPlaylistAndQueueToolsTests() {
     });
   }
 
-  // Test 2: Add to Playlist Tool Validation & Authentication Requirement
+  // Test 2: Playlist Modification Tool - Add Songs
   {
-    const addTool = new AddToPlaylistTool();
-    assert.strictEqual(addTool.name, 'add_to_playlist');
+    const playlistMod = new PlaylistModificationTool();
+    assert.strictEqual(playlistMod.name, 'modify_playlist');
 
-    const valid = addTool.validate({
+    const valid = playlistMod.validate({
       playlistId: '507f1f77bcf86cd799439011',
+      action: 'add_songs',
       songIds: ['507f1f77bcf86cd799439012'],
     });
     assert.strictEqual(valid.valid, true);
     assert.strictEqual(valid.data?.playlistId, '507f1f77bcf86cd799439011');
-    assert.strictEqual(valid.data?.songIds.length, 1);
+    assert.strictEqual(valid.data?.songIds?.length, 1);
+    assert.strictEqual(valid.data?.action, 'add_songs');
 
-    const invalid = addTool.validate({ playlistId: 'invalid_id', songIds: [] });
+    // Invalid playlist ID
+    const invalid = playlistMod.validate({ playlistId: 'invalid_id', action: 'add_songs', songIds: [] });
     assert.strictEqual(invalid.valid, false);
 
     // Unauthenticated check
-    addTool.execute(valid.data!, {}).then((result) => {
+    playlistMod.execute(valid.data!, {}).then((result) => {
       assert.strictEqual(result.success, false);
       assert.ok(result.error?.includes('Authentication required'));
-      console.log('✓ Test 2 Passed: Add to playlist validation & authentication requirement verified.');
+      console.log('✓ Test 2 Passed: Playlist modification (add songs) validation & auth requirement verified.');
     });
   }
 
-  // Test 3: Remove from Playlist Tool Validation & Authentication Requirement
+  // Test 3: Playlist Modification Tool - Remove Songs
   {
-    const removeTool = new RemoveFromPlaylistTool();
-    assert.strictEqual(removeTool.name, 'remove_from_playlist');
+    const playlistMod = new PlaylistModificationTool();
 
-    const valid = removeTool.validate({
+    const valid = playlistMod.validate({
       playlistId: '507f1f77bcf86cd799439011',
+      action: 'remove_songs',
       songIds: ['507f1f77bcf86cd799439012'],
     });
     assert.strictEqual(valid.valid, true);
+    assert.strictEqual(valid.data?.action, 'remove_songs');
 
-    const invalid = removeTool.validate({ playlistId: '', songIds: [] });
+    const invalid = playlistMod.validate({ playlistId: '', action: 'remove_songs', songIds: [] });
     assert.strictEqual(invalid.valid, false);
 
     // Unauthenticated check
-    removeTool.execute(valid.data!, {}).then((result) => {
+    playlistMod.execute(valid.data!, {}).then((result) => {
       assert.strictEqual(result.success, false);
       assert.ok(result.error?.includes('Authentication required'));
-      console.log('✓ Test 3 Passed: Remove from playlist validation & authentication requirement verified.');
+      console.log('✓ Test 3 Passed: Playlist modification (remove songs) validation & auth requirement verified.');
     });
   }
 
-  // Test 4: Add to Queue Tool (Position next vs end)
+  // Test 4: Queue Management Tool - Add Songs (Position next vs end)
   {
-    const queueAdd = new AddToQueueTool();
-    assert.strictEqual(queueAdd.name, 'add_to_queue');
+    const queueTool = new QueueManagementTool();
+    assert.strictEqual(queueTool.name, 'queue_management');
 
-    const validNext = queueAdd.validate({
+    const validNext = queueTool.validate({
+      action: 'add_next',
       songIds: ['507f1f77bcf86cd799439011'],
-      position: 'next',
     });
     assert.strictEqual(validNext.valid, true);
-    assert.strictEqual(validNext.data?.position, 'next');
+    assert.strictEqual(validNext.data?.action, 'add_next');
 
-    const validEnd = queueAdd.validate({
+    const validEnd = queueTool.validate({
+      action: 'add',
       songIds: ['507f1f77bcf86cd799439011'],
-      position: 'end',
     });
     assert.strictEqual(validEnd.valid, true);
-    assert.strictEqual(validEnd.data?.position, 'end');
+    assert.strictEqual(validEnd.data?.action, 'add');
 
-    const invalid = queueAdd.validate({ songIds: [] });
+    const invalid = queueTool.validate({ action: 'add', songIds: [] });
     assert.strictEqual(invalid.valid, false);
 
-    console.log('✓ Test 4 Passed: Add to queue tool position & input validation verified.');
+    console.log('✓ Test 4 Passed: Queue management tool position & input validation verified.');
   }
 
-  // Test 5: Remove from Queue Tool
+  // Test 5: Queue Management Tool - Remove Songs
   {
-    const queueRemove = new RemoveFromQueueTool();
-    assert.strictEqual(queueRemove.name, 'remove_from_queue');
+    const queueTool = new QueueManagementTool();
 
-    const valid = queueRemove.validate({
+    const valid = queueTool.validate({
+      action: 'remove',
       songIds: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
     });
     assert.strictEqual(valid.valid, true);
-    assert.strictEqual(valid.data?.songIds.length, 2);
+    assert.strictEqual(valid.data?.songIds?.length, 2);
 
-    queueRemove.execute(valid.data!, {}).then((result) => {
+    queueTool.execute(valid.data!, {}).then((result) => {
       assert.strictEqual(result.success, true);
       assert.strictEqual(result.data?.count, 2);
-      console.log('✓ Test 5 Passed: Remove from queue tool execution verified.');
+      console.log('✓ Test 5 Passed: Queue management (remove) tool execution verified.');
     });
   }
 
-  // Test 6: Clear Queue Tool
+  // Test 6: Queue Management Tool - Clear
   {
-    const queueClear = new ClearQueueTool();
-    assert.strictEqual(queueClear.name, 'clear_queue');
+    const queueTool = new QueueManagementTool();
 
-    const valid = queueClear.validate({ preserveCurrentTrack: false });
+    const valid = queueTool.validate({ action: 'clear', preserveCurrentTrack: false });
     assert.strictEqual(valid.valid, true);
     assert.strictEqual(valid.data?.preserveCurrentTrack, false);
 
-    queueClear.execute(valid.data!, {}).then((result) => {
+    queueTool.execute(valid.data!, {}).then((result) => {
       assert.strictEqual(result.success, true);
-      assert.strictEqual(result.data?.action, 'clear_queue');
+      assert.strictEqual(result.data?.action, 'clear');
       assert.strictEqual(result.data?.preserveCurrentTrack, false);
-      console.log('✓ Test 6 Passed: Clear queue tool execution verified.');
+      console.log('✓ Test 6 Passed: Queue management (clear) tool execution verified.');
     });
   }
 
@@ -150,8 +150,10 @@ export function runPlaylistAndQueueToolsTests() {
   {
     const expected = [
       'create_playlist',
+      'modify_playlist',
       'add_to_playlist',
       'remove_from_playlist',
+      'queue_management',
       'add_to_queue',
       'remove_from_queue',
       'clear_queue',

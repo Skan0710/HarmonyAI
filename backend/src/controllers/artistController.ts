@@ -1,234 +1,151 @@
 import { Request, Response } from 'express';
 import { ArtistService } from '../services/artistService.js';
+import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
+import { extractQueryParams, sanitizeString } from '../utils/validators.js';
 
-export const createArtist = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const {
-      name,
-      bio,
-      profileImage,
-      avatar,
-      bannerImage,
-      genres,
-      socialLinks,
-      monthlyListeners,
-      verified,
-      tags,
-      similarArtists,
-      vectorEmbedding,
-      recommendationMetadata,
-    } = req.body;
+export const createArtist = controllerWrapper(async (req: Request, res: Response) => {
+  const {
+    name,
+    bio,
+    profileImage,
+    avatar,
+    bannerImage,
+    genres,
+    socialLinks,
+    monthlyListeners,
+    verified,
+    tags,
+    similarArtists,
+    vectorEmbedding,
+    recommendationMetadata,
+  } = req.body;
 
-    // Input Validation
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      res.status(400).json({
-        success: false,
-        message: 'Artist name is required and must be a non-empty string',
-      });
-      return;
-    }
-
-    if (monthlyListeners !== undefined && (typeof monthlyListeners !== 'number' || monthlyListeners < 0)) {
-      res.status(400).json({
-        success: false,
-        message: 'Monthly listeners must be a non-negative number',
-      });
-      return;
-    }
-
-    const artist = await ArtistService.createArtist({
-      name: name.trim(),
-      bio,
-      profileImage,
-      avatar,
-      bannerImage,
-      genres,
-      socialLinks,
-      monthlyListeners,
-      verified,
-      tags,
-      similarArtists,
-      vectorEmbedding,
-      recommendationMetadata,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Artist created successfully',
-      data: artist,
-    });
-  } catch (error: any) {
-    if (error.name === 'ValidationError' || error.name === 'CastError') {
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Invalid input data',
-      });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to create artist',
-    });
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    throw new ControllerError(400, 'Artist name is required and must be a non-empty string');
   }
-};
 
-export const getArtists = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const search = req.query.search ? String(req.query.search) : undefined;
-    const genreId = (req.query.genreId || req.query.genre) ? String(req.query.genreId || req.query.genre) : undefined;
-    const verified = req.query.verified !== undefined ? req.query.verified === 'true' : undefined;
-    const sortBy = req.query.sortBy ? (String(req.query.sortBy) as any) : 'monthlyListeners';
-    const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
-    const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 20;
+  if (monthlyListeners !== undefined && (typeof monthlyListeners !== 'number' || monthlyListeners < 0)) {
+    throw new ControllerError(400, 'Monthly listeners must be a non-negative number');
+  }
 
-    const result = await ArtistService.getAllArtists({
-      search,
-      genreId,
-      verified,
-      sortBy,
-      sortOrder,
+  const artist = await ArtistService.createArtist({
+    name: name.trim(),
+    bio,
+    profileImage,
+    avatar,
+    bannerImage,
+    genres,
+    socialLinks,
+    monthlyListeners,
+    verified,
+    tags,
+    similarArtists,
+    vectorEmbedding,
+    recommendationMetadata,
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Artist created successfully',
+    data: artist,
+  });
+});
+
+export const getArtists = controllerWrapper(async (req: Request, res: Response) => {
+  const q = extractQueryParams(req, {
+    search: 'string',
+    genreId: 'string',
+    sortBy: 'string',
+    sortOrder: 'string',
+    page: 'int',
+    limit: 'int',
+  });
+
+  const search = sanitizeString(q.search);
+  const genreId = sanitizeString(q.genreId) || sanitizeString(String(req.query.genre || ''));
+  const verified = req.query.verified !== undefined ? req.query.verified === 'true' : undefined;
+  const sortBy = (q.sortBy as any) || 'monthlyListeners';
+  const sortOrder = q.sortOrder === 'asc' ? 'asc' : 'desc';
+  const page = q.page || 1;
+  const limit = q.limit || 20;
+
+  const result = await ArtistService.getAllArtists({
+    search,
+    genreId,
+    verified,
+    sortBy,
+    sortOrder,
+    page,
+    limit,
+  });
+
+  res.status(200).json({
+    success: true,
+    data: result.artists,
+    pagination: {
+      total: result.total,
       page,
       limit,
-    });
+      pages: Math.ceil(result.total / limit),
+    },
+  });
+});
 
-    res.status(200).json({
-      success: true,
-      data: result.artists,
-      pagination: {
-        total: result.total,
-        page,
-        limit,
-        pages: Math.ceil(result.total / limit),
-      },
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch artists',
-    });
+export const getArtistById = controllerWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const artist = await ArtistService.getArtistById(id);
+
+  if (!artist) {
+    throw new ControllerError(404, 'Artist not found');
   }
-};
 
-export const getArtistById = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const artist = await ArtistService.getArtistById(id);
+  res.status(200).json({ success: true, data: artist });
+});
 
-    if (!artist) {
-      res.status(404).json({ success: false, message: 'Artist not found' });
-      return;
-    }
+export const updateArtist = controllerWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name, monthlyListeners } = req.body;
 
-    res.status(200).json({
-      success: true,
-      data: artist,
-    });
-  } catch (error: any) {
-    if (error.name === 'CastError') {
-      res.status(400).json({ success: false, message: 'Invalid artist ID format' });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch artist',
-    });
+  if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+    throw new ControllerError(400, 'Artist name must be a non-empty string');
   }
-};
 
-export const updateArtist = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { name, monthlyListeners } = req.body;
-
-    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
-      res.status(400).json({
-        success: false,
-        message: 'Artist name must be a non-empty string',
-      });
-      return;
-    }
-
-    if (monthlyListeners !== undefined && (typeof monthlyListeners !== 'number' || monthlyListeners < 0)) {
-      res.status(400).json({
-        success: false,
-        message: 'Monthly listeners must be a non-negative number',
-      });
-      return;
-    }
-
-    const updatedArtist = await ArtistService.updateArtist(id, req.body);
-
-    if (!updatedArtist) {
-      res.status(404).json({ success: false, message: 'Artist not found' });
-      return;
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Artist updated successfully',
-      data: updatedArtist,
-    });
-  } catch (error: any) {
-    if (error.name === 'CastError' || error.name === 'ValidationError') {
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Invalid input data',
-      });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to update artist',
-    });
+  if (monthlyListeners !== undefined && (typeof monthlyListeners !== 'number' || monthlyListeners < 0)) {
+    throw new ControllerError(400, 'Monthly listeners must be a non-negative number');
   }
-};
 
-export const deleteArtist = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const deletedArtist = await ArtistService.deleteArtist(id);
+  const updatedArtist = await ArtistService.updateArtist(id, req.body);
 
-    if (!deletedArtist) {
-      res.status(404).json({ success: false, message: 'Artist not found' });
-      return;
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Artist deleted successfully',
-    });
-  } catch (error: any) {
-    if (error.name === 'CastError') {
-      res.status(400).json({ success: false, message: 'Invalid artist ID format' });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to delete artist',
-    });
+  if (!updatedArtist) {
+    throw new ControllerError(404, 'Artist not found');
   }
-};
 
-export const getSimilarArtists = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 5;
+  res.status(200).json({
+    success: true,
+    message: 'Artist updated successfully',
+    data: updatedArtist,
+  });
+});
 
-    const similar = await ArtistService.getRecommendedArtists(id, limit);
+export const deleteArtist = controllerWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const deletedArtist = await ArtistService.deleteArtist(id);
 
-    res.status(200).json({
-      success: true,
-      data: similar,
-    });
-  } catch (error: any) {
-    if (error.name === 'CastError') {
-      res.status(400).json({ success: false, message: 'Invalid artist ID format' });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch similar artists',
-    });
+  if (!deletedArtist) {
+    throw new ControllerError(404, 'Artist not found');
   }
-};
+
+  res.status(200).json({
+    success: true,
+    message: 'Artist deleted successfully',
+  });
+});
+
+export const getSimilarArtists = controllerWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 5;
+
+  const similar = await ArtistService.getRecommendedArtists(id, limit);
+
+  res.status(200).json({ success: true, data: similar });
+});

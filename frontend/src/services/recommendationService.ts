@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import { extractEnvelopeData } from '../utils/apiHelpers';
 import type { Song } from '../types/music';
 
 export interface HybridItemResponse {
@@ -105,16 +106,8 @@ export const fetchCollaborativeRecommendationsApi = async (
     `/recommendations/collaborative?limit=${limit}`,
     { method: 'GET' }
   );
-
-  if (response.error) {
-    return { songs: [], error: response.error };
-  }
-
-  if (response.data && response.data.success && Array.isArray(response.data.data)) {
-    return { songs: response.data.data, error: null };
-  }
-
-  return { songs: [], error: response.data?.message || 'Failed to fetch collaborative recommendations' };
+  const result = extractEnvelopeData(response, 'Failed to fetch collaborative recommendations');
+  return { songs: result.data || [], error: result.error };
 };
 
 export const fetchHybridRecommendationsApi = async (
@@ -130,29 +123,18 @@ export const fetchHybridRecommendationsApi = async (
     { method: 'GET' }
   );
 
-  if (response.error) {
-    return { songs: [], rawHybridItems: [], error: response.error };
-  }
+  const result = extractEnvelopeData(response, 'Failed to fetch hybrid recommendations');
+  const rawItems = result.data || [];
+  const songs = rawItems
+    .filter((item) => Boolean(item.song))
+    .map((item) => ({
+      ...item.song,
+      hybridScore: item.hybridScore,
+      componentScores: item.componentScores,
+      sources: item.sources,
+    }));
 
-  if (response.data && response.data.success && Array.isArray(response.data.data)) {
-    const rawHybridItems = response.data.data;
-    const songs = rawHybridItems
-      .filter((item) => Boolean(item.song))
-      .map((item) => ({
-        ...item.song,
-        hybridScore: item.hybridScore,
-        componentScores: item.componentScores,
-        sources: item.sources,
-      }));
-
-    return { songs, rawHybridItems, error: null };
-  }
-
-  return {
-    songs: [],
-    rawHybridItems: [],
-    error: response.data?.message || 'Failed to fetch hybrid recommendations',
-  };
+  return { songs, rawHybridItems: rawItems, error: result.error };
 };
 
 export const fetchContextualRecommendationsApi = async (params: {
@@ -179,21 +161,11 @@ export const fetchContextualRecommendationsApi = async (params: {
     { method: 'GET' }
   );
 
-  if (response.error) {
-    return { songs: [], rawItems: [], error: response.error };
-  }
+  const result = extractEnvelopeData(response, 'Failed to fetch contextual recommendations');
+  const rawItems = result.data || [];
+  const songs = rawItems.filter((item) => Boolean(item.song)).map((item) => item.song);
 
-  if (response.data && response.data.success && Array.isArray(response.data.data)) {
-    const rawItems = response.data.data;
-    const songs = rawItems.filter((item) => Boolean(item.song)).map((item) => item.song);
-    return { songs, rawItems, detectedContext: response.data.detectedContext, error: null };
-  }
-
-  return {
-    songs: [],
-    rawItems: [],
-    error: response.data?.message || 'Failed to fetch contextual recommendations',
-  };
+  return { songs, rawItems, detectedContext: undefined, error: result.error };
 };
 
 export const fetchSessionRecommendationsApi = async (
@@ -209,26 +181,15 @@ export const fetchSessionRecommendationsApi = async (
     { method: 'GET' }
   );
 
-  if (response.error) {
-    return { songs: [], rawItems: [], hasActiveSession: false, error: response.error };
-  }
-
-  if (response.data && response.data.success && Array.isArray(response.data.data)) {
-    const rawItems = response.data.data;
-    const songs = rawItems.filter((item) => Boolean(item.song)).map((item) => item.song);
-    return {
-      songs,
-      rawItems,
-      hasActiveSession: Boolean(response.data.hasActiveSession),
-      error: null,
-    };
-  }
+  const result = extractEnvelopeData(response, 'Failed to fetch session recommendations');
+  const rawItems = result.data || [];
+  const songs = rawItems.filter((item) => Boolean(item.song)).map((item) => item.song);
 
   return {
-    songs: [],
-    rawItems: [],
+    songs,
+    rawItems,
     hasActiveSession: false,
-    error: response.data?.message || 'Failed to fetch session recommendations',
+    error: result.error,
   };
 };
 
@@ -253,19 +214,9 @@ export const fetchSmartAutoplayApi = async (params: {
     { method: 'GET' }
   );
 
-  if (response.error) {
-    return { songs: [], rawCandidates: [], error: response.error };
-  }
+  const result = extractEnvelopeData(response, 'Failed to fetch autoplay candidates');
+  const rawCandidates = result.data || [];
+  const songs = rawCandidates.filter((item) => Boolean(item.song)).map((item) => item.song);
 
-  if (response.data && response.data.success && Array.isArray(response.data.data)) {
-    const rawCandidates = response.data.data;
-    const songs = rawCandidates.filter((item) => Boolean(item.song)).map((item) => item.song);
-    return { songs, rawCandidates, error: null };
-  }
-
-  return {
-    songs: [],
-    rawCandidates: [],
-    error: response.data?.message || 'Failed to fetch autoplay candidates',
-  };
+  return { songs, rawCandidates, error: result.error };
 };

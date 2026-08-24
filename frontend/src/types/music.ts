@@ -1,87 +1,14 @@
-export interface Genre {
-  _id: string;
-  name: string;
-  slug?: string;
-  description?: string;
-  coverImage?: string;
-  songCount?: number;
-}
+/**
+ * Barrel re-export: all music-related types.
+ *
+ * Prefer importing from the specific module (e.g. '../types/song') for new code.
+ * This file re-exports everything for backward compatibility with existing imports.
+ */
 
-export interface Artist {
-  _id: string;
-  name: string;
-  bio?: string;
-  profileImage?: string;
-  avatar?: string;
-  monthlyListeners?: number;
-  verified?: boolean;
-}
-
-export interface Album {
-  _id: string;
-  title: string;
-  artist?: Artist | string;
-  coverImage?: string;
-  releaseYear?: number;
-  albumType?: string;
-  totalTracks?: number;
-}
-
-export interface AudioFeatures {
-  bpm?: number;
-  key?: string;
-  energy?: number;
-  danceability?: number;
-  valence?: number;
-  acousticness?: number;
-  instrumentalness?: number;
-  liveness?: number;
-  speechiness?: number;
-}
-
-export interface Song {
-  _id: string;
-  title: string;
-  artist: Artist | string;
-  featuredArtists?: (Artist | string)[];
-  album?: Album | string;
-  genre: Genre | string;
-  duration: number; // in seconds
-  coverImage?: string;
-  audioUrl: string;
-  releaseYear?: number;
-  playCount: number;
-  audioFeatures?: AudioFeatures;
-  mood?: string;
-  tags?: string[];
-  language?: string;
-  explicit?: boolean;
-  createdAt?: string;
-}
-
-export interface Playlist {
-  _id: string;
-  name: string;
-  description?: string;
-  coverImage?: string;
-  owner: { _id: string; name: string; profilePicture?: string } | string;
-  songs: Song[];
-  visibility?: 'public' | 'private';
-  isCollaborative?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface PaginationData {
-  total: number;
-  page: number;
-  limit: number;
-  pages: number;
-}
-
-export interface SongsApiResponse {
-  success: boolean;
-  data: Song[];
-  pagination: PaginationData;
-  message?: string;
-}
+export type { Genre } from './genre';
+export type { Artist } from './artist';
+export type { Album } from './album';
+export type { AudioFeatures } from './audio';
+export type { Song } from './song';
+export type { Playlist } from './playlist';
+export type { PaginationData, SongsApiResponse } from './api';

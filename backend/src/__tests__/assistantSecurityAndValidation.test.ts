@@ -2,9 +2,8 @@ import assert from 'node:assert';
 import { MusicSearchTool } from '../tools/musicSearchTool.js';
 import { SemanticSearchTool } from '../tools/semanticSearchTool.js';
 import { PlaylistCreationTool } from '../tools/playlistCreationTool.js';
-import { AddToPlaylistTool } from '../tools/addToPlaylistTool.js';
-import { RemoveFromPlaylistTool } from '../tools/removeFromPlaylistTool.js';
-import { AddToQueueTool } from '../tools/addToQueueTool.js';
+import { PlaylistModificationTool } from '../tools/playlistModificationTool.js';
+import { QueueManagementTool } from '../tools/queueManagementTool.js';
 import { ToolRegistry } from '../tools/toolRegistry.js';
 import { MultiStepAssistantService } from '../services/multiStepAssistantService.js';
 import { MAX_MESSAGE_LENGTH } from '../controllers/assistantController.js';
@@ -81,42 +80,47 @@ export function runAssistantSecurityAndValidationTests() {
 
   // Test 4: Queue Modification Input Validation
   {
-    const queueAdd = new AddToQueueTool();
+    const queueTool = new QueueManagementTool();
 
-    // Rejection of empty songIds
-    const emptyQueueRes = queueAdd.validate({ songIds: [] });
+    // Rejection of empty songIds for add action
+    const emptyQueueRes = queueTool.validate({ action: 'add', songIds: [] });
     assert.strictEqual(emptyQueueRes.valid, false);
-    assert.ok(emptyQueueRes.error?.includes('At least one songId'));
+    assert.ok(emptyQueueRes.error?.includes('At least one valid songId'));
 
     // Rejection of non-ObjectId strings
-    const invalidQueueIds = queueAdd.validate({ songIds: ['not_an_id', 'also_invalid'] });
+    const invalidQueueIds = queueTool.validate({ action: 'add', songIds: ['not_an_id', 'also_invalid'] });
     assert.strictEqual(invalidQueueIds.valid, false);
-    assert.ok(invalidQueueIds.error?.includes('No valid song ObjectIds'));
+    assert.ok(invalidQueueIds.error?.includes('At least one valid songId'));
 
-    // Position defaulting
-    const validQueue = queueAdd.validate({ songIds: ['507f1f77bcf86cd799439011'], position: 'other' as any });
+    // Valid input
+    const validQueue = queueTool.validate({ action: 'add', songIds: ['507f1f77bcf86cd799439011'] });
     assert.strictEqual(validQueue.valid, true);
-    assert.strictEqual(validQueue.data?.position, 'end', 'Defaults unknown position safely to end');
 
     console.log('✓ Test 4 Passed: Queue modification input validation verified.');
   }
 
   // Test 5: Unauthorized Playlist Access & Modification Defense
   {
-    const addTool = new AddToPlaylistTool();
-    const removeTool = new RemoveFromPlaylistTool();
+    const playlistModTool = new PlaylistModificationTool();
 
-    const validPayload = {
+    const validAddPayload = {
       playlistId: '507f1f77bcf86cd799439011',
+      action: 'add_songs' as const,
+      songIds: ['507f1f77bcf86cd799439012'],
+    };
+
+    const validRemovePayload = {
+      playlistId: '507f1f77bcf86cd799439011',
+      action: 'remove_songs' as const,
       songIds: ['507f1f77bcf86cd799439012'],
     };
 
     // Attempt without authentication
-    addTool.execute(validPayload, {}).then((unauthAdd) => {
+    playlistModTool.execute(validAddPayload, {}).then((unauthAdd) => {
       assert.strictEqual(unauthAdd.success, false);
       assert.ok(unauthAdd.error?.includes('Authentication required'));
 
-      removeTool.execute(validPayload, {}).then((unauthRemove) => {
+      playlistModTool.execute(validRemovePayload, {}).then((unauthRemove) => {
         assert.strictEqual(unauthRemove.success, false);
         assert.ok(unauthRemove.error?.includes('Authentication required'));
         console.log('✓ Test 5 Passed: Unauthorized playlist access & modification defense verified.');

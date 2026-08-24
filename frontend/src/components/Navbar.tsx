@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
+import { SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import { searchGlobal } from '../services/searchService';
 import type { GroupedSearchResults } from '../services/searchService';
 import { SearchSuggestionsDropdown } from './SearchSuggestionsDropdown';
@@ -118,43 +119,58 @@ export const Navbar: React.FC = () => {
         )}
       </div>
 
-      {/* Right User Actions */}
+      {/* Right User Actions with Clerk Auth Controls */}
       <div className="flex items-center gap-4 text-sm shrink-0">
-        {isAuthenticated && user ? (
+        <SignedIn>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700/60">
-              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">
-                {getInitials(user.name)}
+            <UserButton
+              appearance={{
+                elements: {
+                  userButtonAvatarBox: 'w-8 h-8 rounded-full ring-2 ring-indigo-500/50',
+                },
+              }}
+            />
+          </div>
+        </SignedIn>
+
+        <SignedOut>
+          {isAuthenticated && user ? (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700/60">
+                <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">
+                  {getInitials(user.name)}
+                </div>
+                <span className="text-slate-200 font-medium text-xs hidden md:inline">
+                  {user.name}
+                </span>
               </div>
-              <span className="text-slate-200 font-medium text-xs hidden md:inline">
-                {user.name}
-              </span>
+              <button
+                onClick={handleLogout}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 rounded-lg text-xs font-medium border border-slate-700/80 hover:border-rose-700/60 transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Sign Out"
+              >
+                <span>Sign Out</span>
+              </button>
             </div>
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 rounded-lg text-xs font-medium border border-slate-700/80 hover:border-rose-700/60 transition-colors flex items-center gap-1.5"
-              title="Sign Out"
-            >
-              <span>Sign Out</span>
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <Link
-              to="/login"
-              className="px-3 py-1.5 text-slate-300 hover:text-white text-xs font-medium transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              to="/register"
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors shadow-sm"
-            >
-              Register
-            </Link>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center gap-3">
+              <Link
+                to="/login"
+                className="px-3 py-1.5 text-slate-300 hover:text-white text-xs font-medium transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/register"
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors shadow-sm"
+              >
+                Register
+              </Link>
+            </div>
+          )}
+        </SignedOut>
       </div>
     </header>
   );
 };
+

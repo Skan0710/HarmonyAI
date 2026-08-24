@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import { extractEnvelopeData } from '../utils/apiHelpers';
 import type { Song, Artist } from '../types/music';
 
 export interface PersonalizedFeedData {
@@ -18,14 +19,5 @@ export const fetchPersonalizedFeedApi = async (): Promise<{
   error: string | null;
 }> => {
   const response = await apiClient<PersonalizedFeedApiResponse>('/music/personalized-feed');
-
-  if (response.error) {
-    return { feed: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { feed: response.data.data, error: null };
-  }
-
-  return { feed: null, error: response.data?.message || 'Failed to fetch personalized feed' };
+  return extractEnvelopeData(response, 'Failed to fetch personalized feed');
 };
