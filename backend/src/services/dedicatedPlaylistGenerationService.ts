@@ -4,11 +4,42 @@ import { CandidateGenerationService } from './candidateGenerationService.js';
 import { SemanticSearchService } from './semanticSearchService.js';
 import { RecommendationPostRankingPipeline } from './recommendationPostRankingPipeline.js';
 
+export interface PlaylistDurationConfig {
+  defaultToleranceSeconds: number; // default: 120 seconds (2 mins)
+  minPlaylistDurationSeconds: number; // default: 180 seconds (3 mins)
+  maxPlaylistDurationSeconds: number; // default: 14400 seconds (4 hours)
+}
+
+export const DEFAULT_DURATION_CONFIG: PlaylistDurationConfig = {
+  defaultToleranceSeconds: 120,
+  minPlaylistDurationSeconds: 180,
+  maxPlaylistDurationSeconds: 14400,
+};
+
+let currentDurationConfig: PlaylistDurationConfig = { ...DEFAULT_DURATION_CONFIG };
+
+export const getPlaylistDurationConfig = (): PlaylistDurationConfig => {
+  return { ...currentDurationConfig };
+};
+
+export const updatePlaylistDurationConfig = (
+  newConfig: Partial<PlaylistDurationConfig>
+): PlaylistDurationConfig => {
+  currentDurationConfig = { ...currentDurationConfig, ...newConfig };
+  return { ...currentDurationConfig };
+};
+
+export const resetPlaylistDurationConfig = (): PlaylistDurationConfig => {
+  currentDurationConfig = { ...DEFAULT_DURATION_CONFIG };
+  return { ...currentDurationConfig };
+};
+
 export interface AIPlaylistGenerationInput {
   userId?: string;
   mood?: string;
   activity?: string; // context or activity (e.g. Study, Workout, Commute)
   targetDurationMinutes?: number; // target duration in minutes
+  durationToleranceSeconds?: number; // custom tolerance window (default: 120s)
   targetSongCount?: number; // specific number of tracks (optional)
   preferredGenres?: string[];
   preferredArtists?: string[];
@@ -28,6 +59,16 @@ export interface GeneratedPlaylistTrack {
   durationFormatted: string;
 }
 
+export interface DurationOptimizationDiagnostics {
+  targetDurationSeconds: number;
+  achievedDurationSeconds: number;
+  durationVarianceSeconds: number; // achieved - target
+  durationToleranceSeconds: number;
+  isWithinTolerance: boolean;
+  isDurationGoalMet: boolean;
+  duplicateTracksPrevented: number;
+}
+
 export interface DedicatedAIPlaylistResult {
   title: string;
   description: string;
@@ -37,6 +78,7 @@ export interface DedicatedAIPlaylistResult {
   totalDurationFormatted: string;
   trackCount: number;
   candidateCountEvaluated: number;
+  durationDiagnostics?: DurationOptimizationDiagnostics;
   generatedAt: Date;
 }
 
@@ -54,6 +96,7 @@ export class DedicatedPlaylistGenerationService {
       mood,
       activity,
       targetDurationMinutes,
+      durationToleranceSeconds: customTolerance,
       targetSongCount,
       preferredGenres = [],
       preferredArtists = [],
@@ -62,13 +105,22 @@ export class DedicatedPlaylistGenerationService {
       searchPrompt,
     } = input;
 
-    // 1. Calculate Target Count
+    const durationConfig = getPlaylistDurationConfig();
+    const toleranceSeconds =
+      typeof customTolerance === 'number' && customTolerance >= 0
+        ? customTolerance
+        : durationConfig.defaultToleranceSeconds;
+
+    // 1. Calculate Target Duration & Estimate Candidate Pool Size
+    let targetSeconds = 0;
     let desiredCount = 12;
-    if (typeof targetSongCount === 'number' && targetSongCount > 0) {
-      desiredCount = Math.min(50, Math.max(1, targetSongCount));
-    } else if (typeof targetDurationMinutes === 'number' && targetDurationMinutes > 0) {
+
+    if (typeof targetDurationMinutes === 'number' && targetDurationMinutes > 0) {
+      targetSeconds = Math.round(targetDurationMinutes * 60);
       // Average song length is approx 210 seconds (3.5 minutes)
-      desiredCount = Math.min(50, Math.max(1, Math.ceil((targetDurationMinutes * 60) / 210)));
+      desiredCount = Math.max(1, Math.ceil(targetSeconds / 210));
+    } else if (typeof targetSongCount === 'number' && targetSongCount > 0) {
+      desiredCount = Math.min(50, Math.max(1, targetSongCount));
     }
 
     const candidatePoolLimit = Math.max(40, desiredCount * 4);
@@ -194,7 +246,7 @@ export class DedicatedPlaylistGenerationService {
         rankedResults = await RecommendationPostRankingPipeline.executePostRanking({
           items: initialCandidates,
           userId,
-          targetLimit: desiredCount,
+          targetLimit: desiredCount * 2, // Request extra candidates for knapsack duration fitting
           requestedGenres: preferredGenres,
           scoreExtractor: (item) => item.originalScore,
           songExtractor: (item) => item.song,
@@ -225,66 +277,110 @@ export class DedicatedPlaylistGenerationService {
       }
     }
 
-    // 7. Track Selection & Duration Constraint Fulfillment
+    // 7. Duration-Aware Track Selection & Strict Duplicate Prevention
     const selectedTracks: GeneratedPlaylistTrack[] = [];
+    const selectedSongIdSet = new Set<string>();
+    let duplicatesPrevented = 0;
     let currentDurationSeconds = 0;
-    const targetSeconds =
-      typeof targetDurationMinutes === 'number' && targetDurationMinutes > 0
-        ? targetDurationMinutes * 60
-        : Infinity;
 
-    for (const res of rankedResults) {
-      if (selectedTracks.length >= desiredCount) break;
+    if (targetSeconds > 0) {
+      // Duration-Aware Selection Loop
+      const maxAllowedSeconds = targetSeconds + toleranceSeconds;
+      const minAllowedSeconds = Math.max(0, targetSeconds - toleranceSeconds);
 
-      const song = res.song;
-      if (!song || !song._id) continue;
+      for (const res of rankedResults) {
+        const song = res.song;
+        if (!song) continue;
 
-      const duration = typeof song.duration === 'number' && song.duration > 0 ? song.duration : 210;
+        const songId = song._id ? String(song._id) : (song as any).id;
+        if (!songId) continue;
 
-      // Stop if target duration met and minimum 3 songs collected
-      if (currentDurationSeconds + duration > targetSeconds && selectedTracks.length >= 3) {
-        break;
+        // Duplicate Check
+        if (selectedSongIdSet.has(songId)) {
+          duplicatesPrevented++;
+          continue;
+        }
+
+        const duration =
+          typeof song.duration === 'number' && song.duration > 0 ? song.duration : 210;
+
+        // Check if adding this song would push the total beyond the upper tolerance ceiling
+        if (currentDurationSeconds + duration > maxAllowedSeconds) {
+          // If we haven't reached minimum duration yet, look for shorter candidate tracks further in list
+          if (currentDurationSeconds < minAllowedSeconds) {
+            continue; // Skip this track and check subsequent candidates for a smaller duration fit
+          }
+          // If we are already in the acceptable duration window, stop selection
+          break;
+        }
+
+        // Add track
+        selectedSongIdSet.add(songId);
+        selectedTracks.push(this.formatTrack(res, duration));
+        currentDurationSeconds += duration;
+
+        // If we are within tolerance of targetSeconds and have at least 3 tracks, check if stopping is optimal
+        if (currentDurationSeconds >= minAllowedSeconds) {
+          const currentDiff = Math.abs(currentDurationSeconds - targetSeconds);
+          // If already very close (e.g. within 45s) or adding another average song would overshoot target, we can stop
+          if (currentDiff <= 45 || currentDurationSeconds >= targetSeconds) {
+            break;
+          }
+        }
       }
+    } else {
+      // Count-based Selection Loop (when targetDurationMinutes is not specified)
+      for (const res of rankedResults) {
+        if (selectedTracks.length >= desiredCount) break;
 
-      const artistName =
-        typeof song.artist === 'object' && song.artist && 'name' in song.artist
-          ? String(song.artist.name)
-          : String(song.artist || 'Unknown Artist');
+        const song = res.song;
+        if (!song) continue;
 
-      const genreName =
-        typeof song.genre === 'object' && song.genre && 'name' in song.genre
-          ? String(song.genre.name)
-          : String(song.genre || 'Music');
+        const songId = song._id ? String(song._id) : (song as any).id;
+        if (!songId) continue;
 
-      const mins = Math.floor(duration / 60);
-      const secs = duration % 60;
-      const durationFormatted = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        if (selectedSongIdSet.has(songId)) {
+          duplicatesPrevented++;
+          continue;
+        }
 
-      selectedTracks.push({
-        song,
-        score: Number((res.finalScore || res.originalScore || 0.7).toFixed(4)),
-        matchScore: Number((res.originalScore || 0.7).toFixed(4)),
-        noveltyScore: res.componentBreakdown?.noveltyScore,
-        genre: genreName,
-        artist: artistName,
-        durationSeconds: duration,
-        durationFormatted,
-      });
+        const duration =
+          typeof song.duration === 'number' && song.duration > 0 ? song.duration : 210;
 
-      currentDurationSeconds += duration;
+        selectedSongIdSet.add(songId);
+        selectedTracks.push(this.formatTrack(res, duration));
+        currentDurationSeconds += duration;
+      }
     }
 
-    // 8. Generate Playlist Title & Description
+    // 8. Generate Duration Diagnostics & Summary
     const totalMins = Math.floor(currentDurationSeconds / 60);
     const totalSecs = currentDurationSeconds % 60;
     const totalDurationFormatted = `${totalMins}m ${totalSecs}s`;
 
+    let durationDiagnostics: DurationOptimizationDiagnostics | undefined = undefined;
+    if (targetSeconds > 0) {
+      const variance = currentDurationSeconds - targetSeconds;
+      durationDiagnostics = {
+        targetDurationSeconds: targetSeconds,
+        achievedDurationSeconds: currentDurationSeconds,
+        durationVarianceSeconds: variance,
+        durationToleranceSeconds: toleranceSeconds,
+        isWithinTolerance: Math.abs(variance) <= toleranceSeconds,
+        isDurationGoalMet: currentDurationSeconds >= Math.max(0, targetSeconds - toleranceSeconds),
+        duplicateTracksPrevented: duplicatesPrevented,
+      };
+    }
+
+    // 9. Generate Playlist Title & Description
     const titleParts = [mood, activity, preferredGenres[0]].filter(Boolean);
     const title =
       titleParts.length > 0
         ? `${titleParts.join(' ')} Mix`
         : searchPrompt
         ? `${searchPrompt.slice(0, 25)} Mix`
+        : targetDurationMinutes
+        ? `${targetDurationMinutes}-Min Curated Mix`
         : 'AI Curated Playlist';
 
     const description = `AI curated ${selectedTracks.length}-track mix for ${
@@ -300,7 +396,36 @@ export class DedicatedPlaylistGenerationService {
       totalDurationFormatted,
       trackCount: selectedTracks.length,
       candidateCountEvaluated: candidateMap.size,
+      durationDiagnostics,
       generatedAt: new Date(),
+    };
+  }
+
+  private static formatTrack(res: any, duration: number): GeneratedPlaylistTrack {
+    const song = res.song;
+    const artistName =
+      typeof song.artist === 'object' && song.artist && 'name' in song.artist
+        ? String(song.artist.name)
+        : String(song.artist || 'Unknown Artist');
+
+    const genreName =
+      typeof song.genre === 'object' && song.genre && 'name' in song.genre
+        ? String(song.genre.name)
+        : String(song.genre || 'Music');
+
+    const mins = Math.floor(duration / 60);
+    const secs = duration % 60;
+    const durationFormatted = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
+    return {
+      song,
+      score: Number((res.finalScore || res.originalScore || 0.7).toFixed(4)),
+      matchScore: Number((res.originalScore || 0.7).toFixed(4)),
+      noveltyScore: res.componentBreakdown?.noveltyScore,
+      genre: genreName,
+      artist: artistName,
+      durationSeconds: duration,
+      durationFormatted,
     };
   }
 }

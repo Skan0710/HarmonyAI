@@ -2,6 +2,9 @@ import assert from 'node:assert';
 import {
   DedicatedPlaylistGenerationService,
   AIPlaylistGenerationInput,
+  getPlaylistDurationConfig,
+  updatePlaylistDurationConfig,
+  resetPlaylistDurationConfig,
 } from '../services/dedicatedPlaylistGenerationService.js';
 
 export function runDedicatedPlaylistGenerationServiceTests() {
@@ -37,7 +40,7 @@ export function runDedicatedPlaylistGenerationServiceTests() {
     });
   }
 
-  // Test 2: Structured Track Output with Recommendation Scores
+  // Test 2: Structured Track Output with Recommendation Scores & Formatting
   {
     const input: AIPlaylistGenerationInput = {
       mood: 'Energetic',
@@ -63,7 +66,43 @@ export function runDedicatedPlaylistGenerationServiceTests() {
     });
   }
 
-  // Test 3: Unauthenticated / Cold Start Graceful Handling
+  // Test 3: Duration Tolerance & Diagnostics Tracking
+  {
+    const input: AIPlaylistGenerationInput = {
+      targetDurationMinutes: 15, // 900 seconds
+      durationToleranceSeconds: 180, // +/- 3 minutes tolerance
+    };
+
+    DedicatedPlaylistGenerationService.generatePlaylist(input).then((result) => {
+      assert.ok(result !== null);
+      assert.ok(result.durationDiagnostics !== undefined);
+      assert.strictEqual(result.durationDiagnostics?.targetDurationSeconds, 900);
+      assert.strictEqual(result.durationDiagnostics?.durationToleranceSeconds, 180);
+      assert.ok(typeof result.durationDiagnostics?.achievedDurationSeconds === 'number');
+      assert.ok(typeof result.durationDiagnostics?.durationVarianceSeconds === 'number');
+      assert.ok(typeof result.durationDiagnostics?.isWithinTolerance === 'boolean');
+      assert.ok(typeof result.durationDiagnostics?.isDurationGoalMet === 'boolean');
+      assert.ok(typeof result.durationDiagnostics?.duplicateTracksPrevented === 'number');
+
+      console.log('✓ Test 3 Passed: Duration tolerance & diagnostics tracking verified.');
+    });
+  }
+
+  // Test 4: Global Duration Configuration Management
+  {
+    const defaultConfig = getPlaylistDurationConfig();
+    assert.strictEqual(defaultConfig.defaultToleranceSeconds, 120);
+
+    const updated = updatePlaylistDurationConfig({ defaultToleranceSeconds: 90 });
+    assert.strictEqual(updated.defaultToleranceSeconds, 90);
+
+    resetPlaylistDurationConfig();
+    assert.strictEqual(getPlaylistDurationConfig().defaultToleranceSeconds, 120);
+
+    console.log('✓ Test 4 Passed: Global duration configuration management verified.');
+  }
+
+  // Test 5: Unauthenticated / Cold Start Graceful Handling
   {
     const input: AIPlaylistGenerationInput = {
       userId: undefined,
@@ -77,21 +116,7 @@ export function runDedicatedPlaylistGenerationServiceTests() {
       assert.strictEqual(result.preferences.searchPrompt, 'Late night lofi study beats');
       assert.ok(typeof result.candidateCountEvaluated === 'number');
 
-      console.log('✓ Test 3 Passed: Unauthenticated / cold-start fallback handled gracefully.');
-    });
-  }
-
-  // Test 4: Target Duration Calculation Bounds
-  {
-    const input: AIPlaylistGenerationInput = {
-      targetDurationMinutes: 60, // 60 mins -> ~17-18 songs
-    };
-
-    DedicatedPlaylistGenerationService.generatePlaylist(input).then((result) => {
-      assert.ok(result.trackCount >= 0);
-      assert.ok(result.totalDurationSeconds >= 0);
-
-      console.log('✓ Test 4 Passed: Target duration calculation bounds verified.');
+      console.log('✓ Test 5 Passed: Unauthenticated / cold-start fallback handled gracefully.');
     });
   }
 
