@@ -102,7 +102,32 @@ export function runDedicatedPlaylistGenerationServiceTests() {
     console.log('✓ Test 4 Passed: Global duration configuration management verified.');
   }
 
-  // Test 5: Unauthenticated / Cold Start Graceful Handling
+  // Test 5: Discovery Percentage & Diversity Diagnostics Integration
+  {
+    const input: AIPlaylistGenerationInput = {
+      searchPrompt: 'Electronic Synth Odyssey',
+      discoveryPercentage: 70, // 70% discovery
+      diversityPreference: 0.8,
+      maxSongsPerArtist: 2,
+      maxConsecutiveSameArtist: 1,
+      targetSongCount: 6,
+    };
+
+    DedicatedPlaylistGenerationService.generatePlaylist(input).then((result) => {
+      assert.ok(result !== null);
+      assert.ok(result.diversityDiagnostics !== undefined);
+      assert.strictEqual(result.diversityDiagnostics?.discoveryPercentage, 70);
+      assert.ok(typeof result.diversityDiagnostics?.uniqueArtistsCount === 'number');
+      assert.ok(typeof result.diversityDiagnostics?.uniqueGenresCount === 'number');
+      assert.ok(typeof result.diversityDiagnostics?.artistDistribution === 'object');
+      assert.ok(typeof result.diversityDiagnostics?.genreDistribution === 'object');
+      assert.ok(typeof result.diversityDiagnostics?.recentSkipsFiltered === 'number');
+
+      console.log('✓ Test 5 Passed: Discovery percentage & diversity diagnostics verified.');
+    });
+  }
+
+  // Test 6: Unauthenticated / Cold Start Graceful Handling
   {
     const input: AIPlaylistGenerationInput = {
       userId: undefined,
@@ -116,7 +141,7 @@ export function runDedicatedPlaylistGenerationServiceTests() {
       assert.strictEqual(result.preferences.searchPrompt, 'Late night lofi study beats');
       assert.ok(typeof result.candidateCountEvaluated === 'number');
 
-      console.log('✓ Test 5 Passed: Unauthenticated / cold-start fallback handled gracefully.');
+      console.log('✓ Test 6 Passed: Unauthenticated / cold-start fallback handled gracefully.');
     });
   }
 

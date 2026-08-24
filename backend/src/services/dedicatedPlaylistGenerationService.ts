@@ -3,6 +3,13 @@ import { Song, ISong } from '../models/Song.js';
 import { CandidateGenerationService } from './candidateGenerationService.js';
 import { SemanticSearchService } from './semanticSearchService.js';
 import { RecommendationPostRankingPipeline } from './recommendationPostRankingPipeline.js';
+import {
+  NoveltyScoringWeights,
+  GenreDiversityWeights,
+  getNoveltyConfigWeights,
+  getGenreDiversityWeights,
+} from '../config/recommendationConfig.js';
+import { ListeningSession } from '../models/ListeningSession.js';
 
 export interface PlaylistDurationConfig {
   defaultToleranceSeconds: number; // default: 120 seconds (2 mins)
@@ -36,6 +43,7 @@ export const resetPlaylistDurationConfig = (): PlaylistDurationConfig => {
 
 export interface AIPlaylistGenerationInput {
   userId?: string;
+  sessionId?: string; // session ID for active session skip history
   mood?: string;
   activity?: string; // context or activity (e.g. Study, Workout, Commute)
   targetDurationMinutes?: number; // target duration in minutes
@@ -44,7 +52,12 @@ export interface AIPlaylistGenerationInput {
   preferredGenres?: string[];
   preferredArtists?: string[];
   noveltyPreference?: number; // 0.0 (familiar) to 1.0 (novel discoveries)
+  discoveryPercentage?: number; // 0 to 100% discovery ratio (takes precedence or maps to noveltyPreference)
   diversityPreference?: number; // 0.0 (tight focus) to 1.0 (eclectic mix)
+  maxSongsPerArtist?: number; // max tracks per artist (default: 2)
+  maxConsecutiveSameArtist?: number; // max consecutive tracks by same artist (default: 1)
+  customNoveltyWeights?: Partial<NoveltyScoringWeights>;
+  customGenreWeights?: Partial<GenreDiversityWeights>;
   searchPrompt?: string;
 }
 
@@ -69,6 +82,15 @@ export interface DurationOptimizationDiagnostics {
   duplicateTracksPrevented: number;
 }
 
+export interface PlaylistDiversityDiagnostics {
+  uniqueArtistsCount: number;
+  uniqueGenresCount: number;
+  artistDistribution: Record<string, number>;
+  genreDistribution: Record<string, number>;
+  discoveryPercentage: number;
+  recentSkipsFiltered: number;
+}
+
 export interface DedicatedAIPlaylistResult {
   title: string;
   description: string;
@@ -79,6 +101,7 @@ export interface DedicatedAIPlaylistResult {
   trackCount: number;
   candidateCountEvaluated: number;
   durationDiagnostics?: DurationOptimizationDiagnostics;
+  diversityDiagnostics?: PlaylistDiversityDiagnostics;
   generatedAt: Date;
 }
 
@@ -86,13 +109,14 @@ export class DedicatedPlaylistGenerationService {
   /**
    * Generates a curated playlist using the existing HarmonyAI recommendation engine,
    * factoring in user mood, activity, preferred genres/artists, target duration,
-   * novelty preference, and diversity preference.
+   * novelty preference, diversity preference, discovery percentage, and skip avoidance.
    */
   static async generatePlaylist(
     input: AIPlaylistGenerationInput
   ): Promise<DedicatedAIPlaylistResult> {
     const {
       userId,
+      sessionId,
       mood,
       activity,
       targetDurationMinutes,
@@ -101,9 +125,20 @@ export class DedicatedPlaylistGenerationService {
       preferredGenres = [],
       preferredArtists = [],
       noveltyPreference = 0.5,
+      discoveryPercentage,
       diversityPreference = 0.5,
+      maxSongsPerArtist = 2,
+      maxConsecutiveSameArtist = 1,
+      customNoveltyWeights,
+      customGenreWeights,
       searchPrompt,
     } = input;
+
+    // Resolve discovery factor (0.0 to 1.0)
+    const effectiveNoveltyPreference =
+      typeof discoveryPercentage === 'number' && discoveryPercentage >= 0 && discoveryPercentage <= 100
+        ? discoveryPercentage / 100
+        : noveltyPreference;
 
     const durationConfig = getPlaylistDurationConfig();
     const toleranceSeconds =
@@ -117,7 +152,6 @@ export class DedicatedPlaylistGenerationService {
 
     if (typeof targetDurationMinutes === 'number' && targetDurationMinutes > 0) {
       targetSeconds = Math.round(targetDurationMinutes * 60);
-      // Average song length is approx 210 seconds (3.5 minutes)
       desiredCount = Math.max(1, Math.ceil(targetSeconds / 210));
     } else if (typeof targetSongCount === 'number' && targetSongCount > 0) {
       desiredCount = Math.min(50, Math.max(1, targetSongCount));
@@ -231,34 +265,67 @@ export class DedicatedPlaylistGenerationService {
       console.warn(`[DedicatedPlaylistGeneration] Catalog query fallback failed: ${err.message}`);
     }
 
-    // 5. Transform to Candidate Array for Post-Ranking Pipeline
-    const initialCandidates = Array.from(candidateMap.values()).map((item) => ({
-      song: item.song,
-      originalScore: item.baseScore,
-      candidateScore: item.baseScore,
-      sources: Array.from(item.sources),
-    }));
+    // 5. Session Data: Look up session skipped tracks if sessionId is provided
+    const sessionSkippedIds = new Set<string>();
+    if (sessionId && Types.ObjectId.isValid(sessionId)) {
+      try {
+        const sessionDoc = await ListeningSession.findById(sessionId).lean();
+        if (sessionDoc && Array.isArray((sessionDoc as any).skippedSongs)) {
+          for (const skipId of (sessionDoc as any).skippedSongs) {
+            sessionSkippedIds.add(String(skipId));
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[DedicatedPlaylistGeneration] Session skipped track fetch failed: ${err.message}`);
+      }
+    }
 
-    // 6. Post-Ranking Pipeline Execution (Diversity, Novelty, Repetition)
+    // 6. Transform to Candidate Array for Post-Ranking Pipeline (Filtering session skips)
+    let recentSkipsFiltered = 0;
+    const initialCandidates = Array.from(candidateMap.values())
+      .filter((item) => {
+        const sId = item.song._id ? String(item.song._id) : '';
+        if (sId && sessionSkippedIds.has(sId)) {
+          recentSkipsFiltered++;
+          return false;
+        }
+        return true;
+      })
+      .map((item) => ({
+        song: item.song,
+        originalScore: item.baseScore,
+        candidateScore: item.baseScore,
+        sources: Array.from(item.sources),
+      }));
+
+    // 7. Post-Ranking Pipeline Execution (Diversity, Novelty, Repetition)
     let rankedResults: any[] = [];
     if (initialCandidates.length > 0) {
       try {
+        const resolvedNoveltyWeights: Partial<NoveltyScoringWeights> = {
+          noveltyWeight: 0.15 * effectiveNoveltyPreference,
+          minRelevanceThreshold: 0.35,
+          ...customNoveltyWeights,
+        };
+
+        const resolvedGenreWeights: Partial<GenreDiversityWeights> = {
+          defaultMaxGenreConcentration: Math.max(0.2, 0.6 - 0.4 * diversityPreference),
+          diversityPenaltyWeight: 0.15 * diversityPreference,
+          ...customGenreWeights,
+        };
+
         rankedResults = await RecommendationPostRankingPipeline.executePostRanking({
           items: initialCandidates,
           userId,
-          targetLimit: desiredCount * 2, // Request extra candidates for knapsack duration fitting
+          targetLimit: desiredCount * 2,
           requestedGenres: preferredGenres,
+          maxSongsPerArtist,
+          maxConsecutiveSameArtist,
           scoreExtractor: (item) => item.originalScore,
           songExtractor: (item) => item.song,
           sourcesExtractor: (item) => item.sources,
-          customNoveltyWeights: {
-            noveltyWeight: 0.15 * noveltyPreference,
-            minRelevanceThreshold: 0.35,
-          },
-          customGenreWeights: {
-            defaultMaxGenreConcentration: Math.max(0.2, 0.6 - 0.4 * diversityPreference),
-            diversityPenaltyWeight: 0.15 * diversityPreference,
-          },
+          customNoveltyWeights: resolvedNoveltyWeights,
+          customGenreWeights: resolvedGenreWeights,
         });
       } catch (err: any) {
         console.warn(`[DedicatedPlaylistGeneration] Post-ranking pipeline failed: ${err.message}`);
@@ -277,14 +344,13 @@ export class DedicatedPlaylistGenerationService {
       }
     }
 
-    // 7. Duration-Aware Track Selection & Strict Duplicate Prevention
+    // 8. Duration-Aware Track Selection & Strict Duplicate Prevention
     const selectedTracks: GeneratedPlaylistTrack[] = [];
     const selectedSongIdSet = new Set<string>();
     let duplicatesPrevented = 0;
     let currentDurationSeconds = 0;
 
     if (targetSeconds > 0) {
-      // Duration-Aware Selection Loop
       const maxAllowedSeconds = targetSeconds + toleranceSeconds;
       const minAllowedSeconds = Math.max(0, targetSeconds - toleranceSeconds);
 
@@ -295,7 +361,6 @@ export class DedicatedPlaylistGenerationService {
         const songId = song._id ? String(song._id) : (song as any).id;
         if (!songId) continue;
 
-        // Duplicate Check
         if (selectedSongIdSet.has(songId)) {
           duplicatesPrevented++;
           continue;
@@ -304,32 +369,25 @@ export class DedicatedPlaylistGenerationService {
         const duration =
           typeof song.duration === 'number' && song.duration > 0 ? song.duration : 210;
 
-        // Check if adding this song would push the total beyond the upper tolerance ceiling
         if (currentDurationSeconds + duration > maxAllowedSeconds) {
-          // If we haven't reached minimum duration yet, look for shorter candidate tracks further in list
           if (currentDurationSeconds < minAllowedSeconds) {
-            continue; // Skip this track and check subsequent candidates for a smaller duration fit
+            continue;
           }
-          // If we are already in the acceptable duration window, stop selection
           break;
         }
 
-        // Add track
         selectedSongIdSet.add(songId);
         selectedTracks.push(this.formatTrack(res, duration));
         currentDurationSeconds += duration;
 
-        // If we are within tolerance of targetSeconds and have at least 3 tracks, check if stopping is optimal
         if (currentDurationSeconds >= minAllowedSeconds) {
           const currentDiff = Math.abs(currentDurationSeconds - targetSeconds);
-          // If already very close (e.g. within 45s) or adding another average song would overshoot target, we can stop
           if (currentDiff <= 45 || currentDurationSeconds >= targetSeconds) {
             break;
           }
         }
       }
     } else {
-      // Count-based Selection Loop (when targetDurationMinutes is not specified)
       for (const res of rankedResults) {
         if (selectedTracks.length >= desiredCount) break;
 
@@ -353,7 +411,7 @@ export class DedicatedPlaylistGenerationService {
       }
     }
 
-    // 8. Generate Duration Diagnostics & Summary
+    // 9. Generate Diagnostics & Distributions
     const totalMins = Math.floor(currentDurationSeconds / 60);
     const totalSecs = currentDurationSeconds % 60;
     const totalDurationFormatted = `${totalMins}m ${totalSecs}s`;
@@ -372,7 +430,24 @@ export class DedicatedPlaylistGenerationService {
       };
     }
 
-    // 9. Generate Playlist Title & Description
+    const artistDistribution: Record<string, number> = {};
+    const genreDistribution: Record<string, number> = {};
+
+    for (const t of selectedTracks) {
+      artistDistribution[t.artist] = (artistDistribution[t.artist] || 0) + 1;
+      genreDistribution[t.genre] = (genreDistribution[t.genre] || 0) + 1;
+    }
+
+    const diversityDiagnostics: PlaylistDiversityDiagnostics = {
+      uniqueArtistsCount: Object.keys(artistDistribution).length,
+      uniqueGenresCount: Object.keys(genreDistribution).length,
+      artistDistribution,
+      genreDistribution,
+      discoveryPercentage: Math.round(effectiveNoveltyPreference * 100),
+      recentSkipsFiltered,
+    };
+
+    // 10. Generate Playlist Title & Description
     const titleParts = [mood, activity, preferredGenres[0]].filter(Boolean);
     const title =
       titleParts.length > 0
@@ -397,6 +472,7 @@ export class DedicatedPlaylistGenerationService {
       trackCount: selectedTracks.length,
       candidateCountEvaluated: candidateMap.size,
       durationDiagnostics,
+      diversityDiagnostics,
       generatedAt: new Date(),
     };
   }
