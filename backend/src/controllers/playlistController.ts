@@ -1,230 +1,150 @@
 import { Request, Response } from 'express';
 import { PlaylistService } from '../services/playlistService.js';
 import { AIPlaylistPipelineService } from '../services/aiPlaylistPipelineService.js';
+import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
 
-export const createPlaylist = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Unauthorized access' });
-      return;
-    }
+export const createPlaylist = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
 
-    const { name, description, coverImage, visibility, isCollaborative } = req.body;
+  const { name, description, coverImage, visibility, isCollaborative } = req.body;
 
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      res.status(400).json({ success: false, message: 'Playlist name is required' });
-      return;
-    }
-
-    const playlist = await PlaylistService.createPlaylist(req.user._id.toString(), {
-      name: name.trim(),
-      description,
-      coverImage,
-      visibility,
-      isCollaborative,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Playlist created successfully',
-      data: playlist,
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to create playlist',
-    });
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    throw new ControllerError(400, 'Playlist name is required');
   }
-};
 
-export const getUserPlaylists = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Unauthorized access' });
-      return;
-    }
+  const playlist = await PlaylistService.createPlaylist(user._id.toString(), {
+    name: name.trim(),
+    description,
+    coverImage,
+    visibility,
+    isCollaborative,
+  });
 
-    const playlists = await PlaylistService.getUserPlaylists(req.user._id.toString());
+  res.status(201).json({
+    success: true,
+    message: 'Playlist created successfully',
+    data: playlist,
+  });
+});
 
-    res.status(200).json({
-      success: true,
-      data: playlists,
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch playlists',
-    });
+export const getUserPlaylists = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
+
+  const playlists = await PlaylistService.getUserPlaylists(user._id.toString());
+
+  res.status(200).json({
+    success: true,
+    data: playlists,
+  });
+});
+
+export const getPlaylistById = controllerWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user?._id?.toString();
+
+  const playlist = await PlaylistService.getPlaylistById(id, userId);
+
+  if (!playlist) {
+    throw new ControllerError(404, 'Playlist not found');
   }
-};
 
-export const getPlaylistById = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const userId = req.user?._id?.toString();
+  res.status(200).json({
+    success: true,
+    data: playlist,
+  });
+});
 
-    const playlist = await PlaylistService.getPlaylistById(id, userId);
+export const updatePlaylist = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
 
-    if (!playlist) {
-      res.status(404).json({ success: false, message: 'Playlist not found' });
-      return;
-    }
+  const { id } = req.params;
+  const updated = await PlaylistService.updatePlaylist(id, user._id.toString(), req.body);
 
-    res.status(200).json({
-      success: true,
-      data: playlist,
-    });
-  } catch (error: any) {
-    if (error.message === 'Access denied to private playlist') {
-      res.status(403).json({ success: false, message: error.message });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch playlist details',
-    });
+  if (!updated) {
+    throw new ControllerError(404, 'Playlist not found');
   }
-};
 
-export const updatePlaylist = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Unauthorized access' });
-      return;
-    }
+  res.status(200).json({
+    success: true,
+    message: 'Playlist updated successfully',
+    data: updated,
+  });
+});
 
-    const { id } = req.params;
-    const updated = await PlaylistService.updatePlaylist(id, req.user._id.toString(), req.body);
+export const deletePlaylist = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
 
-    if (!updated) {
-      res.status(404).json({ success: false, message: 'Playlist not found' });
-      return;
-    }
+  const { id } = req.params;
+  const deleted = await PlaylistService.deletePlaylist(id, user._id.toString());
 
-    res.status(200).json({
-      success: true,
-      message: 'Playlist updated successfully',
-      data: updated,
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message || 'Failed to update playlist',
-    });
+  if (!deleted) {
+    throw new ControllerError(404, 'Playlist not found');
   }
-};
 
-export const deletePlaylist = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Unauthorized access' });
-      return;
-    }
+  res.status(200).json({
+    success: true,
+    message: 'Playlist deleted successfully',
+  });
+});
 
-    const { id } = req.params;
-    const deleted = await PlaylistService.deletePlaylist(id, req.user._id.toString());
+export const addSongToPlaylist = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
 
-    if (!deleted) {
-      res.status(404).json({ success: false, message: 'Playlist not found' });
-      return;
-    }
+  const { id } = req.params;
+  const { songId } = req.body;
 
-    res.status(200).json({
-      success: true,
-      message: 'Playlist deleted successfully',
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message || 'Failed to delete playlist',
-    });
+  if (!songId) {
+    throw new ControllerError(400, 'songId is required');
   }
-};
 
-export const addSongToPlaylist = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Unauthorized access' });
-      return;
-    }
+  const playlist = await PlaylistService.addSongToPlaylist(id, user._id.toString(), songId);
 
-    const { id } = req.params;
-    const { songId } = req.body;
+  res.status(200).json({
+    success: true,
+    message: 'Song added to playlist',
+    data: playlist,
+  });
+});
 
-    if (!songId) {
-      res.status(400).json({ success: false, message: 'songId is required' });
-      return;
-    }
+export const removeSongFromPlaylist = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
 
-    const playlist = await PlaylistService.addSongToPlaylist(id, req.user._id.toString(), songId);
+  const { id, songId } = req.params;
 
-    res.status(200).json({
-      success: true,
-      message: 'Song added to playlist',
-      data: playlist,
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message || 'Failed to add song to playlist',
-    });
+  const playlist = await PlaylistService.removeSongFromPlaylist(id, user._id.toString(), songId);
+
+  res.status(200).json({
+    success: true,
+    message: 'Song removed from playlist',
+    data: playlist,
+  });
+});
+
+export const generateAIPlaylistEndpoint = controllerWrapper(async (req: Request, res: Response) => {
+  const { prompt, count } = req.body;
+
+  if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+    throw new ControllerError(400, 'Prompt is required for AI playlist generation');
   }
-};
 
-export const removeSongFromPlaylist = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Unauthorized access' });
-      return;
-    }
+  const userId = req.user?._id?.toString();
+  const parsedCount = count && !isNaN(parseInt(String(count), 10)) ? parseInt(String(count), 10) : undefined;
 
-    const { id, songId } = req.params;
+  const result = await AIPlaylistPipelineService.generateAIPlaylist({
+    prompt: prompt.trim(),
+    userId,
+    count: parsedCount,
+  });
 
-    const playlist = await PlaylistService.removeSongFromPlaylist(id, req.user._id.toString(), songId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Song removed from playlist',
-      data: playlist,
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message || 'Failed to remove song from playlist',
-    });
-  }
-};
-
-export const generateAIPlaylistEndpoint = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { prompt, count } = req.body;
-
-    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
-      res.status(400).json({
-        success: false,
-        message: 'Prompt is required for AI playlist generation',
-      });
-      return;
-    }
-
-    const userId = req.user?._id?.toString();
-    const parsedCount = count && !isNaN(parseInt(String(count), 10)) ? parseInt(String(count), 10) : undefined;
-
-    const result = await AIPlaylistPipelineService.generateAIPlaylist({
-      prompt: prompt.trim(),
-      userId,
-      count: parsedCount,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'AI Playlist generated successfully',
-      data: result,
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to generate AI playlist',
-    });
-  }
-};
+  res.status(200).json({
+    success: true,
+    message: 'AI Playlist generated successfully',
+    data: result,
+  });
+});

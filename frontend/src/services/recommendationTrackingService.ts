@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import { extractEnvelopeData } from '../utils/apiHelpers';
 
 export type RecommendationActionType =
   | 'impression'
@@ -54,11 +55,8 @@ export const submitRecommendationFeedbackApi = async (
       }),
     });
 
-    if (response.error) {
-      return { success: false, error: response.error };
-    }
-
-    return { success: true, error: null };
+    const result = extractEnvelopeData(response, 'Failed to submit feedback');
+    return { success: !result.error, error: result.error };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to submit feedback' };
   }
@@ -75,15 +73,8 @@ export const fetchUserRecommendationFeedbackApi = async (
       method: 'GET',
     });
 
-    if (response.error) {
-      return { feedback: [], error: response.error };
-    }
-
-    if (response.data && response.data.success && Array.isArray(response.data.data)) {
-      return { feedback: response.data.data, error: null };
-    }
-
-    return { feedback: [], error: response.data?.message || 'Failed to fetch feedback history' };
+    const result = extractEnvelopeData(response, 'Failed to fetch feedback history');
+    return { feedback: result.data || [], error: result.error };
   } catch (err: any) {
     return { feedback: [], error: err.message || 'Failed to fetch feedback history' };
   }

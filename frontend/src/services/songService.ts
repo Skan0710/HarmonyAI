@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import { extractEnvelopeData, extractEnvelopeList } from '../utils/apiHelpers';
 import type { SongsApiResponse, Song, Genre, Artist, Album } from '../types/music';
 
 export interface GetSongsParams {
@@ -48,12 +49,8 @@ export const fetchSongs = async (params: GetSongsParams = {}): Promise<{
 
 export const fetchSongById = async (songId: string): Promise<{ song?: Song; error?: string }> => {
   const response = await apiClient<{ success: boolean; data: Song }>(`/songs/${songId}`, { method: 'GET' });
-
-  if (response.error || !response.data) {
-    return { error: response.error || 'Failed to load song details' };
-  }
-
-  return { song: response.data.data };
+  const result = extractEnvelopeData(response, 'Failed to load song details');
+  return { song: result.data || undefined, error: result.error || undefined };
 };
 
 export const recordSongPlay = async (songId: string): Promise<void> => {
@@ -68,24 +65,16 @@ export const fetchSimilarSongsApi = async (
     `/recommendations/similar/${songId}?limit=${limit}`,
     { method: 'GET' }
   );
-
-  if (response.error || !response.data) {
-    return { songs: [], error: response.error || 'Failed to load similar songs' };
-  }
-
-  return { songs: response.data.data || [] };
+  const result = extractEnvelopeData(response, 'Failed to load similar songs');
+  return { songs: result.data || [], error: result.error || undefined };
 };
 
 export const fetchTrendingSongsApi = async (limit = 10): Promise<{ songs: Song[]; error?: string }> => {
   const response = await apiClient<{ success: boolean; data: Song[] }>(`/music/trending?limit=${limit}`, {
     method: 'GET',
   });
-
-  if (response.error || !response.data) {
-    return { songs: [], error: response.error || 'Failed to load trending songs' };
-  }
-
-  return { songs: response.data.data || [] };
+  const result = extractEnvelopeData(response, 'Failed to load trending songs');
+  return { songs: result.data || [], error: result.error || undefined };
 };
 
 export const fetchNewReleasesApi = async (
@@ -106,55 +95,38 @@ export const fetchNewReleasesApi = async (
     };
   }>(`/music/new-releases?page=${page}&limit=${limit}`, { method: 'GET' });
 
-  if (response.error || !response.data || !response.data.data) {
-    return { songs: [], albums: [], error: response.error || 'Failed to load new releases' };
-  }
-
+  const result = extractEnvelopeData(response, 'Failed to load new releases');
+  const data = result.data;
   return {
-    songs: response.data.data.songs || [],
-    albums: response.data.data.albums || [],
-    pagination: response.data.data.pagination,
+    songs: data?.songs || [],
+    albums: data?.albums || [],
+    pagination: data?.pagination,
+    error: result.error || undefined,
   };
 };
 
 export const fetchGenres = async (): Promise<{ genres: Genre[]; error?: string }> => {
   const response = await apiClient<{ success: boolean; data: Genre[] }>('/genres', { method: 'GET' });
-
-  if (response.error || !response.data) {
-    return { genres: [], error: response.error || 'Failed to load genres' };
-  }
-
-  return { genres: response.data.data || [] };
+  const result = extractEnvelopeData(response, 'Failed to load genres');
+  return { genres: result.data || [], error: result.error || undefined };
 };
 
 export const fetchArtists = async (): Promise<{ artists: Artist[]; error?: string }> => {
   const response = await apiClient<{ success: boolean; data: Artist[] }>('/artists', { method: 'GET' });
-
-  if (response.error || !response.data) {
-    return { artists: [], error: response.error || 'Failed to load artists' };
-  }
-
-  return { artists: response.data.data || [] };
+  const result = extractEnvelopeData(response, 'Failed to load artists');
+  return { artists: result.data || [], error: result.error || undefined };
 };
 
 export const fetchArtistById = async (artistId: string): Promise<{ artist?: Artist; error?: string }> => {
   const response = await apiClient<{ success: boolean; data: Artist }>(`/artists/${artistId}`, { method: 'GET' });
-
-  if (response.error || !response.data) {
-    return { error: response.error || 'Failed to load artist profile' };
-  }
-
-  return { artist: response.data.data };
+  const result = extractEnvelopeData(response, 'Failed to load artist profile');
+  return { artist: result.data || undefined, error: result.error || undefined };
 };
 
 export const fetchSimilarArtists = async (artistId: string): Promise<{ artists: Artist[]; error?: string }> => {
   const response = await apiClient<{ success: boolean; data: Artist[] }>(`/artists/${artistId}/similar`, { method: 'GET' });
-
-  if (response.error || !response.data) {
-    return { artists: [], error: response.error || 'Failed to load similar artists' };
-  }
-
-  return { artists: response.data.data || [] };
+  const result = extractEnvelopeData(response, 'Failed to load similar artists');
+  return { artists: result.data || [], error: result.error || undefined };
 };
 
 export const fetchAlbums = async (params: { artistId?: string } = {}): Promise<{ albums: Album[]; error?: string }> => {
@@ -165,20 +137,12 @@ export const fetchAlbums = async (params: { artistId?: string } = {}): Promise<{
   const endpoint = `/albums${queryString ? `?${queryString}` : ''}`;
 
   const response = await apiClient<{ success: boolean; data: Album[] }>(endpoint, { method: 'GET' });
-
-  if (response.error || !response.data) {
-    return { albums: [], error: response.error || 'Failed to load albums' };
-  }
-
-  return { albums: response.data.data || [] };
+  const result = extractEnvelopeData(response, 'Failed to load albums');
+  return { albums: result.data || [], error: result.error || undefined };
 };
 
 export const fetchAlbumById = async (albumId: string): Promise<{ album?: Album; error?: string }> => {
   const response = await apiClient<{ success: boolean; data: Album }>(`/albums/${albumId}`, { method: 'GET' });
-
-  if (response.error || !response.data) {
-    return { error: response.error || 'Failed to load album details' };
-  }
-
-  return { album: response.data.data };
+  const result = extractEnvelopeData(response, 'Failed to load album details');
+  return { album: result.data || undefined, error: result.error || undefined };
 };

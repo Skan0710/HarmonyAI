@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import { extractEnvelopeData } from '../utils/apiHelpers';
 import type { Artist, Genre } from '../types/music';
 
 export interface PreferencesApiResponse {
@@ -32,23 +33,11 @@ export const fetchUserPreferencesApi = async (): Promise<{
   error: string | null;
 }> => {
   const response = await apiClient<PreferencesApiResponse>('/users/preferences');
-
-  if (response.error) {
-    return { favoriteArtists: [], favoriteGenres: [], error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return {
-      favoriteArtists: response.data.data.favoriteArtists || [],
-      favoriteGenres: response.data.data.favoriteGenres || [],
-      error: null,
-    };
-  }
-
+  const result = extractEnvelopeData(response, 'Failed to fetch preferences');
   return {
-    favoriteArtists: [],
-    favoriteGenres: [],
-    error: response.data?.message || 'Failed to fetch preferences',
+    favoriteArtists: result.data?.favoriteArtists || [],
+    favoriteGenres: result.data?.favoriteGenres || [],
+    error: result.error,
   };
 };
 
@@ -58,16 +47,8 @@ export const addFavoriteArtistApi = async (
   const response = await apiClient<FavoriteArtistsApiResponse>(`/users/favorite-artists/${artistId}`, {
     method: 'POST',
   });
-
-  if (response.error) {
-    return { favoriteArtists: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { favoriteArtists: response.data.data.favoriteArtists, error: null };
-  }
-
-  return { favoriteArtists: null, error: response.data?.message || 'Failed to add favorite artist' };
+  const result = extractEnvelopeData(response, 'Failed to add favorite artist');
+  return { favoriteArtists: result.data?.favoriteArtists ?? null, error: result.error };
 };
 
 export const removeFavoriteArtistApi = async (
@@ -76,16 +57,8 @@ export const removeFavoriteArtistApi = async (
   const response = await apiClient<FavoriteArtistsApiResponse>(`/users/favorite-artists/${artistId}`, {
     method: 'DELETE',
   });
-
-  if (response.error) {
-    return { favoriteArtists: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { favoriteArtists: response.data.data.favoriteArtists, error: null };
-  }
-
-  return { favoriteArtists: null, error: response.data?.message || 'Failed to remove favorite artist' };
+  const result = extractEnvelopeData(response, 'Failed to remove favorite artist');
+  return { favoriteArtists: result.data?.favoriteArtists ?? null, error: result.error };
 };
 
 export const addFavoriteGenreApi = async (
@@ -94,16 +67,8 @@ export const addFavoriteGenreApi = async (
   const response = await apiClient<FavoriteGenresApiResponse>(`/users/favorite-genres/${genreId}`, {
     method: 'POST',
   });
-
-  if (response.error) {
-    return { favoriteGenres: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { favoriteGenres: response.data.data.favoriteGenres, error: null };
-  }
-
-  return { favoriteGenres: null, error: response.data?.message || 'Failed to add favorite genre' };
+  const result = extractEnvelopeData(response, 'Failed to add favorite genre');
+  return { favoriteGenres: result.data?.favoriteGenres ?? null, error: result.error };
 };
 
 export const removeFavoriteGenreApi = async (
@@ -112,14 +77,6 @@ export const removeFavoriteGenreApi = async (
   const response = await apiClient<FavoriteGenresApiResponse>(`/users/favorite-genres/${genreId}`, {
     method: 'DELETE',
   });
-
-  if (response.error) {
-    return { favoriteGenres: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { favoriteGenres: response.data.data.favoriteGenres, error: null };
-  }
-
-  return { favoriteGenres: null, error: response.data?.message || 'Failed to remove favorite genre' };
+  const result = extractEnvelopeData(response, 'Failed to remove favorite genre');
+  return { favoriteGenres: result.data?.favoriteGenres ?? null, error: result.error };
 };

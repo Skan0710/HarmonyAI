@@ -5,12 +5,7 @@ import { RecommendationsTool } from './recommendationsTool.js';
 import { PersonalizedRecommendationsTool } from './personalizedRecommendationsTool.js';
 import { ContextualRecommendationsTool } from './contextualRecommendationsTool.js';
 import { PlaylistCreationTool } from './playlistCreationTool.js';
-import { AddToPlaylistTool } from './addToPlaylistTool.js';
-import { RemoveFromPlaylistTool } from './removeFromPlaylistTool.js';
 import { PlaylistModificationTool } from './playlistModificationTool.js';
-import { AddToQueueTool } from './addToQueueTool.js';
-import { RemoveFromQueueTool } from './removeFromQueueTool.js';
-import { ClearQueueTool } from './clearQueueTool.js';
 import { QueueManagementTool } from './queueManagementTool.js';
 import { UserPreferenceRetrievalTool } from './userPreferenceRetrievalTool.js';
 
@@ -53,19 +48,19 @@ export class ToolRegistry {
     this.registerTool(playlistCreate);
     this.registerAlias('playlist_creation', playlistCreate);
 
-    // 7. Playlist Modification
+    // 7. Playlist Modification (consolidated: add_songs, remove_songs, update_metadata)
     const playlistMod = new PlaylistModificationTool();
     this.registerTool(playlistMod);
     this.registerAlias('playlist_modification', playlistMod);
-    this.registerTool(new AddToPlaylistTool());
-    this.registerTool(new RemoveFromPlaylistTool());
+    this.registerAlias('add_to_playlist', playlistMod);
+    this.registerAlias('remove_from_playlist', playlistMod);
 
-    // 8. Queue Management
+    // 8. Queue Management (consolidated: add, add_next, remove, clear, list)
     const queueMgmt = new QueueManagementTool();
     this.registerTool(queueMgmt);
-    this.registerTool(new AddToQueueTool());
-    this.registerTool(new RemoveFromQueueTool());
-    this.registerTool(new ClearQueueTool());
+    this.registerAlias('add_to_queue', queueMgmt);
+    this.registerAlias('remove_from_queue', queueMgmt);
+    this.registerAlias('clear_queue', queueMgmt);
   }
 
   static registerTool(tool: AssistantTool): void {

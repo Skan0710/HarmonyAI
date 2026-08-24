@@ -1,264 +1,206 @@
 import { Request, Response } from 'express';
 import { SongService } from '../services/songService.js';
+import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
+import { extractQueryParams, sanitizeString } from '../utils/validators.js';
 
-export const createSong = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const {
-      title,
-      artist,
-      featuredArtists,
-      album,
-      genre,
-      duration,
-      coverImage,
-      audioUrl,
-      releaseYear,
-      audioFeatures,
-      tags,
-      language,
-      explicit,
-      lyrics,
-      vectorEmbedding,
-      recommendationMetadata,
-    } = req.body;
+export const createSong = controllerWrapper(async (req: Request, res: Response) => {
+  const {
+    title,
+    artist,
+    featuredArtists,
+    album,
+    genre,
+    duration,
+    coverImage,
+    audioUrl,
+    releaseYear,
+    audioFeatures,
+    tags,
+    language,
+    explicit,
+    lyrics,
+    vectorEmbedding,
+    recommendationMetadata,
+  } = req.body;
 
-    if (!title || !artist || !genre || !duration || !audioUrl) {
-      res.status(400).json({
-        success: false,
-        message: 'Missing required fields: title, artist, genre, duration, and audioUrl are required',
-      });
-      return;
-    }
-
-    const song = await SongService.createSong({
-      title,
-      artist,
-      featuredArtists,
-      album,
-      genre,
-      duration,
-      coverImage,
-      audioUrl,
-      releaseYear,
-      audioFeatures,
-      tags,
-      language,
-      explicit,
-      lyrics,
-      vectorEmbedding,
-      recommendationMetadata,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Song created successfully',
-      data: song,
-    });
-  } catch (error: any) {
-    if (error.name === 'ValidationError' || error.name === 'CastError') {
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Validation error',
-      });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to create song',
-    });
+  if (!title || !artist || !genre || !duration || !audioUrl) {
+    throw new ControllerError(400, 'Missing required fields: title, artist, genre, duration, and audioUrl are required');
   }
-};
 
-export const getSongs = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const search = req.query.search ? String(req.query.search) : undefined;
-    const artistId = (req.query.artistId || req.query.artist) ? String(req.query.artistId || req.query.artist) : undefined;
-    const albumId = (req.query.albumId || req.query.album) ? String(req.query.albumId || req.query.album) : undefined;
-    const genreId = (req.query.genreId || req.query.genre) ? String(req.query.genreId || req.query.genre) : undefined;
-    const tag = req.query.tag ? String(req.query.tag) : undefined;
-    const releaseYear = req.query.releaseYear ? parseInt(String(req.query.releaseYear), 10) : undefined;
-    const minBpm = req.query.minBpm ? parseFloat(String(req.query.minBpm)) : undefined;
-    const maxBpm = req.query.maxBpm ? parseFloat(String(req.query.maxBpm)) : undefined;
-    const minEnergy = req.query.minEnergy ? parseFloat(String(req.query.minEnergy)) : undefined;
-    const maxEnergy = req.query.maxEnergy ? parseFloat(String(req.query.maxEnergy)) : undefined;
-    const minValence = req.query.minValence ? parseFloat(String(req.query.minValence)) : undefined;
-    const maxValence = req.query.maxValence ? parseFloat(String(req.query.maxValence)) : undefined;
-    const sortBy = req.query.sortBy ? (String(req.query.sortBy) as any) : 'createdAt';
-    const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
-    const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 20;
+  const song = await SongService.createSong({
+    title,
+    artist,
+    featuredArtists,
+    album,
+    genre,
+    duration,
+    coverImage,
+    audioUrl,
+    releaseYear,
+    audioFeatures,
+    tags,
+    language,
+    explicit,
+    lyrics,
+    vectorEmbedding,
+    recommendationMetadata,
+  });
 
-    const result = await SongService.getAllSongs({
-      search,
-      artistId,
-      albumId,
-      genreId,
-      tag,
-      releaseYear,
-      minBpm,
-      maxBpm,
-      minEnergy,
-      maxEnergy,
-      minValence,
-      maxValence,
-      sortBy,
-      sortOrder,
+  res.status(201).json({
+    success: true,
+    message: 'Song created successfully',
+    data: song,
+  });
+});
+
+export const getSongs = controllerWrapper(async (req: Request, res: Response) => {
+  const q = extractQueryParams(req, {
+    search: 'string',
+    artistId: 'string',
+    albumId: 'string',
+    genreId: 'string',
+    tag: 'string',
+    releaseYear: 'int',
+    minBpm: 'number',
+    maxBpm: 'number',
+    minEnergy: 'number',
+    maxEnergy: 'number',
+    minValence: 'number',
+    maxValence: 'number',
+    sortBy: 'string',
+    sortOrder: 'string',
+    page: 'int',
+    limit: 'int',
+  });
+
+  // Support alias query params
+  const search = sanitizeString(q.search);
+  const artistId = sanitizeString(q.artistId) || sanitizeString(String(req.query.artist || ''));
+  const albumId = sanitizeString(q.albumId) || sanitizeString(String(req.query.album || ''));
+  const genreId = sanitizeString(q.genreId) || sanitizeString(String(req.query.genre || ''));
+  const tag = sanitizeString(q.tag);
+  const releaseYear = q.releaseYear || undefined;
+  const minBpm = q.minBpm || undefined;
+  const maxBpm = q.maxBpm || undefined;
+  const minEnergy = q.minEnergy || undefined;
+  const maxEnergy = q.maxEnergy || undefined;
+  const minValence = q.minValence || undefined;
+  const maxValence = q.maxValence || undefined;
+  const sortBy = (q.sortBy as any) || 'createdAt';
+  const sortOrder = q.sortOrder === 'asc' ? 'asc' : 'desc';
+  const page = q.page || 1;
+  const limit = q.limit || 20;
+
+  const result = await SongService.getAllSongs({
+    search,
+    artistId,
+    albumId,
+    genreId,
+    tag,
+    releaseYear,
+    minBpm,
+    maxBpm,
+    minEnergy,
+    maxEnergy,
+    minValence,
+    maxValence,
+    sortBy,
+    sortOrder,
+    page,
+    limit,
+  });
+
+  res.status(200).json({
+    success: true,
+    data: result.songs,
+    pagination: {
+      total: result.total,
       page,
       limit,
-    });
+      pages: Math.ceil(result.total / limit),
+    },
+  });
+});
 
-    res.status(200).json({
-      success: true,
-      data: result.songs,
-      pagination: {
-        total: result.total,
-        page,
-        limit,
-        pages: Math.ceil(result.total / limit),
-      },
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch songs',
-    });
+export const getSongById = controllerWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const song = await SongService.getSongById(id);
+
+  if (!song) {
+    throw new ControllerError(404, 'Song not found');
   }
-};
 
-export const getSongById = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const song = await SongService.getSongById(id);
+  res.status(200).json({ success: true, data: song });
+});
 
-    if (!song) {
-      res.status(404).json({ success: false, message: 'Song not found' });
-      return;
-    }
+export const updateSong = controllerWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const updatedSong = await SongService.updateSong(id, req.body);
 
-    res.status(200).json({
-      success: true,
-      data: song,
-    });
-  } catch (error: any) {
-    if (error.name === 'CastError') {
-      res.status(400).json({ success: false, message: 'Invalid song ID format' });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch song',
-    });
+  if (!updatedSong) {
+    throw new ControllerError(404, 'Song not found');
   }
-};
 
-export const updateSong = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const updatedSong = await SongService.updateSong(id, req.body);
+  res.status(200).json({
+    success: true,
+    message: 'Song updated successfully',
+    data: updatedSong,
+  });
+});
 
-    if (!updatedSong) {
-      res.status(404).json({ success: false, message: 'Song not found' });
-      return;
-    }
+export const deleteSong = controllerWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const deletedSong = await SongService.deleteSong(id);
 
-    res.status(200).json({
-      success: true,
-      message: 'Song updated successfully',
-      data: updatedSong,
-    });
-  } catch (error: any) {
-    if (error.name === 'CastError' || error.name === 'ValidationError') {
-      res.status(400).json({ success: false, message: error.message || 'Invalid input data' });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to update song',
-    });
+  if (!deletedSong) {
+    throw new ControllerError(404, 'Song not found');
   }
-};
 
-export const deleteSong = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const deletedSong = await SongService.deleteSong(id);
+  res.status(200).json({
+    success: true,
+    message: 'Song deleted successfully',
+  });
+});
 
-    if (!deletedSong) {
-      res.status(404).json({ success: false, message: 'Song not found' });
-      return;
-    }
+export const recordPlay = controllerWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const song = await SongService.incrementPlayCount(id);
 
-    res.status(200).json({
-      success: true,
-      message: 'Song deleted successfully',
-    });
-  } catch (error: any) {
-    if (error.name === 'CastError') {
-      res.status(400).json({ success: false, message: 'Invalid song ID format' });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to delete song',
-    });
+  if (!song) {
+    throw new ControllerError(404, 'Song not found');
   }
-};
 
-export const recordPlay = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const song = await SongService.incrementPlayCount(id);
+  res.status(200).json({
+    success: true,
+    message: 'Play count updated successfully',
+    data: { id: song._id, playCount: song.playCount },
+  });
+});
 
-    if (!song) {
-      res.status(404).json({ success: false, message: 'Song not found' });
-      return;
-    }
+export const getRecommendations = controllerWrapper(async (req: Request, res: Response) => {
+  const q = extractQueryParams(req, {
+    songId: 'string',
+    genreId: 'string',
+    targetBpm: 'number',
+    targetEnergy: 'number',
+    targetValence: 'number',
+    limit: 'int',
+  });
 
-    res.status(200).json({
-      success: true,
-      message: 'Play count updated successfully',
-      data: { id: song._id, playCount: song.playCount },
-    });
-  } catch (error: any) {
-    if (error.name === 'CastError') {
-      res.status(400).json({ success: false, message: 'Invalid song ID format' });
-      return;
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to record play count',
-    });
-  }
-};
+  const tags = req.query.tags ? String(req.query.tags).split(',') : undefined;
 
-export const getRecommendations = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const songId = req.query.songId ? String(req.query.songId) : undefined;
-    const genreId = req.query.genreId ? String(req.query.genreId) : undefined;
-    const targetBpm = req.query.targetBpm ? parseFloat(String(req.query.targetBpm)) : undefined;
-    const targetEnergy = req.query.targetEnergy ? parseFloat(String(req.query.targetEnergy)) : undefined;
-    const targetValence = req.query.targetValence ? parseFloat(String(req.query.targetValence)) : undefined;
-    const tags = req.query.tags ? String(req.query.tags).split(',') : undefined;
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
+  const recommendations = await SongService.getRecommendations({
+    songId: q.songId,
+    genreId: q.genreId,
+    targetBpm: q.targetBpm,
+    targetEnergy: q.targetEnergy,
+    targetValence: q.targetValence,
+    tags,
+    limit: q.limit || 10,
+  });
 
-    const recommendations = await SongService.getRecommendations({
-      songId,
-      genreId,
-      targetBpm,
-      targetEnergy,
-      targetValence,
-      tags,
-      limit,
-    });
-
-    res.status(200).json({
-      success: true,
-      data: recommendations,
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch recommendations',
-    });
-  }
-};
+  res.status(200).json({
+    success: true,
+    data: recommendations,
+  });
+});

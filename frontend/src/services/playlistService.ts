@@ -1,18 +1,17 @@
 import { apiClient } from './api';
+import { extractEnvelopeData, extractEnvelopeList, extractSuccess } from '../utils/apiHelpers';
 import type { Playlist, Song } from '../types/music';
 
 export interface PlaylistsApiResponse {
   success: boolean;
   data?: Playlist[];
   message?: string;
-  error?: string;
 }
 
 export interface PlaylistApiResponse {
   success: boolean;
   data?: Playlist;
   message?: string;
-  error?: string;
 }
 
 export interface CreatePlaylistParams {
@@ -60,32 +59,15 @@ export interface AIPlaylistApiResponse {
 
 export const fetchUserPlaylistsApi = async (): Promise<{ playlists: Playlist[] | null; error: string | null }> => {
   const response = await apiClient<PlaylistsApiResponse>('/playlists');
-
-  if (response.error) {
-    return { playlists: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { playlists: response.data.data, error: null };
-  }
-
-  return { playlists: null, error: response.data?.message || 'Failed to fetch playlists' };
+  const result = extractEnvelopeList(response, 'Failed to fetch playlists');
+  return { playlists: result.items, error: result.error };
 };
 
 export const fetchPlaylistByIdApi = async (
   id: string
 ): Promise<{ playlist: Playlist | null; error: string | null }> => {
   const response = await apiClient<PlaylistApiResponse>(`/playlists/${id}`);
-
-  if (response.error) {
-    return { playlist: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { playlist: response.data.data, error: null };
-  }
-
-  return { playlist: null, error: response.data?.message || 'Failed to fetch playlist' };
+  return extractEnvelopeData(response, 'Failed to fetch playlist');
 };
 
 export const createPlaylistApi = async (
@@ -95,16 +77,7 @@ export const createPlaylistApi = async (
     method: 'POST',
     body: JSON.stringify(params),
   });
-
-  if (response.error) {
-    return { playlist: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { playlist: response.data.data, error: null };
-  }
-
-  return { playlist: null, error: response.data?.message || 'Failed to create playlist' };
+  return extractEnvelopeData(response, 'Failed to create playlist');
 };
 
 export const updatePlaylistApi = async (
@@ -115,28 +88,14 @@ export const updatePlaylistApi = async (
     method: 'PUT',
     body: JSON.stringify(params),
   });
-
-  if (response.error) {
-    return { playlist: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { playlist: response.data.data, error: null };
-  }
-
-  return { playlist: null, error: response.data?.message || 'Failed to update playlist' };
+  return extractEnvelopeData(response, 'Failed to update playlist');
 };
 
 export const deletePlaylistApi = async (id: string): Promise<{ success: boolean; error: string | null }> => {
   const response = await apiClient<{ success: boolean; message?: string }>(`/playlists/${id}`, {
     method: 'DELETE',
   });
-
-  if (response.error) {
-    return { success: false, error: response.error };
-  }
-
-  return { success: response.data?.success || false, error: null };
+  return extractSuccess(response, 'Failed to delete playlist');
 };
 
 export const addSongToPlaylistApi = async (
@@ -147,16 +106,7 @@ export const addSongToPlaylistApi = async (
     method: 'POST',
     body: JSON.stringify({ songId }),
   });
-
-  if (response.error) {
-    return { playlist: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { playlist: response.data.data, error: null };
-  }
-
-  return { playlist: null, error: response.data?.message || 'Failed to add song to playlist' };
+  return extractEnvelopeData(response, 'Failed to add song to playlist');
 };
 
 export const removeSongFromPlaylistApi = async (
@@ -166,16 +116,7 @@ export const removeSongFromPlaylistApi = async (
   const response = await apiClient<PlaylistApiResponse>(`/playlists/${playlistId}/songs/${songId}`, {
     method: 'DELETE',
   });
-
-  if (response.error) {
-    return { playlist: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { playlist: response.data.data, error: null };
-  }
-
-  return { playlist: null, error: response.data?.message || 'Failed to remove song from playlist' };
+  return extractEnvelopeData(response, 'Failed to remove song from playlist');
 };
 
 export const generateAIPlaylistApi = async (
@@ -186,14 +127,5 @@ export const generateAIPlaylistApi = async (
     method: 'POST',
     body: JSON.stringify({ prompt, count }),
   });
-
-  if (response.error) {
-    return { result: null, error: response.error };
-  }
-
-  if (response.data && response.data.success && response.data.data) {
-    return { result: response.data.data, error: null };
-  }
-
-  return { result: null, error: response.data?.message || 'Failed to generate AI playlist' };
+  return extractEnvelopeData(response, 'Failed to generate AI playlist');
 };
