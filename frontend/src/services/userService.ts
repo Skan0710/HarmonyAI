@@ -18,14 +18,15 @@ export interface ToggleLikeResponse {
 
 export const fetchLikedSongsApi = async (): Promise<{ songs: Song[] | null; error: string | null }> => {
   const response = await apiClient<LikedSongsResponse>('/users/liked-songs');
-  return extractEnvelopeData(response, 'Failed to fetch liked songs');
+  const res = extractEnvelopeData<Song[]>(response, 'Failed to fetch liked songs');
+  return { songs: res.data, error: res.error };
 };
 
 export const likeSongApi = async (songId: string): Promise<{ likedSongs: string[] | null; error: string | null }> => {
   const response = await apiClient<ToggleLikeResponse>(`/users/liked-songs/${songId}`, {
     method: 'POST',
   });
-  const result = extractEnvelopeData(response, 'Failed to like song');
+  const result = extractEnvelopeData<{ likedSongs: string[] }>(response, 'Failed to like song');
   return { likedSongs: result.data?.likedSongs ?? null, error: result.error };
 };
 
@@ -33,6 +34,6 @@ export const unlikeSongApi = async (songId: string): Promise<{ likedSongs: strin
   const response = await apiClient<ToggleLikeResponse>(`/users/liked-songs/${songId}`, {
     method: 'DELETE',
   });
-  const result = extractEnvelopeData(response, 'Failed to unlike song');
+  const result = extractEnvelopeData<{ likedSongs: string[] }>(response, 'Failed to unlike song');
   return { likedSongs: result.data?.likedSongs ?? null, error: result.error };
 };

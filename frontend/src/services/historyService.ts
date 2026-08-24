@@ -33,12 +33,14 @@ export const fetchListeningHistoryApi = async (
   limit: number = 50
 ): Promise<{ history: HistoryItem[] | null; error: string | null }> => {
   const response = await apiClient<HistoryResponse>(`/history?limit=${limit}`);
-  return extractEnvelopeData(response, 'Failed to fetch listening history');
+  const res = extractEnvelopeData<HistoryItem[]>(response, 'Failed to fetch listening history');
+  return { history: res.data, error: res.error };
 };
 
 export const fetchRecentlyPlayedApi = async (
   limit: number = 20
 ): Promise<{ songs: Song[] | null; error: string | null }> => {
   const response = await apiClient<RecentlyPlayedResponse>(`/history/recently-played?limit=${limit}`);
-  return extractEnvelopeData(response, 'Failed to fetch recently played songs');
+  const res = extractEnvelopeData<Song[]>(response, 'Failed to fetch recently played songs');
+  return { songs: res.data, error: res.error };
 };

@@ -19,5 +19,6 @@ export const fetchPersonalizedFeedApi = async (): Promise<{
   error: string | null;
 }> => {
   const response = await apiClient<PersonalizedFeedApiResponse>('/music/personalized-feed');
-  return extractEnvelopeData(response, 'Failed to fetch personalized feed');
+  const res = extractEnvelopeData<PersonalizedFeedData>(response, 'Failed to fetch personalized feed');
+  return { feed: res.data, error: res.error };
 };
