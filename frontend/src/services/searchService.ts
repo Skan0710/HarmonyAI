@@ -31,5 +31,6 @@ export const searchGlobal = async (
     `/search?q=${encodeURIComponent(trimmed)}&limit=${limit}`
   );
 
-  return extractEnvelopeData(response, 'Failed to search catalog');
+  const res = extractEnvelopeData<GroupedSearchResults>(response, 'Failed to search catalog');
+  return { results: res.data, error: res.error };
 };

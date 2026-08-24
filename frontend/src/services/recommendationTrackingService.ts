@@ -73,8 +73,8 @@ export const fetchUserRecommendationFeedbackApi = async (
       method: 'GET',
     });
 
-    const result = extractEnvelopeData(response, 'Failed to fetch feedback history');
-    return { feedback: result.data || [], error: result.error };
+    const result = extractEnvelopeData<any[]>(response, 'Failed to fetch feedback history');
+    return { feedback: Array.isArray(result.data) ? result.data : [], error: result.error };
   } catch (err: any) {
     return { feedback: [], error: err.message || 'Failed to fetch feedback history' };
   }

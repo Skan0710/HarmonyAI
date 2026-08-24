@@ -19,42 +19,90 @@ export interface CreatePlaylistParams {
   description?: string;
   coverImage?: string;
   visibility?: 'public' | 'private';
+  songs?: string[];
 }
 
-export interface AIPlaylistPreferenceDTO {
+export interface GeneratedPlaylistTrackDTO {
+  song: Song;
+  score: number;
+  matchScore: number;
+  noveltyScore?: number;
+  genre: string;
+  artist: string;
+  durationSeconds: number;
+  durationFormatted: string;
+}
+
+export interface DurationOptimizationDiagnosticsDTO {
+  targetDurationSeconds: number;
+  achievedDurationSeconds: number;
+  durationVarianceSeconds: number;
+  durationToleranceSeconds: number;
+  isWithinTolerance: boolean;
+  isDurationGoalMet: boolean;
+  duplicateTracksPrevented: number;
+}
+
+export interface PlaylistDiversityDiagnosticsDTO {
+  uniqueArtistsCount: number;
+  uniqueGenresCount: number;
+  artistDistribution: Record<string, number>;
+  genreDistribution: Record<string, number>;
+  discoveryPercentage: number;
+  recentSkipsFiltered: number;
+}
+
+export interface SequencingDiagnosticsDTO {
+  strategy: string;
+  trackCount: number;
+  averageTransitionDelta: number;
+  maxTransitionDelta: number;
+  smoothnessScore: number;
+  sameArtistAdjacentCount: number;
+}
+
+export interface DedicatedAIPlaylistResponseData {
   title: string;
   description: string;
-  requestedMood?: string;
-  genres: string[];
-  artists: string[];
-  language?: string;
-  energyLevel: number;
-  tempoPreference: string | number;
-  acousticPreference: number;
-  instrumentalPreference: number;
-  requestedSongCount: number;
-  excludedArtists: string[];
-  excludedGenres: string[];
-  searchKeywords: string[];
+  tracks: GeneratedPlaylistTrackDTO[];
+  songs?: Song[];
+  totalDurationSeconds: number;
+  totalDurationFormatted: string;
+  trackCount: number;
+  candidateCountEvaluated: number;
+  durationDiagnostics?: DurationOptimizationDiagnosticsDTO;
+  diversityDiagnostics?: PlaylistDiversityDiagnosticsDTO;
+  sequencingDiagnostics?: SequencingDiagnosticsDTO;
+  preferences?: any;
+  metadata?: {
+    generatedAt: string;
+    requestedBy: string;
+    strategy: string;
+    promptUsed?: string | null;
+  };
 }
 
-export interface AIPlaylistGenerationData {
-  preferences: AIPlaylistPreferenceDTO;
-  songs: Song[];
-  candidatesEvaluated: number;
-  selectedCount: number;
-  metadata: {
-    prompt: string;
-    generatedAt: string;
-    strategy: string;
-    userId?: string;
-  };
+export interface GenerateAIPlaylistRequestParams {
+  prompt?: string;
+  duration?: number;
+  targetDurationMinutes?: number;
+  mood?: string;
+  activity?: string;
+  genre?: string;
+  genres?: string[];
+  artist?: string;
+  artists?: string[];
+  discoveryLevel?: string | number;
+  discoveryPercentage?: number;
+  sequencingStrategy?: 'balanced' | 'energetic' | 'gradual' | 'discovery';
+  count?: number;
+  targetSongCount?: number;
 }
 
 export interface AIPlaylistApiResponse {
   success: boolean;
   message?: string;
-  data?: AIPlaylistGenerationData;
+  data?: DedicatedAIPlaylistResponseData;
 }
 
 export const fetchUserPlaylistsApi = async (): Promise<{ playlists: Playlist[] | null; error: string | null }> => {
@@ -67,7 +115,8 @@ export const fetchPlaylistByIdApi = async (
   id: string
 ): Promise<{ playlist: Playlist | null; error: string | null }> => {
   const response = await apiClient<PlaylistApiResponse>(`/playlists/${id}`);
-  return extractEnvelopeData(response, 'Failed to fetch playlist');
+  const res = extractEnvelopeData<Playlist>(response, 'Failed to fetch playlist');
+  return { playlist: res.data, error: res.error };
 };
 
 export const createPlaylistApi = async (
@@ -77,7 +126,8 @@ export const createPlaylistApi = async (
     method: 'POST',
     body: JSON.stringify(params),
   });
-  return extractEnvelopeData(response, 'Failed to create playlist');
+  const res = extractEnvelopeData<Playlist>(response, 'Failed to create playlist');
+  return { playlist: res.data, error: res.error };
 };
 
 export const updatePlaylistApi = async (
@@ -88,7 +138,8 @@ export const updatePlaylistApi = async (
     method: 'PUT',
     body: JSON.stringify(params),
   });
-  return extractEnvelopeData(response, 'Failed to update playlist');
+  const res = extractEnvelopeData<Playlist>(response, 'Failed to update playlist');
+  return { playlist: res.data, error: res.error };
 };
 
 export const deletePlaylistApi = async (id: string): Promise<{ success: boolean; error: string | null }> => {
@@ -106,7 +157,8 @@ export const addSongToPlaylistApi = async (
     method: 'POST',
     body: JSON.stringify({ songId }),
   });
-  return extractEnvelopeData(response, 'Failed to add song to playlist');
+  const res = extractEnvelopeData<Playlist>(response, 'Failed to add song to playlist');
+  return { playlist: res.data, error: res.error };
 };
 
 export const removeSongFromPlaylistApi = async (
@@ -116,16 +168,19 @@ export const removeSongFromPlaylistApi = async (
   const response = await apiClient<PlaylistApiResponse>(`/playlists/${playlistId}/songs/${songId}`, {
     method: 'DELETE',
   });
-  return extractEnvelopeData(response, 'Failed to remove song from playlist');
+  const res = extractEnvelopeData<Playlist>(response, 'Failed to remove song from playlist');
+  return { playlist: res.data, error: res.error };
 };
 
 export const generateAIPlaylistApi = async (
-  prompt: string,
+  params: string | GenerateAIPlaylistRequestParams,
   count?: number
-): Promise<{ result: AIPlaylistGenerationData | null; error: string | null }> => {
+): Promise<{ result: DedicatedAIPlaylistResponseData | null; error: string | null }> => {
+  const payload = typeof params === 'string' ? { prompt: params, count } : params;
   const response = await apiClient<AIPlaylistApiResponse>('/playlists/ai-generate', {
     method: 'POST',
-    body: JSON.stringify({ prompt, count }),
+    body: JSON.stringify(payload),
   });
-  return extractEnvelopeData(response, 'Failed to generate AI playlist');
+  const res = extractEnvelopeData<DedicatedAIPlaylistResponseData>(response, 'Failed to generate AI playlist');
+  return { result: res.data, error: res.error };
 };
