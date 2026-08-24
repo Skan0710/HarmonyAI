@@ -89,14 +89,34 @@ export class PlaylistSequencingService {
 
     while (remaining.length > 0) {
       const current = result[result.length - 1];
+      const currentArtist = this.getTrackArtist(current).toLowerCase();
       let bestNextIdx = 0;
       let lowestCost = Infinity;
 
+      // Count artist frequencies in remaining pool to prevent starving separator slots
+      const artistCounts: Record<string, number> = {};
+      for (const r of remaining) {
+        const art = this.getTrackArtist(r).toLowerCase();
+        if (art) artistCounts[art] = (artistCounts[art] || 0) + 1;
+      }
+
       for (let i = 0; i < remaining.length; i++) {
         const candidate = remaining[i];
-        const cost = this.calculateTransitionDistance(current, candidate, false);
-        if (cost < lowestCost) {
-          lowestCost = cost;
+        const candidateArtist = this.getTrackArtist(candidate).toLowerCase();
+        const baseCost = this.calculateTransitionDistance(current, candidate, false);
+
+        // Urgency bonus: prioritize inserting high-frequency artists when current is a different artist
+        let urgencyBonus = 0;
+        if (currentArtist && candidateArtist && currentArtist !== candidateArtist) {
+          const count = artistCounts[candidateArtist] || 0;
+          if (count > 1) {
+            urgencyBonus = (count / remaining.length) * 0.45;
+          }
+        }
+
+        const totalCost = baseCost - urgencyBonus;
+        if (totalCost < lowestCost) {
+          lowestCost = totalCost;
           bestNextIdx = i;
         }
       }
@@ -327,8 +347,9 @@ export class PlaylistSequencingService {
   private static getTrackTempo(track: any): number {
     if (!track) return 120;
     const song = track.song || track;
-    if (song.audioFeatures && typeof song.audioFeatures.tempo === 'number' && song.audioFeatures.tempo > 0) {
-      return song.audioFeatures.tempo;
+    if (song.audioFeatures) {
+      const bpm = song.audioFeatures.tempo ?? song.audioFeatures.bpm;
+      if (typeof bpm === 'number' && bpm > 0) return bpm;
     }
     const mood = (song.mood || '').toLowerCase();
     if (mood.includes('energetic') || mood.includes('party')) return 135;
