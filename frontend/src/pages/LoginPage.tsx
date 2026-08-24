@@ -1,34 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { SignIn, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useAuth } from '../hooks/useAuth';
 
 export const LoginPage: React.FC = () => {
   const { isAuthenticated, isInitializing, login, isLoading, error } = useAuth();
   const navigate = useNavigate();
 
-  let clerkLoaded = false;
-  let clerkSignedIn = false;
-  try {
-    const clerkAuth = useClerkAuth();
-    clerkLoaded = clerkAuth.isLoaded;
-    clerkSignedIn = Boolean(clerkAuth.isSignedIn);
-  } catch {
-    clerkLoaded = true;
-    clerkSignedIn = false;
-  }
-
-  const isClerkConfigured = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [useLocalAuth, setUseLocalAuth] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated || (isClerkConfigured && clerkLoaded && clerkSignedIn)) {
+    if (isAuthenticated) {
       navigate('/', { replace: true });
     }
-  }, [isAuthenticated, clerkLoaded, clerkSignedIn, isClerkConfigured, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const handleStandardLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,17 +25,14 @@ export const LoginPage: React.FC = () => {
   };
 
   const handleDemoLogin = async () => {
-    // Attempt login with demo user, or register if not existing
     const demoEmail = 'demo@harmonyai.com';
     const demoPassword = 'password123';
     const success = await login({ email: demoEmail, password: demoPassword });
     if (success) {
       navigate('/', { replace: true });
     } else {
-      // Pre-fill fields for user
       setEmail(demoEmail);
       setPassword(demoPassword);
-      setUseLocalAuth(true);
     }
   };
 
@@ -73,131 +55,81 @@ export const LoginPage: React.FC = () => {
         <p className="text-xs text-slate-400 mt-1">Intelligent AI Music Discovery & Playlist Platform</p>
       </div>
 
-      {isClerkConfigured && !useLocalAuth ? (
-        <div className="w-full max-w-md space-y-4">
-          <SignIn
-            appearance={{
-              elements: {
-                rootBox: 'w-full max-w-md',
-                card: 'bg-slate-900 border border-slate-800 shadow-2xl text-white rounded-2xl',
-                headerTitle: 'text-white font-bold',
-                headerSubtitle: 'text-slate-400',
-                socialButtonsBlockButton: 'bg-slate-800 border-slate-700 text-white hover:bg-slate-700',
-                socialButtonsBlockButtonText: 'text-white font-medium',
-                dividerLine: 'bg-slate-800',
-                dividerText: 'text-slate-500',
-                formButtonPrimary: 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30',
-                formFieldLabel: 'text-slate-300',
-                formFieldInput: 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500',
-                footerActionText: 'text-slate-400',
-                footerActionLink: 'text-indigo-400 hover:text-indigo-300',
-              },
-            }}
-            routing="path"
-            path="/login"
-            signUpUrl="/register"
-            fallbackRedirectUrl="/"
-          />
-
-          <div className="text-center pt-2">
-            <button
-              type="button"
-              onClick={() => setUseLocalAuth(true)}
-              className="text-xs text-slate-400 hover:text-indigo-400 transition-colors underline"
-            >
-              Or sign in with email & password
-            </button>
-          </div>
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-white">Welcome Back</h2>
+          <p className="text-xs text-slate-400 mt-1">Enter your credentials to continue</p>
         </div>
-      ) : (
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-white">Welcome Back</h2>
-            <p className="text-xs text-slate-400 mt-1">Enter your credentials to continue</p>
+
+        {error && (
+          <div className="p-3 bg-rose-950/60 border border-rose-800/80 rounded-xl text-rose-300 text-xs">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleStandardLogin} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Email Address</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-600"
+            />
           </div>
 
-          {error && (
-            <div className="p-3 bg-rose-950/60 border border-rose-800/80 rounded-xl text-rose-300 text-xs">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleStandardLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Email Address</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-600"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-600"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/30 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Signing in...</span>
-                </>
-              ) : (
-                <span>Sign In</span>
-              )}
-            </button>
-          </form>
-
-          <div className="relative flex py-1 items-center">
-            <div className="flex-grow border-t border-slate-800"></div>
-            <span className="flex-shrink mx-3 text-slate-500 text-xs">OR</span>
-            <div className="flex-grow border-t border-slate-800"></div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-600"
+            />
           </div>
 
           <button
-            type="button"
-            onClick={handleDemoLogin}
+            type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs rounded-xl border border-slate-700 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/30 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>⚡ Quick Demo Login</span>
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <span>Sign In</span>
+            )}
           </button>
+        </form>
 
-          {isClerkConfigured && (
-            <div className="text-center pt-1">
-              <button
-                type="button"
-                onClick={() => setUseLocalAuth(false)}
-                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors underline"
-              >
-                ← Back to Clerk Auth
-              </button>
-            </div>
-          )}
-
-          <div className="text-center text-xs text-slate-400">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-semibold">
-              Sign up
-            </Link>
-          </div>
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-slate-800"></div>
+          <span className="flex-shrink mx-3 text-slate-500 text-xs">OR</span>
+          <div className="flex-grow border-t border-slate-800"></div>
         </div>
-      )}
+
+        <button
+          type="button"
+          onClick={handleDemoLogin}
+          disabled={isLoading}
+          className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs rounded-xl border border-slate-700 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <span>⚡ Quick Demo Login</span>
+        </button>
+
+        <div className="text-center text-xs text-slate-400">
+          Don't have an account?{' '}
+          <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-semibold">
+            Sign up
+          </Link>
+        </div>
+      </div>
     </div>
   );
 };

@@ -10,7 +10,6 @@
     "seed": "tsx src/seed.ts"
   },
   "dependencies": {
-    "@clerk/express": "^2.1.61",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import { getAuth } from '@clerk/express';
 import { verifyToken } from '../utils/jwt.js';
 import { User, IUser } from '../models/User.js';
 
@@ -18,30 +17,6 @@ export const protect = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  // 1. Check for Clerk Authentication first
-  try {
-    const auth = getAuth(req);
-    if (auth && auth.userId) {
-      let user = await User.findOne({ clerkId: auth.userId });
-      if (!user) {
-        // Auto-provision user record for Clerk authenticated user
-        user = await User.create({
-          clerkId: auth.userId,
-          name: 'Clerk User',
-          email: `${auth.userId}@clerk.harmonyai.local`,
-          likedSongs: [],
-          favoriteArtists: [],
-          favoriteGenres: [],
-        });
-      }
-      req.user = user as IUser;
-      return next();
-    }
-  } catch {
-    // Clerk check passed through or not configured
-  }
-
-  // 2. Fall back to standard JWT Bearer token
   const token = extractBearerToken(req);
 
   if (!token) {
@@ -79,21 +54,6 @@ export const optionalAuth = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  // 1. Check Clerk Auth
-  try {
-    const auth = getAuth(req);
-    if (auth && auth.userId) {
-      let user = await User.findOne({ clerkId: auth.userId });
-      if (user) {
-        req.user = user as IUser;
-        return next();
-      }
-    }
-  } catch {
-    // Ignore
-  }
-
-  // 2. Check standard JWT
   const token = extractBearerToken(req);
 
   if (!token) {
@@ -111,4 +71,3 @@ export const optionalAuth = async (
   }
   next();
 };
-

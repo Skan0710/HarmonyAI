@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
-import { SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import { searchGlobal } from '../services/searchService';
 import type { GroupedSearchResults } from '../services/searchService';
 import { SearchSuggestionsDropdown } from './SearchSuggestionsDropdown';
@@ -59,53 +58,61 @@ export const Navbar: React.FC = () => {
     if (navSearch.trim()) {
       addSearch(navSearch.trim());
       navigate(`/search?q=${encodeURIComponent(navSearch.trim())}`);
-      setNavSearch('');
       setIsFocused(false);
     }
   };
 
-  const handleSelectRecent = (searchTerm: string) => {
-    addSearch(searchTerm);
-    navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
-    setNavSearch('');
+  const handleSelectRecent = (term: string) => {
+    setNavSearch(term);
+    addSearch(term);
+    navigate(`/search?q=${encodeURIComponent(term)}`);
     setIsFocused(false);
   };
 
-  const getInitials = (name: string): string => {
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
     return name
       .split(' ')
-      .map((part) => part[0])
+      .map((part) => part.charAt(0))
       .join('')
       .toUpperCase()
-      .slice(0, 2);
+      .substring(0, 2);
   };
 
   return (
-    <header className="h-16 bg-slate-900 text-white flex items-center justify-between px-4 sm:px-6 border-b border-slate-800 shadow-sm gap-4 relative z-40">
-      {/* Brand Logo */}
-      <div className="flex items-center gap-3 shrink-0">
-        <Link to="/" className="font-bold text-xl tracking-wide text-white hover:text-indigo-400 transition-colors flex items-center gap-2">
-          <span className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-black text-sm shadow-md shadow-indigo-600/50">H</span>
-          <span className="hidden sm:inline">HarmonyAI</span>
-        </Link>
+    <header className="h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-6 sticky top-0 z-30">
+      {/* Mobile Nav Toggle Button */}
+      <div className="flex items-center gap-3">
+        <span className="font-bold text-white tracking-wide text-lg md:hidden">HarmonyAI</span>
       </div>
 
-      {/* Global Navbar Quick Search Input with Live Suggestions */}
-      <div ref={searchContainerRef} className="flex-1 max-w-xs sm:max-w-md relative">
-        <form onSubmit={handleSearchSubmit}>
-          <div className="relative flex items-center">
-            <svg className="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              value={navSearch}
-              onChange={(e) => setNavSearch(e.target.value)}
-              onFocus={() => setIsFocused(true)}
-              placeholder="Search songs, artists..."
-              className="w-full pl-9 pr-3 py-1.5 bg-slate-800/80 border border-slate-700/70 focus:border-indigo-500 rounded-full text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+      {/* Global Instant Search Bar */}
+      <div ref={searchContainerRef} className="relative flex-1 max-w-lg mx-4">
+        <form onSubmit={handleSearchSubmit} className="relative">
+          <input
+            type="text"
+            value={navSearch}
+            onChange={(e) => setNavSearch(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            placeholder="Search songs, artists, albums, or vibes..."
+            className="w-full bg-slate-950/80 text-white placeholder-slate-500 pl-10 pr-4 py-2 rounded-full text-sm border border-slate-700/60 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner"
+          />
+          <svg
+            className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
-          </div>
+          </svg>
+          {loading && (
+            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+          )}
         </form>
 
         {isFocused && (
@@ -119,58 +126,43 @@ export const Navbar: React.FC = () => {
         )}
       </div>
 
-      {/* Right User Actions with Clerk Auth Controls */}
+      {/* Right User Actions */}
       <div className="flex items-center gap-4 text-sm shrink-0">
-        <SignedIn>
+        {isAuthenticated && user ? (
           <div className="flex items-center gap-3">
-            <UserButton
-              appearance={{
-                elements: {
-                  userButtonAvatarBox: 'w-8 h-8 rounded-full ring-2 ring-indigo-500/50',
-                },
-              }}
-            />
-          </div>
-        </SignedIn>
-
-        <SignedOut>
-          {isAuthenticated && user ? (
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700/60">
-                <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">
-                  {getInitials(user.name)}
-                </div>
-                <span className="text-slate-200 font-medium text-xs hidden md:inline">
-                  {user.name}
-                </span>
+            <div className="flex items-center gap-2 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700/60">
+              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">
+                {getInitials(user.name)}
               </div>
-              <button
-                onClick={handleLogout}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 rounded-lg text-xs font-medium border border-slate-700/80 hover:border-rose-700/60 transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Sign Out"
-              >
-                <span>Sign Out</span>
-              </button>
+              <span className="text-slate-200 font-medium text-xs hidden md:inline">
+                {user.name}
+              </span>
             </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Link
-                to="/login"
-                className="px-3 py-1.5 text-slate-300 hover:text-white text-xs font-medium transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/register"
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors shadow-sm"
-              >
-                Register
-              </Link>
-            </div>
-          )}
-        </SignedOut>
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 rounded-lg text-xs font-medium border border-slate-700/80 hover:border-rose-700/60 transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Sign Out"
+            >
+              <span>Sign Out</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <Link
+              to="/login"
+              className="px-3 py-1.5 text-slate-300 hover:text-white text-xs font-medium transition-colors"
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/register"
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors shadow-sm"
+            >
+              Register
+            </Link>
+          </div>
+        )}
       </div>
     </header>
   );
 };
-
