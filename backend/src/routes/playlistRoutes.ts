@@ -13,8 +13,9 @@ import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
-// AI Playlist Generation Endpoint (In-memory pipeline, does not save to DB)
-router.post('/ai-generate', optionalAuth, generateAIPlaylistEndpoint);
+// AI Playlist Generation Endpoints (Authenticated, In-memory generation pipeline)
+router.post('/ai-generate', protect, generateAIPlaylistEndpoint);
+router.post('/generate', protect, generateAIPlaylistEndpoint);
 
 // Protected & Public Playlist Routes
 router.post('/', protect, createPlaylist);
