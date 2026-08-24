@@ -1,80 +1,44 @@
 import { Request, Response } from 'express';
 import { HistoryService } from '../services/historyService.js';
+import { controllerWrapper, ensureAuth } from '../utils/controllerHelpers.js';
+import { extractQueryParams } from '../utils/validators.js';
 
-export const recordPlayback = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: 'Unauthorized access',
-      });
-      return;
-    }
+export const recordPlayback = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
 
-    const { songId } = req.params;
-    const historyItem = await HistoryService.recordPlayback(req.user._id.toString(), songId);
+  const { songId } = req.params;
+  const historyItem = await HistoryService.recordPlayback(user._id.toString(), songId);
 
-    res.status(200).json({
-      success: true,
-      message: 'Playback recorded successfully',
-      data: historyItem,
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message || 'Failed to record playback',
-    });
-  }
-};
+  res.status(200).json({
+    success: true,
+    message: 'Playback recorded successfully',
+    data: historyItem,
+  });
+});
 
-export const getListeningHistory = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: 'Unauthorized access',
-      });
-      return;
-    }
+export const getListeningHistory = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
 
-    const limit = parseInt(req.query.limit as string, 10) || 50;
-    const history = await HistoryService.getListeningHistory(req.user._id.toString(), limit);
+  const q = extractQueryParams(req, { limit: 'int' });
+  const history = await HistoryService.getListeningHistory(user._id.toString(), q.limit || 50);
 
-    res.status(200).json({
-      success: true,
-      data: history,
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch listening history',
-      error: error.message,
-    });
-  }
-};
+  res.status(200).json({
+    success: true,
+    data: history,
+  });
+});
 
-export const getRecentlyPlayed = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: 'Unauthorized access',
-      });
-      return;
-    }
+export const getRecentlyPlayed = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
 
-    const limit = parseInt(req.query.limit as string, 10) || 20;
-    const songs = await HistoryService.getRecentlyPlayed(req.user._id.toString(), limit);
+  const q = extractQueryParams(req, { limit: 'int' });
+  const songs = await HistoryService.getRecentlyPlayed(user._id.toString(), q.limit || 20);
 
-    res.status(200).json({
-      success: true,
-      data: songs,
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch recently played songs',
-      error: error.message,
-    });
-  }
-};
+  res.status(200).json({
+    success: true,
+    data: songs,
+  });
+});
