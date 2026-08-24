@@ -10,6 +10,11 @@ import {
   getGenreDiversityWeights,
 } from '../config/recommendationConfig.js';
 import { ListeningSession } from '../models/ListeningSession.js';
+import {
+  PlaylistSequencingService,
+  SequencingStrategy,
+  SequencingDiagnostics,
+} from './playlistSequencingService.js';
 
 export interface PlaylistDurationConfig {
   defaultToleranceSeconds: number; // default: 120 seconds (2 mins)
@@ -54,6 +59,7 @@ export interface AIPlaylistGenerationInput {
   noveltyPreference?: number; // 0.0 (familiar) to 1.0 (novel discoveries)
   discoveryPercentage?: number; // 0 to 100% discovery ratio (takes precedence or maps to noveltyPreference)
   diversityPreference?: number; // 0.0 (tight focus) to 1.0 (eclectic mix)
+  sequencingStrategy?: SequencingStrategy; // 'balanced' | 'energetic' | 'gradual' | 'discovery' (default: 'balanced')
   maxSongsPerArtist?: number; // max tracks per artist (default: 2)
   maxConsecutiveSameArtist?: number; // max consecutive tracks by same artist (default: 1)
   customNoveltyWeights?: Partial<NoveltyScoringWeights>;
@@ -102,6 +108,7 @@ export interface DedicatedAIPlaylistResult {
   candidateCountEvaluated: number;
   durationDiagnostics?: DurationOptimizationDiagnostics;
   diversityDiagnostics?: PlaylistDiversityDiagnostics;
+  sequencingDiagnostics?: SequencingDiagnostics;
   generatedAt: Date;
 }
 
@@ -109,7 +116,8 @@ export class DedicatedPlaylistGenerationService {
   /**
    * Generates a curated playlist using the existing HarmonyAI recommendation engine,
    * factoring in user mood, activity, preferred genres/artists, target duration,
-   * novelty preference, diversity preference, discovery percentage, and skip avoidance.
+   * novelty preference, diversity preference, discovery percentage, skip avoidance,
+   * and intelligent sequencing.
    */
   static async generatePlaylist(
     input: AIPlaylistGenerationInput
@@ -127,6 +135,7 @@ export class DedicatedPlaylistGenerationService {
       noveltyPreference = 0.5,
       discoveryPercentage,
       diversityPreference = 0.5,
+      sequencingStrategy = 'balanced',
       maxSongsPerArtist = 2,
       maxConsecutiveSameArtist = 1,
       customNoveltyWeights,
@@ -345,7 +354,7 @@ export class DedicatedPlaylistGenerationService {
     }
 
     // 8. Duration-Aware Track Selection & Strict Duplicate Prevention
-    const selectedTracks: GeneratedPlaylistTrack[] = [];
+    const rawSelectedTracks: GeneratedPlaylistTrack[] = [];
     const selectedSongIdSet = new Set<string>();
     let duplicatesPrevented = 0;
     let currentDurationSeconds = 0;
@@ -377,7 +386,7 @@ export class DedicatedPlaylistGenerationService {
         }
 
         selectedSongIdSet.add(songId);
-        selectedTracks.push(this.formatTrack(res, duration));
+        rawSelectedTracks.push(this.formatTrack(res, duration));
         currentDurationSeconds += duration;
 
         if (currentDurationSeconds >= minAllowedSeconds) {
@@ -389,7 +398,7 @@ export class DedicatedPlaylistGenerationService {
       }
     } else {
       for (const res of rankedResults) {
-        if (selectedTracks.length >= desiredCount) break;
+        if (rawSelectedTracks.length >= desiredCount) break;
 
         const song = res.song;
         if (!song) continue;
@@ -406,12 +415,16 @@ export class DedicatedPlaylistGenerationService {
           typeof song.duration === 'number' && song.duration > 0 ? song.duration : 210;
 
         selectedSongIdSet.add(songId);
-        selectedTracks.push(this.formatTrack(res, duration));
+        rawSelectedTracks.push(this.formatTrack(res, duration));
         currentDurationSeconds += duration;
       }
     }
 
-    // 9. Generate Diagnostics & Distributions
+    // 9. Intelligent Playlist Sequencing (Ordering by Strategy)
+    const { sequencedTracks: finalTracks, diagnostics: sequencingDiagnostics } =
+      PlaylistSequencingService.sequenceTracks(rawSelectedTracks, sequencingStrategy);
+
+    // 10. Generate Diagnostics & Distributions
     const totalMins = Math.floor(currentDurationSeconds / 60);
     const totalSecs = currentDurationSeconds % 60;
     const totalDurationFormatted = `${totalMins}m ${totalSecs}s`;
@@ -433,7 +446,7 @@ export class DedicatedPlaylistGenerationService {
     const artistDistribution: Record<string, number> = {};
     const genreDistribution: Record<string, number> = {};
 
-    for (const t of selectedTracks) {
+    for (const t of finalTracks) {
       artistDistribution[t.artist] = (artistDistribution[t.artist] || 0) + 1;
       genreDistribution[t.genre] = (genreDistribution[t.genre] || 0) + 1;
     }
@@ -447,7 +460,7 @@ export class DedicatedPlaylistGenerationService {
       recentSkipsFiltered,
     };
 
-    // 10. Generate Playlist Title & Description
+    // 11. Generate Playlist Title & Description
     const titleParts = [mood, activity, preferredGenres[0]].filter(Boolean);
     const title =
       titleParts.length > 0
@@ -458,7 +471,7 @@ export class DedicatedPlaylistGenerationService {
         ? `${targetDurationMinutes}-Min Curated Mix`
         : 'AI Curated Playlist';
 
-    const description = `AI curated ${selectedTracks.length}-track mix for ${
+    const description = `AI curated ${finalTracks.length}-track mix for ${
       activity || mood || 'your listening session'
     } (${totalDurationFormatted}).`;
 
@@ -466,13 +479,14 @@ export class DedicatedPlaylistGenerationService {
       title,
       description,
       preferences: input,
-      tracks: selectedTracks,
+      tracks: finalTracks,
       totalDurationSeconds: currentDurationSeconds,
       totalDurationFormatted,
-      trackCount: selectedTracks.length,
+      trackCount: finalTracks.length,
       candidateCountEvaluated: candidateMap.size,
       durationDiagnostics,
       diversityDiagnostics,
+      sequencingDiagnostics,
       generatedAt: new Date(),
     };
   }
