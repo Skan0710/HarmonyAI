@@ -18,6 +18,19 @@ export interface UpdatePlaylistInput {
   isCollaborative?: boolean;
 }
 
+/**
+ * Shared population config for songs inside playlists.
+ * Avoids repeating the same populate chain across multiple queries.
+ */
+const SONG_POPULATE_OPTIONS = {
+  path: 'songs',
+  populate: [
+    { path: 'artist', select: 'name profileImage avatar verified' },
+    { path: 'album', select: 'title coverImage releaseYear' },
+    { path: 'genre', select: 'name slug' },
+  ],
+};
+
 export class PlaylistService {
   static async createPlaylist(ownerId: string, data: CreatePlaylistInput): Promise<IPlaylist> {
     const playlist = new Playlist({
@@ -36,14 +49,7 @@ export class PlaylistService {
       $or: [{ owner: userObjectId }, { collaborators: userObjectId }],
     })
       .populate('owner', 'name profilePicture')
-      .populate({
-        path: 'songs',
-        populate: [
-          { path: 'artist', select: 'name profileImage avatar verified' },
-          { path: 'album', select: 'title coverImage releaseYear' },
-          { path: 'genre', select: 'name slug' },
-        ],
-      })
+      .populate(SONG_POPULATE_OPTIONS)
       .sort({ updatedAt: -1 })
       .lean();
   }
@@ -54,14 +60,7 @@ export class PlaylistService {
     const playlist = await Playlist.findById(playlistId)
       .populate('owner', 'name profilePicture email')
       .populate('collaborators', 'name profilePicture')
-      .populate({
-        path: 'songs',
-        populate: [
-          { path: 'artist', select: 'name profileImage avatar verified' },
-          { path: 'album', select: 'title coverImage releaseYear' },
-          { path: 'genre', select: 'name slug' },
-        ],
-      })
+      .populate(SONG_POPULATE_OPTIONS)
       .lean();
 
     if (!playlist) return null;
@@ -150,14 +149,7 @@ export class PlaylistService {
       { new: true }
     )
       .populate('owner', 'name profilePicture')
-      .populate({
-        path: 'songs',
-        populate: [
-          { path: 'artist', select: 'name profileImage avatar verified' },
-          { path: 'album', select: 'title coverImage releaseYear' },
-          { path: 'genre', select: 'name slug' },
-        ],
-      })
+      .populate(SONG_POPULATE_OPTIONS)
       .lean();
 
     return updated;
@@ -190,14 +182,7 @@ export class PlaylistService {
       { new: true }
     )
       .populate('owner', 'name profilePicture')
-      .populate({
-        path: 'songs',
-        populate: [
-          { path: 'artist', select: 'name profileImage avatar verified' },
-          { path: 'album', select: 'title coverImage releaseYear' },
-          { path: 'genre', select: 'name slug' },
-        ],
-      })
+      .populate(SONG_POPULATE_OPTIONS)
       .lean();
 
     return updated;

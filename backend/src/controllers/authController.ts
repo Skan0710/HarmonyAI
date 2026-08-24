@@ -1,84 +1,60 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/authService.js';
+import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const register = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { name, email, password, profilePicture } = req.body;
+export const register = controllerWrapper(async (req: Request, res: Response) => {
+  const { name, email, password, profilePicture } = req.body;
 
-    // Validation
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      res.status(400).json({ success: false, message: 'Name is required' });
-      return;
-    }
-
-    if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
-      res.status(400).json({ success: false, message: 'A valid email address is required' });
-      return;
-    }
-
-    if (!password || typeof password !== 'string' || password.length < 6) {
-      res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
-      return;
-    }
-
-    const result = await AuthService.register({
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      password,
-      profilePicture,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      data: result,
-    });
-  } catch (error) {
-    const err = error as Error & { statusCode?: number };
-    const statusCode = err.statusCode || 500;
-    res.status(statusCode).json({
-      success: false,
-      message: err.message || 'Server error during registration',
-    });
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    throw new ControllerError(400, 'Name is required');
   }
-};
 
-export const login = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email, password } = req.body;
-
-    // Validation
-    if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
-      res.status(400).json({ success: false, message: 'A valid email address is required' });
-      return;
-    }
-
-    if (!password || typeof password !== 'string') {
-      res.status(400).json({ success: false, message: 'Password is required' });
-      return;
-    }
-
-    const result = await AuthService.login({
-      email: email.trim().toLowerCase(),
-      password,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      data: result,
-    });
-  } catch (error) {
-    const err = error as Error & { statusCode?: number };
-    const statusCode = err.statusCode || 401;
-    res.status(statusCode).json({
-      success: false,
-      message: err.message || 'Invalid credentials',
-    });
+  if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
+    throw new ControllerError(400, 'A valid email address is required');
   }
-};
+
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    throw new ControllerError(400, 'Password must be at least 6 characters long');
+  }
+
+  const result = await AuthService.register({
+    name: name.trim(),
+    email: email.trim().toLowerCase(),
+    password,
+    profilePicture,
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'User registered successfully',
+    data: result,
+  });
+});
+
+export const login = controllerWrapper(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
+    throw new ControllerError(400, 'A valid email address is required');
+  }
+
+  if (!password || typeof password !== 'string') {
+    throw new ControllerError(400, 'Password is required');
+  }
+
+  const result = await AuthService.login({
+    email: email.trim().toLowerCase(),
+    password,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Login successful',
+    data: result,
+  });
+});
 
 export const getMe = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json({

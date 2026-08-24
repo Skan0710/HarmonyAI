@@ -7,75 +7,48 @@ import { ContextAwareRecommendationService } from '../services/contextAwareRecom
 import { ContextualAssistantService } from '../services/contextualAssistantService.js';
 import { SessionRecommendationService } from '../services/sessionRecommendationService.js';
 import { SmartAutoplayService } from '../services/smartAutoplayService.js';
+import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
+import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
 
-export const getSimilarSongs = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { songId } = req.params;
+export const getSimilarSongs = controllerWrapper(async (req: Request, res: Response) => {
+  const { songId } = req.params;
 
-    if (!songId || !Types.ObjectId.isValid(songId)) {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid song ID format',
-      });
-      return;
-    }
-
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
-    const parsedLimit = isNaN(limit) || limit < 1 ? 10 : limit;
-
-    // Enable debugging only when debug=true query parameter is passed AND not in production
-    const isDebugMode =
-      req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
-
-    const recommendations = await ContentRecommendationService.getRecommendationsForSong(
-      songId,
-      parsedLimit,
-      isDebugMode
-    );
-
-    res.status(200).json({
-      success: true,
-      data: recommendations,
-      ...(isDebugMode ? { debug: { isDebugEnabled: true, evaluatedCandidates: recommendations.length } } : {}),
-    });
-  } catch (error: any) {
-    if (error.message === 'Seed song not found' || error.message === 'Song not found') {
-      res.status(404).json({
-        success: false,
-        message: 'Seed song not found',
-      });
-      return;
-    }
-
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch similar song recommendations',
-    });
+  if (!songId || !Types.ObjectId.isValid(songId)) {
+    throw new ControllerError(400, 'Invalid song ID format');
   }
-};
 
-export const getCollaborativeRecommendations = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+  const q = extractQueryParams(req, { limit: 'int' });
+  const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 10 : q.limit;
+
+  const isDebugMode =
+    req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
+
+  const recommendations = await ContentRecommendationService.getRecommendationsForSong(
+    songId,
+    parsedLimit,
+    isDebugMode
+  );
+
+  res.status(200).json({
+    success: true,
+    data: recommendations,
+    ...(isDebugMode ? { debug: { isDebugEnabled: true, evaluatedCandidates: recommendations.length } } : {}),
+  });
+});
+
+export const getCollaborativeRecommendations = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
+
+  const q = extractQueryParams(req, { limit: 'int' });
+  const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 10 : q.limit;
+
+  const isDebugMode =
+    req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
+
   try {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: 'Unauthorized access. Authentication token required.',
-      });
-      return;
-    }
-
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
-    const parsedLimit = isNaN(limit) || limit < 1 ? 10 : limit;
-
-    // Enable debugging only when debug=true query parameter is passed AND not in production
-    const isDebugMode =
-      req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
-
     const result = await CollaborativeFilteringService.getRecommendationsForUser(
-      req.user._id.toString(),
+      user._id.toString(),
       parsedLimit,
       20,
       isDebugMode
@@ -85,10 +58,7 @@ export const getCollaborativeRecommendations = async (
       res.status(200).json({
         success: true,
         data: result.recommendations,
-        debug: {
-          isDebugEnabled: true,
-          diagnostics: result.diagnostics,
-        },
+        debug: { isDebugEnabled: true, diagnostics: result.diagnostics },
       });
       return;
     }
@@ -98,42 +68,30 @@ export const getCollaborativeRecommendations = async (
       data: Array.isArray(result) ? result : [],
     });
   } catch (error: any) {
-    // Handle cold start users or insufficient history gracefully by returning empty array
+    // Cold start / insufficient history → return empty array (not an error)
     res.status(200).json({
       success: true,
       data: [],
       message: error.message || 'Insufficient listening history for collaborative recommendations',
     });
   }
-};
+});
 
-export const getHybridRecommendations = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const getHybridRecommendations = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
+
+  const q = extractQueryParams(req, { limit: 'int' });
+  const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 10 : q.limit;
+
+  const seedSongId = req.query.seedSongId ? String(req.query.seedSongId) : undefined;
+  if (seedSongId && !Types.ObjectId.isValid(seedSongId)) {
+    throw new ControllerError(400, 'Invalid seed song ID format');
+  }
+
   try {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: 'Unauthorized access. Authentication token required.',
-      });
-      return;
-    }
-
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
-    const parsedLimit = isNaN(limit) || limit < 1 ? 10 : limit;
-
-    const seedSongId = req.query.seedSongId ? String(req.query.seedSongId) : undefined;
-    if (seedSongId && !Types.ObjectId.isValid(seedSongId)) {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid seed song ID format',
-      });
-      return;
-    }
-
     const result = await HybridRecommendationService.getHybridRecommendations({
-      userId: req.user._id.toString(),
+      userId: user._id.toString(),
       seedSongId,
       limit: parsedLimit,
     });
@@ -146,7 +104,7 @@ export const getHybridRecommendations = async (
       data: result.recommendations || [],
     });
   } catch (error: any) {
-    // Never crash recommendation API for users with insufficient data
+    // Cold start fallback → return empty array (not an error)
     res.status(200).json({
       success: true,
       strategyUsed: 'COLD_START',
@@ -156,34 +114,31 @@ export const getHybridRecommendations = async (
       message: error.message || 'Failed to fetch hybrid recommendations safely',
     });
   }
-};
+});
 
-export const getContextualRecommendations = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const getContextualRecommendations = controllerWrapper(async (req: Request, res: Response) => {
+  const q = extractQueryParams(req, { limit: 'int' });
+  const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 10 : Math.min(50, q.limit);
+
+  const mood = req.query.mood ? String(req.query.mood) : undefined;
+  const activity = req.query.activity ? String(req.query.activity) : undefined;
+
+  const energyParam = req.query.energy || req.query.energyLevel;
+  const energyLevel =
+    energyParam && !isNaN(parseFloat(String(energyParam)))
+      ? parseFloat(String(energyParam))
+      : undefined;
+
+  const durationParam =
+    req.query.duration || req.query.durationMinutes || req.query.preferredDurationMinutes;
+  const durationMinutes =
+    durationParam && !isNaN(parseInt(String(durationParam), 10))
+      ? parseInt(String(durationParam), 10)
+      : undefined;
+
+  const userId = req.user?._id?.toString();
+
   try {
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
-    const parsedLimit = isNaN(limit) || limit < 1 ? 10 : Math.min(50, limit);
-
-    const mood = req.query.mood ? String(req.query.mood) : undefined;
-    const activity = req.query.activity ? String(req.query.activity) : undefined;
-
-    const energyParam = req.query.energy || req.query.energyLevel;
-    const energyLevel =
-      energyParam && !isNaN(parseFloat(String(energyParam)))
-        ? parseFloat(String(energyParam))
-        : undefined;
-
-    const durationParam =
-      req.query.duration || req.query.durationMinutes || req.query.preferredDurationMinutes;
-    const durationMinutes =
-      durationParam && !isNaN(parseInt(String(durationParam), 10))
-        ? parseInt(String(durationParam), 10)
-        : undefined;
-
-    const userId = req.user?._id?.toString();
-
     const result = await ContextAwareRecommendationService.getContextualRecommendations({
       userId,
       mood,
@@ -202,6 +157,7 @@ export const getContextualRecommendations = async (
       data: result.data || [],
     });
   } catch (error: any) {
+    // Fallback → return empty array (not an error)
     res.status(200).json({
       success: true,
       strategyUsed: 'COLD_START',
@@ -212,67 +168,44 @@ export const getContextualRecommendations = async (
       message: error.message || 'Contextual recommendations generated fallback response',
     });
   }
-};
+});
 
-export const processContextualAssistantRequest = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { prompt, limit } = req.body;
+export const processContextualAssistantRequest = controllerWrapper(async (req: Request, res: Response) => {
+  const { prompt, limit } = req.body;
 
-    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
-      res.status(400).json({
-        success: false,
-        message: 'Prompt string is required',
-      });
-      return;
-    }
-
-    const parsedLimit = limit && !isNaN(parseInt(String(limit), 10)) ? parseInt(String(limit), 10) : 10;
-    const userId = req.user?._id?.toString();
-
-    const result = await ContextualAssistantService.processAssistantRequest({
-      userPrompt: prompt.trim(),
-      userId,
-      limit: parsedLimit,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Contextual assistant request processed successfully',
-      data: result,
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to process contextual assistant request',
-    });
+  if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+    throw new ControllerError(400, 'Prompt string is required');
   }
-};
 
-export const getSessionRecommendations = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+  const parsedLimit = limit && !isNaN(parseInt(String(limit), 10)) ? parseInt(String(limit), 10) : 10;
+  const userId = req.user?._id?.toString();
+
+  const result = await ContextualAssistantService.processAssistantRequest({
+    userPrompt: prompt.trim(),
+    userId,
+    limit: parsedLimit,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Contextual assistant request processed successfully',
+    data: result,
+  });
+});
+
+export const getSessionRecommendations = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
+
+  const q = extractQueryParams(req, { limit: 'int' });
+  const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 10 : Math.min(50, q.limit);
+
+  const isDebugMode =
+    req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
+
   try {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: 'Unauthorized access. Authentication token required.',
-      });
-      return;
-    }
-
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
-    const parsedLimit = isNaN(limit) || limit < 1 ? 10 : Math.min(50, limit);
-
-    // Enable debugging only when debug=true query parameter is passed AND not in production
-    const isDebugMode =
-      req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
-
     const result = await SessionRecommendationService.getSessionRecommendations({
-      userId: req.user._id.toString(),
+      userId: user._id.toString(),
       limit: parsedLimit,
       isDebugMode,
     });
@@ -288,6 +221,7 @@ export const getSessionRecommendations = async (
       ...(isDebugMode && result.diagnostics ? { diagnostics: result.diagnostics } : {}),
     });
   } catch (error: any) {
+    // Fallback → return empty array (not an error)
     res.status(200).json({
       success: true,
       hasActiveSession: false,
@@ -297,33 +231,24 @@ export const getSessionRecommendations = async (
       message: error.message || 'Session recommendations generated fallback response',
     });
   }
-};
+});
 
-export const getSmartAutoplayCandidates = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const getSmartAutoplayCandidates = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
+
+  const q = extractQueryParams(req, { limit: 'int' });
+  const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 5 : Math.min(25, q.limit);
+
+  const lastPlayedArtistId = req.query.lastPlayedArtistId ? String(req.query.lastPlayedArtistId) : undefined;
+  const excludeQueueParam = req.query.excludeQueue ? String(req.query.excludeQueue).split(',') : [];
+
+  const isDebugMode =
+    req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
+
   try {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: 'Unauthorized access. Authentication token required.',
-      });
-      return;
-    }
-
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 5;
-    const parsedLimit = isNaN(limit) || limit < 1 ? 5 : Math.min(25, limit);
-
-    const lastPlayedArtistId = req.query.lastPlayedArtistId ? String(req.query.lastPlayedArtistId) : undefined;
-    const excludeQueueParam = req.query.excludeQueue ? String(req.query.excludeQueue).split(',') : [];
-
-    // Enable debugging only when debug=true query parameter is passed AND not in production
-    const isDebugMode =
-      req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
-
     const result = await SmartAutoplayService.generateAutoplayCandidates({
-      userId: req.user._id.toString(),
+      userId: user._id.toString(),
       limit: parsedLimit,
       lastPlayedArtistId,
       currentQueueSongIds: excludeQueueParam,
@@ -338,6 +263,7 @@ export const getSmartAutoplayCandidates = async (
       ...(isDebugMode && result.diagnostics ? { diagnostics: result.diagnostics } : {}),
     });
   } catch (error: any) {
+    // Fallback → return empty array (not an error)
     res.status(200).json({
       success: true,
       strategyUsed: 'SMART_AUTOPLAY_FALLBACK',
@@ -346,4 +272,4 @@ export const getSmartAutoplayCandidates = async (
       message: error.message || 'Smart autoplay generated fallback response',
     });
   }
-};
+});
