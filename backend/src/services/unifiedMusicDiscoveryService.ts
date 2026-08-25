@@ -29,6 +29,17 @@ export interface NormalizedGenreSummary {
   slug?: string;
 }
 
+export interface RankingScoreBreakdown {
+  exactTitleMatch: number;
+  exactArtistMatch: number;
+  partialTextMatch: number;
+  artistRelevance: number;
+  albumRelevance: number;
+  semanticSimilarity: number;
+  popularityScore: number;
+  finalScore: number;
+}
+
 export interface NormalizedSongItem {
   type: 'song';
   id: string;
@@ -42,6 +53,7 @@ export interface NormalizedSongItem {
   audioUrl?: string;
   score: number;
   matchReason?: string;
+  rankingBreakdown?: RankingScoreBreakdown;
   source: DiscoverySourceType;
   sources: DiscoverySourceType[];
   raw?: any;
@@ -59,6 +71,7 @@ export interface NormalizedArtistItem {
   monthlyListeners?: number;
   score: number;
   matchReason?: string;
+  rankingBreakdown?: Partial<RankingScoreBreakdown>;
   source: DiscoverySourceType;
   sources: DiscoverySourceType[];
   raw?: any;
@@ -75,6 +88,7 @@ export interface NormalizedAlbumItem {
   trackCount?: number;
   score: number;
   matchReason?: string;
+  rankingBreakdown?: Partial<RankingScoreBreakdown>;
   source: DiscoverySourceType;
   sources: DiscoverySourceType[];
   raw?: any;
@@ -87,6 +101,7 @@ export interface UnifiedDiscoveryOptions {
   seedSongId?: string;
   limit?: number;
   includeEntities?: ('songs' | 'artists' | 'albums')[];
+  customRankingWeights?: Partial<UnifiedSearchRankingWeights>;
 }
 
 export interface UnifiedDiscoveryResponse {
@@ -110,7 +125,59 @@ export interface UnifiedDiscoveryResponse {
     hasResults: boolean;
     fallbackApplied: boolean;
     userState?: string;
+    rankingWeightsApplied: UnifiedSearchRankingWeights;
   };
+}
+
+/**
+ * Configurable weights for intelligent ranking of unified search results.
+ * Allows fine-tuning of exact match priorities, semantic signals, and popularity damping.
+ */
+export interface UnifiedSearchRankingWeights {
+  /** Weight for exact song or album title matches (Default: 0.35) */
+  exactTitleMatchWeight: number;
+  /** Weight for exact artist name matches (Default: 0.30) */
+  exactArtistMatchWeight: number;
+  /** Weight for partial substring and token overlap matching (Default: 0.15) */
+  partialTextMatchWeight: number;
+  /** Weight for artist authority/verification relevance (Default: 0.10) */
+  artistRelevanceWeight: number;
+  /** Weight for album contextual match relevance (Default: 0.05) */
+  albumRelevanceWeight: number;
+  /** Weight for vector semantic similarity when surfaced by semantic search (Default: 0.20) */
+  semanticSimilarityWeight: number;
+  /** Weight for popularity (play count, listeners) - strictly bounded to prevent query hijacking (Default: 0.08) */
+  popularityWeight: number;
+}
+
+const DEFAULT_UNIFIED_RANKING_WEIGHTS: UnifiedSearchRankingWeights = {
+  exactTitleMatchWeight: 0.35,
+  exactArtistMatchWeight: 0.30,
+  partialTextMatchWeight: 0.15,
+  artistRelevanceWeight: 0.10,
+  albumRelevanceWeight: 0.05,
+  semanticSimilarityWeight: 0.20,
+  popularityWeight: 0.08,
+};
+
+let activeUnifiedRankingWeights: UnifiedSearchRankingWeights = { ...DEFAULT_UNIFIED_RANKING_WEIGHTS };
+
+export function getUnifiedSearchRankingWeights(): UnifiedSearchRankingWeights {
+  return { ...activeUnifiedRankingWeights };
+}
+
+export function updateUnifiedSearchRankingWeights(
+  newWeights: Partial<UnifiedSearchRankingWeights>
+): UnifiedSearchRankingWeights {
+  activeUnifiedRankingWeights = {
+    ...activeUnifiedRankingWeights,
+    ...newWeights,
+  };
+  return { ...activeUnifiedRankingWeights };
+}
+
+export function resetUnifiedSearchRankingWeights(): void {
+  activeUnifiedRankingWeights = { ...DEFAULT_UNIFIED_RANKING_WEIGHTS };
 }
 
 export class UnifiedMusicDiscoveryService {
@@ -137,13 +204,297 @@ export class UnifiedMusicDiscoveryService {
   }
 
   /**
+   * Helper: Sanitizes string for normalized comparison (lowercasing, trimming, removing extra punctuation)
+   */
+  public static cleanText(text?: string): string {
+    if (!text || typeof text !== 'string') return '';
+    return text.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Helper: Computes token overlap Jaccard ratio between query and target string
+   */
+  public static calculateTokenOverlap(queryText: string, targetText: string): number {
+    const qTokens = new Set(this.cleanText(queryText).split(' ').filter(Boolean));
+    const tTokens = new Set(this.cleanText(targetText).split(' ').filter(Boolean));
+
+    if (qTokens.size === 0 || tTokens.size === 0) return 0;
+
+    let intersectionCount = 0;
+    for (const token of qTokens) {
+      if (tTokens.has(token)) {
+        intersectionCount++;
+      }
+    }
+
+    return intersectionCount / Math.max(qTokens.size, 1);
+  }
+
+  /**
+   * Intelligent Ranking Engine for Songs:
+   * Evaluates exact title, exact artist, partial text overlap, artist relevance,
+   * album relevance, semantic vector similarity, and bounded popularity.
+   *
+   * Exact matches receive guaranteed strong baseline priority (>= 0.90),
+   * ensuring popularity never overrides an exact user search query.
+   */
+  public static calculateSongRanking(
+    songDoc: any,
+    query: string,
+    semanticSimilarity: number = 0,
+    weights: UnifiedSearchRankingWeights = activeUnifiedRankingWeights
+  ): { finalScore: number; matchReason: string; breakdown: RankingScoreBreakdown } {
+    const cleanQuery = this.cleanText(query);
+    const cleanTitle = this.cleanText(songDoc?.title);
+    const artistName = typeof songDoc?.artist === 'object' ? songDoc?.artist?.name : songDoc?.artist;
+    const cleanArtist = this.cleanText(artistName);
+    const albumTitle = typeof songDoc?.album === 'object' ? songDoc?.album?.title : songDoc?.album;
+    const cleanAlbum = this.cleanText(albumTitle);
+
+    // 1. Exact Title Match Factor
+    const isExactTitle = cleanQuery && cleanTitle && cleanTitle === cleanQuery;
+    const exactTitleScore = isExactTitle ? 1.0 : 0.0;
+
+    // 2. Exact Artist Match Factor
+    const isExactArtist = cleanQuery && cleanArtist && cleanArtist === cleanQuery;
+    const exactArtistScore = isExactArtist ? 1.0 : 0.0;
+
+    // 3. Partial Text Match Factor (title substring / token overlap)
+    let partialTextScore = 0.0;
+    if (cleanQuery) {
+      if (cleanTitle.includes(cleanQuery) || cleanQuery.includes(cleanTitle)) {
+        partialTextScore = Math.max(partialTextScore, 0.85);
+      } else {
+        const overlap = this.calculateTokenOverlap(cleanQuery, cleanTitle);
+        partialTextScore = Math.max(partialTextScore, overlap * 0.75);
+      }
+    }
+
+    // 4. Artist Relevance Factor (artist match or partial artist overlap)
+    let artistRelevanceScore = 0.0;
+    if (cleanQuery && cleanArtist) {
+      if (cleanArtist.includes(cleanQuery) || cleanQuery.includes(cleanArtist)) {
+        artistRelevanceScore = 0.80;
+      } else {
+        const overlap = this.calculateTokenOverlap(cleanQuery, cleanArtist);
+        artistRelevanceScore = overlap * 0.60;
+      }
+    }
+    if (songDoc?.artist && typeof songDoc.artist === 'object' && songDoc.artist.verified) {
+      artistRelevanceScore = Math.min(1.0, artistRelevanceScore + 0.10);
+    }
+
+    // 5. Album Relevance Factor
+    let albumRelevanceScore = 0.0;
+    if (cleanQuery && cleanAlbum) {
+      if (cleanAlbum.includes(cleanQuery) || cleanQuery.includes(cleanAlbum)) {
+        albumRelevanceScore = 0.70;
+      } else {
+        albumRelevanceScore = this.calculateTokenOverlap(cleanQuery, cleanAlbum) * 0.50;
+      }
+    }
+
+    // 6. Semantic Similarity Factor (0 to 1)
+    const boundedSemantic = Math.max(0, Math.min(1.0, semanticSimilarity));
+
+    // 7. Popularity Factor (logarithmic normalization, strictly bounded to prevent override)
+    const playCount = Number(songDoc?.playCount) || 0;
+    const popularityScore = Math.max(0, Math.min(1.0, Math.log10(playCount + 1) / 5)); // 100,000 plays = 1.0
+
+    // Weighted linear combination of active ranking components
+    const weightedSum =
+      exactTitleScore * weights.exactTitleMatchWeight +
+      exactArtistScore * weights.exactArtistMatchWeight +
+      partialTextScore * weights.partialTextMatchWeight +
+      artistRelevanceScore * weights.artistRelevanceWeight +
+      albumRelevanceScore * weights.albumRelevanceWeight +
+      boundedSemantic * weights.semanticSimilarityWeight +
+      popularityScore * weights.popularityWeight;
+
+    // Normalizing denominator based on active weights
+    const totalWeights =
+      weights.exactTitleMatchWeight +
+      weights.exactArtistMatchWeight +
+      weights.partialTextMatchWeight +
+      weights.artistRelevanceWeight +
+      weights.albumRelevanceWeight +
+      weights.semanticSimilarityWeight +
+      weights.popularityWeight;
+
+    let finalScore = totalWeights > 0 ? weightedSum / totalWeights : 0.5;
+
+    // Exact Match Strong Priority Guard:
+    // If exact title or exact artist matches the query, guarantee strong score >= 0.90
+    if (isExactTitle) {
+      finalScore = Math.max(finalScore, 0.92 + 0.08 * popularityScore);
+    } else if (isExactArtist) {
+      finalScore = Math.max(finalScore, 0.88 + 0.08 * popularityScore);
+    }
+
+    // Strictly bound score in [0.0, 1.0]
+    finalScore = Number(Math.max(0.0, Math.min(1.0, finalScore)).toFixed(4));
+
+    // Formulate descriptive match reason
+    let matchReason = 'Catalog search result';
+    if (isExactTitle) {
+      matchReason = 'Exact song title match (100%)';
+    } else if (isExactArtist) {
+      matchReason = `Exact artist match: ${artistName}`;
+    } else if (boundedSemantic >= 0.65) {
+      matchReason = `Semantic query match (${Math.round(boundedSemantic * 100)}% similarity)`;
+    } else if (partialTextScore >= 0.7) {
+      matchReason = 'High keyword relevance';
+    } else if (popularityScore >= 0.6) {
+      matchReason = 'Popular trending match';
+    }
+
+    const breakdown: RankingScoreBreakdown = {
+      exactTitleMatch: exactTitleScore,
+      exactArtistMatch: exactArtistScore,
+      partialTextMatch: partialTextScore,
+      artistRelevance: artistRelevanceScore,
+      albumRelevance: albumRelevanceScore,
+      semanticSimilarity: boundedSemantic,
+      popularityScore,
+      finalScore,
+    };
+
+    return { finalScore, matchReason, breakdown };
+  }
+
+  /**
+   * Intelligent Ranking Engine for Artists:
+   * Prioritizes exact name matches, partial name/bio matches, and bounded listener popularity.
+   */
+  public static calculateArtistRanking(
+    artistDoc: any,
+    query: string,
+    semanticSimilarity: number = 0,
+    weights: UnifiedSearchRankingWeights = activeUnifiedRankingWeights
+  ): { finalScore: number; matchReason: string; breakdown: Partial<RankingScoreBreakdown> } {
+    const cleanQuery = this.cleanText(query);
+    const cleanName = this.cleanText(artistDoc?.name);
+    const cleanBio = this.cleanText(artistDoc?.bio);
+
+    const isExactName = cleanQuery && cleanName && cleanName === cleanQuery;
+    const exactNameScore = isExactName ? 1.0 : 0.0;
+
+    let partialTextScore = 0.0;
+    if (cleanQuery) {
+      if (cleanName.includes(cleanQuery) || cleanQuery.includes(cleanName)) {
+        partialTextScore = 0.85;
+      } else {
+        partialTextScore = this.calculateTokenOverlap(cleanQuery, cleanName) * 0.75;
+      }
+      if (cleanBio && (cleanBio.includes(cleanQuery) || this.calculateTokenOverlap(cleanQuery, cleanBio) > 0.3)) {
+        partialTextScore = Math.max(partialTextScore, 0.60);
+      }
+    }
+
+    const listeners = Number(artistDoc?.monthlyListeners) || 0;
+    const popularityScore = Math.max(0, Math.min(1.0, Math.log10(listeners + 1) / 7)); // 10M listeners = 1.0
+
+    let finalScore =
+      exactNameScore * 0.50 +
+      partialTextScore * 0.30 +
+      popularityScore * weights.popularityWeight +
+      semanticSimilarity * 0.12;
+
+    if (isExactName) {
+      finalScore = Math.max(finalScore, 0.95 + 0.05 * popularityScore);
+    }
+
+    finalScore = Number(Math.max(0.0, Math.min(1.0, finalScore)).toFixed(4));
+
+    const matchReason = isExactName
+      ? 'Exact artist name match (100%)'
+      : partialTextScore >= 0.7
+      ? 'Artist keyword match'
+      : 'Related artist discovery';
+
+    return {
+      finalScore,
+      matchReason,
+      breakdown: {
+        exactArtistMatch: exactNameScore,
+        partialTextMatch: partialTextScore,
+        popularityScore,
+        finalScore,
+      },
+    };
+  }
+
+  /**
+   * Intelligent Ranking Engine for Albums:
+   * Prioritizes exact title match, associated artist match, and release year recency.
+   */
+  public static calculateAlbumRanking(
+    albumDoc: any,
+    query: string,
+    semanticSimilarity: number = 0,
+    weights: UnifiedSearchRankingWeights = activeUnifiedRankingWeights
+  ): { finalScore: number; matchReason: string; breakdown: Partial<RankingScoreBreakdown> } {
+    const cleanQuery = this.cleanText(query);
+    const cleanTitle = this.cleanText(albumDoc?.title);
+    const artistName = typeof albumDoc?.artist === 'object' ? albumDoc?.artist?.name : albumDoc?.artist;
+    const cleanArtist = this.cleanText(artistName);
+
+    const isExactTitle = cleanQuery && cleanTitle && cleanTitle === cleanQuery;
+    const exactTitleScore = isExactTitle ? 1.0 : 0.0;
+
+    const isExactArtist = cleanQuery && cleanArtist && cleanArtist === cleanQuery;
+    const exactArtistScore = isExactArtist ? 1.0 : 0.0;
+
+    let partialTextScore = 0.0;
+    if (cleanQuery) {
+      if (cleanTitle.includes(cleanQuery) || cleanQuery.includes(cleanTitle)) {
+        partialTextScore = 0.80;
+      } else {
+        partialTextScore = this.calculateTokenOverlap(cleanQuery, cleanTitle) * 0.70;
+      }
+    }
+
+    let finalScore =
+      exactTitleScore * 0.45 +
+      exactArtistScore * 0.25 +
+      partialTextScore * 0.20 +
+      semanticSimilarity * 0.10;
+
+    if (isExactTitle) {
+      finalScore = Math.max(finalScore, 0.92);
+    } else if (isExactArtist) {
+      finalScore = Math.max(finalScore, 0.85);
+    }
+
+    finalScore = Number(Math.max(0.0, Math.min(1.0, finalScore)).toFixed(4));
+
+    const matchReason = isExactTitle
+      ? 'Exact album title match (100%)'
+      : isExactArtist
+      ? `Album by artist: ${artistName}`
+      : 'Album catalog match';
+
+    return {
+      finalScore,
+      matchReason,
+      breakdown: {
+        exactTitleMatch: exactTitleScore,
+        exactArtistMatch: exactArtistScore,
+        partialTextMatch: partialTextScore,
+        finalScore,
+      },
+    };
+  }
+
+  /**
    * Normalize any Song document into the unified NormalizedSongItem structure
    */
   public static normalizeSong(
     songDoc: any,
     source: DiscoverySourceType = 'keyword_search',
     score: number = 1.0,
-    matchReason?: string
+    matchReason?: string,
+    breakdown?: RankingScoreBreakdown
   ): NormalizedSongItem | null {
     if (!songDoc) return null;
 
@@ -223,6 +574,7 @@ export class UnifiedMusicDiscoveryService {
       audioUrl: songDoc.audioUrl,
       score: Number(score.toFixed(4)),
       matchReason: matchReason || (source === 'semantic_search' ? 'Semantic vector match' : 'Catalog match'),
+      rankingBreakdown: breakdown,
       source,
       sources: [source],
       raw: songDoc,
@@ -236,7 +588,8 @@ export class UnifiedMusicDiscoveryService {
     artistDoc: any,
     source: DiscoverySourceType = 'keyword_search',
     score: number = 1.0,
-    matchReason?: string
+    matchReason?: string,
+    breakdown?: Partial<RankingScoreBreakdown>
   ): NormalizedArtistItem | null {
     if (!artistDoc) return null;
 
@@ -263,6 +616,7 @@ export class UnifiedMusicDiscoveryService {
       monthlyListeners: artistDoc.monthlyListeners,
       score: Number(score.toFixed(4)),
       matchReason: matchReason || 'Artist catalog match',
+      rankingBreakdown: breakdown,
       source,
       sources: [source],
       raw: artistDoc,
@@ -276,7 +630,8 @@ export class UnifiedMusicDiscoveryService {
     albumDoc: any,
     source: DiscoverySourceType = 'keyword_search',
     score: number = 1.0,
-    matchReason?: string
+    matchReason?: string,
+    breakdown?: Partial<RankingScoreBreakdown>
   ): NormalizedAlbumItem | null {
     if (!albumDoc) return null;
 
@@ -328,6 +683,7 @@ export class UnifiedMusicDiscoveryService {
       trackCount: Array.isArray(albumDoc.songs) ? albumDoc.songs.length : albumDoc.trackCount,
       score: Number(score.toFixed(4)),
       matchReason: matchReason || 'Album catalog match',
+      rankingBreakdown: breakdown,
       source,
       sources: [source],
       raw: albumDoc,
@@ -336,7 +692,8 @@ export class UnifiedMusicDiscoveryService {
 
   /**
    * Main unified discovery entrypoint.
-   * Coordinates keyword search, semantic search, and recommendation services with deduplication and normalized formatting.
+   * Coordinates keyword search, semantic search, and recommendation services,
+   * applying multi-factor intelligent ranking, deduplication, and normalized formatting.
    */
   public static async discover(options: UnifiedDiscoveryOptions = {}): Promise<UnifiedDiscoveryResponse> {
     const startTime = Date.now();
@@ -347,7 +704,13 @@ export class UnifiedMusicDiscoveryService {
       seedSongId,
       limit = 10,
       includeEntities = ['songs', 'artists', 'albums'],
+      customRankingWeights,
     } = options;
+
+    const rankingWeights: UnifiedSearchRankingWeights = {
+      ...activeUnifiedRankingWeights,
+      ...customRankingWeights,
+    };
 
     const trimmedQuery = (query || '').trim();
     const safeLimit = Math.max(1, Math.min(50, limit));
@@ -367,12 +730,18 @@ export class UnifiedMusicDiscoveryService {
     // 1. Keyword Search Execution (if mode is 'all', 'keyword', or 'hybrid')
     if (trimmedQuery && (mode === 'all' || mode === 'keyword' || mode === 'hybrid')) {
       try {
-        const keywordResults: GroupedSearchResults = await searchCatalog(trimmedQuery, safeLimit);
+        const keywordResults: GroupedSearchResults = await searchCatalog(trimmedQuery, safeLimit * 2);
         sourcesUsed.push('keyword_search');
 
         if (searchSongs && Array.isArray(keywordResults.songs)) {
-          keywordResults.songs.forEach((s, idx) => {
-            const normalized = this.normalizeSong(s, 'keyword_search', 1.0 - idx * 0.02, 'Exact keyword text match');
+          keywordResults.songs.forEach((s) => {
+            const { finalScore, matchReason, breakdown } = this.calculateSongRanking(
+              s,
+              trimmedQuery,
+              0,
+              rankingWeights
+            );
+            const normalized = this.normalizeSong(s, 'keyword_search', finalScore, matchReason, breakdown);
             if (normalized) {
               this.mergeSong(songsMap, normalized);
             }
@@ -380,8 +749,14 @@ export class UnifiedMusicDiscoveryService {
         }
 
         if (searchArtists && Array.isArray(keywordResults.artists)) {
-          keywordResults.artists.forEach((a, idx) => {
-            const normalized = this.normalizeArtist(a, 'keyword_search', 1.0 - idx * 0.02, 'Artist keyword text match');
+          keywordResults.artists.forEach((a) => {
+            const { finalScore, matchReason, breakdown } = this.calculateArtistRanking(
+              a,
+              trimmedQuery,
+              0,
+              rankingWeights
+            );
+            const normalized = this.normalizeArtist(a, 'keyword_search', finalScore, matchReason, breakdown);
             if (normalized) {
               this.mergeArtist(artistsMap, normalized);
             }
@@ -389,8 +764,14 @@ export class UnifiedMusicDiscoveryService {
         }
 
         if (searchAlbums && Array.isArray(keywordResults.albums)) {
-          keywordResults.albums.forEach((al, idx) => {
-            const normalized = this.normalizeAlbum(al, 'keyword_search', 1.0 - idx * 0.02, 'Album keyword text match');
+          keywordResults.albums.forEach((al) => {
+            const { finalScore, matchReason, breakdown } = this.calculateAlbumRanking(
+              al,
+              trimmedQuery,
+              0,
+              rankingWeights
+            );
+            const normalized = this.normalizeAlbum(al, 'keyword_search', finalScore, matchReason, breakdown);
             if (normalized) {
               this.mergeAlbum(albumsMap, normalized);
             }
@@ -406,33 +787,42 @@ export class UnifiedMusicDiscoveryService {
       try {
         const semanticResults: SemanticSearchResult[] = await SemanticSearchService.searchSongsBySemanticQuery(
           trimmedQuery,
-          safeLimit
+          safeLimit * 2
         );
 
         if (Array.isArray(semanticResults) && semanticResults.length > 0) {
           sourcesUsed.push('semantic_search');
 
           for (const item of semanticResults) {
+            const similarity = typeof item.similarityScore === 'number' ? item.similarityScore : 0.8;
+
             if (searchSongs && item.song) {
-              const score = typeof item.similarityScore === 'number' ? item.similarityScore : 0.8;
-              const normalized = this.normalizeSong(
+              const { finalScore, matchReason, breakdown } = this.calculateSongRanking(
                 item.song,
-                'semantic_search',
-                score,
-                `Semantic match (${Math.round(score * 100)}% similarity)`
+                trimmedQuery,
+                similarity,
+                rankingWeights
               );
+              const normalized = this.normalizeSong(item.song, 'semantic_search', finalScore, matchReason, breakdown);
               if (normalized) {
                 this.mergeSong(songsMap, normalized);
               }
             }
 
-            // Extract associated artists and albums from semantic songs
+            // Extract and rank associated artists and albums from semantic songs
             if (searchArtists && item.song?.artist && typeof item.song.artist === 'object') {
+              const { finalScore, matchReason, breakdown } = this.calculateArtistRanking(
+                item.song.artist,
+                trimmedQuery,
+                similarity * 0.9,
+                rankingWeights
+              );
               const normalizedArtist = this.normalizeArtist(
                 item.song.artist,
                 'semantic_search',
-                (item.similarityScore || 0.7) * 0.9,
-                'Related artist from semantic query'
+                finalScore,
+                matchReason,
+                breakdown
               );
               if (normalizedArtist) {
                 this.mergeArtist(artistsMap, normalizedArtist);
@@ -440,11 +830,18 @@ export class UnifiedMusicDiscoveryService {
             }
 
             if (searchAlbums && item.song?.album && typeof item.song.album === 'object') {
+              const { finalScore, matchReason, breakdown } = this.calculateAlbumRanking(
+                item.song.album,
+                trimmedQuery,
+                similarity * 0.9,
+                rankingWeights
+              );
               const normalizedAlbum = this.normalizeAlbum(
                 item.song.album,
                 'semantic_search',
-                (item.similarityScore || 0.7) * 0.9,
-                'Related album from semantic query'
+                finalScore,
+                matchReason,
+                breakdown
               );
               if (normalizedAlbum) {
                 this.mergeAlbum(albumsMap, normalizedAlbum);
@@ -470,9 +867,21 @@ export class UnifiedMusicDiscoveryService {
           const recSongs = await ContentRecommendationService.getRecommendationsForSong(seedSongId, safeLimit);
           if (Array.isArray(recSongs) && recSongs.length > 0) {
             sourcesUsed.push('recommendation');
-            recSongs.forEach((s, idx) => {
-              const score = typeof s.similarityScore === 'number' ? s.similarityScore : 0.85 - idx * 0.03;
-              const normalized = this.normalizeSong(s, 'recommendation', score, 'Content similarity recommendation');
+            recSongs.forEach((s) => {
+              const score = typeof s.similarityScore === 'number' ? s.similarityScore : 0.80;
+              const { finalScore, matchReason, breakdown } = this.calculateSongRanking(
+                s,
+                trimmedQuery,
+                score,
+                rankingWeights
+              );
+              const normalized = this.normalizeSong(
+                s,
+                'recommendation',
+                finalScore,
+                'Content similarity recommendation',
+                breakdown
+              );
               if (normalized) {
                 this.mergeSong(songsMap, normalized);
               }
@@ -495,12 +904,19 @@ export class UnifiedMusicDiscoveryService {
           if (hybridRes.recommendations.length > 0) {
             sourcesUsed.push('recommendation');
             hybridRes.recommendations.forEach((item) => {
-              const score = item.hybridScore || 0.8;
+              const hybridScore = item.hybridScore || 0.8;
+              const { finalScore, matchReason, breakdown } = this.calculateSongRanking(
+                item.song,
+                trimmedQuery,
+                hybridScore,
+                rankingWeights
+              );
               const normalized = this.normalizeSong(
                 item.song,
                 'recommendation',
-                score,
-                `Personalized ${hybridRes.strategyUsed.toLowerCase()} recommendation`
+                finalScore,
+                matchReason || `Personalized ${hybridRes.strategyUsed.toLowerCase()} recommendation`,
+                breakdown
               );
               if (normalized) {
                 this.mergeSong(songsMap, normalized);
@@ -519,9 +935,14 @@ export class UnifiedMusicDiscoveryService {
           const trendingSongs = await TrendingService.getTrendingSongs(safeLimit);
           if (Array.isArray(trendingSongs) && trendingSongs.length > 0) {
             sourcesUsed.push('trending');
-            trendingSongs.forEach((s, idx) => {
-              const score = 0.9 - idx * 0.03;
-              const normalized = this.normalizeSong(s, 'trending', score, 'Trending popular track');
+            trendingSongs.forEach((s) => {
+              const { finalScore, matchReason, breakdown } = this.calculateSongRanking(
+                s,
+                '',
+                0,
+                rankingWeights
+              );
+              const normalized = this.normalizeSong(s, 'trending', finalScore, 'Trending popular track', breakdown);
               if (normalized) {
                 this.mergeSong(songsMap, normalized);
               }
@@ -533,7 +954,7 @@ export class UnifiedMusicDiscoveryService {
       }
     }
 
-    // 4. Sort and Limit Final Normalized Collections
+    // 4. Sort and Limit Final Normalized Collections by Intelligent Ranking Score Descending
     const sortedSongs = Array.from(songsMap.values())
       .sort((a, b) => b.score - a.score)
       .slice(0, safeLimit);
@@ -570,6 +991,7 @@ export class UnifiedMusicDiscoveryService {
         hasResults: totalCount > 0,
         fallbackApplied,
         userState,
+        rankingWeightsApplied: rankingWeights,
       },
     };
   }
@@ -585,6 +1007,7 @@ export class UnifiedMusicDiscoveryService {
       if (incoming.score > existing.score) {
         existing.score = incoming.score;
         existing.matchReason = incoming.matchReason;
+        existing.rankingBreakdown = incoming.rankingBreakdown;
       }
       if (!existing.sources.includes(incoming.source)) {
         existing.sources.push(incoming.source);
@@ -600,6 +1023,7 @@ export class UnifiedMusicDiscoveryService {
       if (incoming.score > existing.score) {
         existing.score = incoming.score;
         existing.matchReason = incoming.matchReason;
+        existing.rankingBreakdown = incoming.rankingBreakdown;
       }
       if (!existing.sources.includes(incoming.source)) {
         existing.sources.push(incoming.source);
@@ -615,6 +1039,7 @@ export class UnifiedMusicDiscoveryService {
       if (incoming.score > existing.score) {
         existing.score = incoming.score;
         existing.matchReason = incoming.matchReason;
+        existing.rankingBreakdown = incoming.rankingBreakdown;
       }
       if (!existing.sources.includes(incoming.source)) {
         existing.sources.push(incoming.source);
