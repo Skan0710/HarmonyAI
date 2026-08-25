@@ -88,6 +88,7 @@ export interface NormalizedAlbumItem {
 
 export interface UnifiedDiscoveryResults {
   artists: NormalizedArtistItem[];
+  similarArtists?: NormalizedArtistItem[];
   albums: NormalizedAlbumItem[];
   songs: NormalizedSongItem[];
   recommendedSongs: NormalizedSongItem[];

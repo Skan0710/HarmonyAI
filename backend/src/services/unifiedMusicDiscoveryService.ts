@@ -5,6 +5,11 @@ import { HybridRecommendationService } from './hybridRecommendationService.js';
 import { ContentRecommendationService } from './recommendationService.js';
 import { TrendingService } from './trendingService.js';
 import { ColdStartRecommendationService } from './coldStartRecommendationService.js';
+import { UserTasteProfileService } from './userTasteProfileService.js';
+import { ListeningSessionService } from './listeningSessionService.js';
+import { CandidateGenerationService } from './candidateGenerationService.js';
+import { RecommendationPostRankingPipeline } from './recommendationPostRankingPipeline.js';
+import { Artist } from '../models/Artist.js';
 
 export type DiscoverySourceType = 'keyword_search' | 'semantic_search' | 'recommendation' | 'trending' | 'hybrid';
 
@@ -103,12 +108,13 @@ export interface UnifiedDiscoveryOptions {
   seedSongId?: string;
   page?: number;
   limit?: number;
-  includeEntities?: ('songs' | 'artists' | 'albums' | 'recommendedSongs')[];
+  includeEntities?: ('songs' | 'artists' | 'similarArtists' | 'albums' | 'recommendedSongs')[];
   customRankingWeights?: Partial<UnifiedSearchRankingWeights>;
 }
 
 export interface UnifiedDiscoveryResults {
   artists: NormalizedArtistItem[];
+  similarArtists?: NormalizedArtistItem[];
   albums: NormalizedAlbumItem[];
   songs: NormalizedSongItem[];
   recommendedSongs: NormalizedSongItem[];
@@ -137,6 +143,7 @@ export interface UnifiedDiscoveryResponse {
   results: UnifiedDiscoveryResults;
   counts: {
     artists: number;
+    similarArtists?: number;
     albums: number;
     songs: number;
     recommendedSongs: number;
@@ -718,8 +725,8 @@ export class UnifiedMusicDiscoveryService {
 
   /**
    * Main unified discovery entrypoint.
-   * Coordinates keyword search, semantic search, and recommendation services,
-   * returning public-safe grouped results for artists, albums, songs, and recommendedSongs with pagination.
+   * Coordinates keyword search, semantic search, and personalized recommendation pipeline,
+   * evaluating long-term taste, session preferences, novelty, and artist/genre diversity.
    */
   public static async discover(options: UnifiedDiscoveryOptions = {}): Promise<UnifiedDiscoveryResponse> {
     const startTime = Date.now();
@@ -730,7 +737,7 @@ export class UnifiedMusicDiscoveryService {
       seedSongId,
       page = 1,
       limit = 10,
-      includeEntities = ['artists', 'albums', 'songs', 'recommendedSongs'],
+      includeEntities = ['artists', 'similarArtists', 'albums', 'songs', 'recommendedSongs'],
       customRankingWeights,
     } = options;
 
@@ -747,6 +754,7 @@ export class UnifiedMusicDiscoveryService {
     const songsMap = new Map<string, NormalizedSongItem>();
     const recommendedSongsMap = new Map<string, NormalizedSongItem>();
     const artistsMap = new Map<string, NormalizedArtistItem>();
+    const similarArtistsMap = new Map<string, NormalizedArtistItem>();
     const albumsMap = new Map<string, NormalizedAlbumItem>();
 
     let fallbackApplied = false;
@@ -754,6 +762,7 @@ export class UnifiedMusicDiscoveryService {
 
     const searchSongs = includeEntities.includes('songs');
     const searchArtists = includeEntities.includes('artists');
+    const searchSimilarArtists = includeEntities.includes('similarArtists');
     const searchAlbums = includeEntities.includes('albums');
     const searchRecommended = includeEntities.includes('recommendedSongs');
 
@@ -769,7 +778,7 @@ export class UnifiedMusicDiscoveryService {
       (!trimmedQuery && (currentMode === 'all' || currentMode === 'hybrid' || currentMode === 'recommendations'))
     );
 
-    // 1. Keyword Search Execution
+    // 1. Keyword Search Execution (Exact & text matches take absolute priority for query items)
     if (executeKeyword) {
       try {
         const keywordResults: GroupedSearchResults = await searchCatalog(trimmedQuery, internalFetchLimit);
@@ -824,7 +833,7 @@ export class UnifiedMusicDiscoveryService {
       }
     }
 
-    // 2. Semantic Search Execution
+    // 2. Semantic Search Execution (Vector cosine similarity)
     if (executeSemantic) {
       try {
         const semanticResults: SemanticSearchResult[] = await SemanticSearchService.searchSongsBySemanticQuery(
@@ -851,7 +860,6 @@ export class UnifiedMusicDiscoveryService {
               }
             }
 
-            // Extract and rank associated artists and albums from semantic songs
             if (searchArtists && item.song?.artist && typeof item.song.artist === 'object') {
               const { finalScore, matchReason, breakdown } = this.calculateArtistRanking(
                 item.song.artist,
@@ -896,10 +904,55 @@ export class UnifiedMusicDiscoveryService {
       }
     }
 
-    // 3. Recommendation Services Execution (for recommendedSongs / recommendations mode)
+    // 3. Personalized Recommendation Engine Execution
     if (executeRecommendations && (searchRecommended || searchSongs)) {
-      // 3A. Seed Song Recommendations
-      if (seedSongId && Types.ObjectId.isValid(seedSongId)) {
+      // 3A. Personalized Discovery via Existing Recommendation Post-Ranking Pipeline
+      if (userId && Types.ObjectId.isValid(userId)) {
+        try {
+          const [tasteProfile, rawCandidates] = await Promise.all([
+            UserTasteProfileService.generateTasteProfile(userId).catch(() => null),
+            CandidateGenerationService.generateHybridCandidates({
+              userId,
+              seedSongId,
+              candidateLimit: internalFetchLimit * 2,
+            }).catch(() => []),
+          ]);
+
+          if (rawCandidates.length > 0) {
+            sourcesUsed.push('recommendation');
+            const postRankedRes = await RecommendationPostRankingPipeline.executePostRanking({
+              userId,
+              items: rawCandidates,
+              tasteProfile: tasteProfile || undefined,
+              targetLimit: internalFetchLimit,
+            });
+
+            if (Array.isArray(postRankedRes) && postRankedRes.length > 0) {
+              postRankedRes.forEach((item) => {
+                const score = item.finalScore || 0.85;
+                const songDoc = item.song || (item.item as any)?.song || item.item;
+                const normalized = this.normalizeSong(
+                  songDoc,
+                  'recommendation',
+                  score,
+                  `Personalized AI match (${Math.round(score * 100)}% taste affinity)`
+                );
+                if (normalized) {
+                  if (currentMode === 'recommendations' || !trimmedQuery) {
+                    this.mergeSong(songsMap, normalized);
+                  }
+                  this.mergeSong(recommendedSongsMap, normalized);
+                }
+              });
+            }
+          }
+        } catch (err: any) {
+          console.warn('[UnifiedDiscovery] Post-ranking recommendation error:', err.message);
+        }
+      }
+
+      // 3B. Seed Song Recommendations Fallback
+      if (seedSongId && Types.ObjectId.isValid(seedSongId) && recommendedSongsMap.size === 0) {
         try {
           const recSongs = await ContentRecommendationService.getRecommendationsForSong(seedSongId, internalFetchLimit);
           if (Array.isArray(recSongs) && recSongs.length > 0) {
@@ -920,7 +973,7 @@ export class UnifiedMusicDiscoveryService {
                 breakdown
               );
               if (normalized) {
-                if (mode === 'recommendations' || !trimmedQuery) {
+                if (currentMode === 'recommendations' || !trimmedQuery) {
                   this.mergeSong(songsMap, normalized);
                 }
                 this.mergeSong(recommendedSongsMap, normalized);
@@ -932,8 +985,8 @@ export class UnifiedMusicDiscoveryService {
         }
       }
 
-      // 3B. Personalized User Hybrid Recommendations (Authenticated User)
-      if (userId && Types.ObjectId.isValid(userId)) {
+      // 3C. Hybrid Recommendation Service Fallback
+      if (userId && Types.ObjectId.isValid(userId) && recommendedSongsMap.size === 0) {
         try {
           const hybridRes = await HybridRecommendationService.getHybridRecommendations({
             userId,
@@ -959,7 +1012,7 @@ export class UnifiedMusicDiscoveryService {
                 breakdown
               );
               if (normalized) {
-                if (mode === 'recommendations' || !trimmedQuery) {
+                if (currentMode === 'recommendations' || !trimmedQuery) {
                   this.mergeSong(songsMap, normalized);
                 }
                 this.mergeSong(recommendedSongsMap, normalized);
@@ -971,7 +1024,7 @@ export class UnifiedMusicDiscoveryService {
         }
       }
 
-      // 3C. Public Trending / Cold-Start Catalog Fallback (Unauthenticated or cold-start)
+      // 3D. Public Trending / Cold-Start Catalog Fallback
       if (recommendedSongsMap.size === 0 || (songsMap.size === 0 && !trimmedQuery)) {
         try {
           fallbackApplied = true;
@@ -987,7 +1040,7 @@ export class UnifiedMusicDiscoveryService {
               );
               const normalized = this.normalizeSong(s, 'trending', finalScore, 'Trending popular track', breakdown);
               if (normalized) {
-                if (!trimmedQuery || mode === 'recommendations') {
+                if (!trimmedQuery || currentMode === 'recommendations') {
                   this.mergeSong(songsMap, normalized);
                 }
                 this.mergeSong(recommendedSongsMap, normalized);
@@ -1000,6 +1053,40 @@ export class UnifiedMusicDiscoveryService {
       }
     }
 
+    // 4. Personalized Similar Artists & Related Discovery
+    if (searchSimilarArtists && artistsMap.size > 0) {
+      try {
+        const topMatchedArtists = Array.from(artistsMap.values()).slice(0, 3);
+        const genresToFind = Array.from(new Set(topMatchedArtists.flatMap((a) => a.genres))).filter(Boolean);
+        const matchedArtistIds = topMatchedArtists.map((a) => a.id);
+
+        if (genresToFind.length > 0) {
+          const similarArtistDocs = await Artist.find({
+            genres: { $in: genresToFind },
+            _id: { $nin: matchedArtistIds.map((id) => new Types.ObjectId(id)) },
+          })
+            .limit(4)
+            .lean();
+
+          if (Array.isArray(similarArtistDocs)) {
+            for (const doc of similarArtistDocs) {
+              const normalized = this.normalizeArtist(
+                doc,
+                'recommendation',
+                0.80,
+                `Similar genre artist (${genresToFind[0]})`
+              );
+              if (normalized) {
+                this.mergeArtist(similarArtistsMap, normalized);
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn('[UnifiedDiscovery] Similar artists discovery error:', err.message);
+      }
+    }
+
     // Filter recommendedSongs to avoid duplicating songs already in primary songs list
     for (const songKey of songsMap.keys()) {
       if (trimmedQuery) {
@@ -1007,8 +1094,9 @@ export class UnifiedMusicDiscoveryService {
       }
     }
 
-    // 4. Sort and Paginate Normalized Collections
+    // 5. Sort and Paginate Normalized Collections
     const allSortedArtists = Array.from(artistsMap.values()).sort((a, b) => b.score - a.score);
+    const allSortedSimilarArtists = Array.from(similarArtistsMap.values()).sort((a, b) => b.score - a.score);
     const allSortedAlbums = Array.from(albumsMap.values()).sort((a, b) => b.score - a.score);
     const allSortedSongs = Array.from(songsMap.values()).sort((a, b) => b.score - a.score);
     const allSortedRecommended = Array.from(recommendedSongsMap.values()).sort((a, b) => b.score - a.score);
@@ -1034,12 +1122,14 @@ export class UnifiedMusicDiscoveryService {
       mode,
       results: {
         artists: pagedArtists,
+        similarArtists: allSortedSimilarArtists.length > 0 ? allSortedSimilarArtists : undefined,
         albums: pagedAlbums,
         songs: pagedSongs,
         recommendedSongs: pagedRecommended,
       },
       counts: {
         artists: totalArtists,
+        similarArtists: allSortedSimilarArtists.length > 0 ? allSortedSimilarArtists.length : undefined,
         albums: totalAlbums,
         songs: totalSongs,
         recommendedSongs: totalRecommended,
