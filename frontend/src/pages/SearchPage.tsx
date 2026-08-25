@@ -229,6 +229,7 @@ export const SearchPage: React.FC = () => {
   const songsList = (discoveryData?.results.songs || []).map(mapToSong);
   const recommendedList = (discoveryData?.results.recommendedSongs || []).map(mapToSong);
   const artistsList = (discoveryData?.results.artists || []).map(mapToArtist);
+  const similarArtistsList = (discoveryData?.results.similarArtists || []).map(mapToArtist);
   const albumsList = (discoveryData?.results.albums || []).map(mapToAlbum);
 
   const handleSongPlay = (song: Song) => {
@@ -241,6 +242,7 @@ export const SearchPage: React.FC = () => {
     (discoveryData?.counts.total || 0) > 0 ||
     songsList.length > 0 ||
     artistsList.length > 0 ||
+    similarArtistsList.length > 0 ||
     albumsList.length > 0 ||
     recommendedList.length > 0;
 
@@ -470,6 +472,28 @@ export const SearchPage: React.FC = () => {
               </div>
               <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700">
                 {artistsList.map((artist) => (
+                  <ArtistCard key={artist._id} artist={artist} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Section A.2: Similar & Related Artists */}
+          {similarArtistsList.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl text-indigo-400">✨</span>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-100">Similar Artists You Might Like</h2>
+                    <p className="text-xs text-slate-400">
+                      Discovered based on genre alignment and your taste profile
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700">
+                {similarArtistsList.map((artist) => (
                   <ArtistCard key={artist._id} artist={artist} />
                 ))}
               </div>
