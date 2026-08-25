@@ -53,7 +53,6 @@ export interface NormalizedSongItem {
   matchReason?: string;
   source: DiscoverySourceType;
   sources: DiscoverySourceType[];
-  raw?: any;
 }
 
 export interface NormalizedArtistItem {
@@ -70,7 +69,6 @@ export interface NormalizedArtistItem {
   matchReason?: string;
   source: DiscoverySourceType;
   sources: DiscoverySourceType[];
-  raw?: any;
 }
 
 export interface NormalizedAlbumItem {
@@ -86,23 +84,44 @@ export interface NormalizedAlbumItem {
   matchReason?: string;
   source: DiscoverySourceType;
   sources: DiscoverySourceType[];
-  raw?: any;
+}
+
+export interface UnifiedDiscoveryResults {
+  artists: NormalizedArtistItem[];
+  albums: NormalizedAlbumItem[];
+  songs: NormalizedSongItem[];
+  recommendedSongs: NormalizedSongItem[];
+}
+
+export interface UnifiedDiscoveryPagination {
+  page: number;
+  limit: number;
+  totalPages: {
+    artists: number;
+    albums: number;
+    songs: number;
+    recommendedSongs: number;
+  };
+  hasMore: {
+    artists: boolean;
+    albums: boolean;
+    songs: boolean;
+    recommendedSongs: boolean;
+  };
 }
 
 export interface UnifiedDiscoveryResponse {
   query: string;
   mode: 'all' | 'keyword' | 'semantic' | 'recommendations' | 'hybrid';
-  results: {
-    songs: NormalizedSongItem[];
-    artists: NormalizedArtistItem[];
-    albums: NormalizedAlbumItem[];
-  };
+  results: UnifiedDiscoveryResults;
   counts: {
-    songs: number;
     artists: number;
     albums: number;
+    songs: number;
+    recommendedSongs: number;
     total: number;
   };
+  pagination: UnifiedDiscoveryPagination;
   metadata: {
     executedAt: string;
     sourcesUsed: DiscoverySourceType[];
@@ -110,6 +129,7 @@ export interface UnifiedDiscoveryResponse {
     hasResults: boolean;
     fallbackApplied: boolean;
     userState?: string;
+    isAuthenticated: boolean;
   };
 }
 
@@ -144,6 +164,7 @@ export const searchUnifiedDiscovery = async (
     query?: string;
     mode?: 'all' | 'keyword' | 'semantic' | 'recommendations' | 'hybrid';
     seedSongId?: string;
+    page?: number;
     limit?: number;
   } = {}
 ): Promise<{ discovery: UnifiedDiscoveryResponse | null; error: string | null }> => {
@@ -151,6 +172,7 @@ export const searchUnifiedDiscovery = async (
   if (options.query) queryParams.append('q', options.query.trim());
   if (options.mode) queryParams.append('mode', options.mode);
   if (options.seedSongId) queryParams.append('seedSongId', options.seedSongId);
+  if (options.page) queryParams.append('page', String(options.page));
   if (options.limit) queryParams.append('limit', String(options.limit));
 
   const endpoint = `/search/discover?${queryParams.toString()}`;
