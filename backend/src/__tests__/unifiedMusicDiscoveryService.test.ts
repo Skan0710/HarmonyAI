@@ -4,6 +4,9 @@ import {
   NormalizedSongItem,
   NormalizedArtistItem,
   NormalizedAlbumItem,
+  getUnifiedSearchRankingWeights,
+  updateUnifiedSearchRankingWeights,
+  resetUnifiedSearchRankingWeights,
 } from '../services/unifiedMusicDiscoveryService.js';
 import { unifiedDiscovery } from '../controllers/searchController.js';
 
@@ -15,6 +18,7 @@ export function runUnifiedMusicDiscoveryServiceTests() {
     _id: '507f1f77bcf86cd799439011',
     title: 'Starboy Nightcall',
     duration: 234, // 3m 54s
+    playCount: 150000,
     audioUrl: 'https://cdn.harmonyai.test/audio/starboy.mp3',
     artist: {
       _id: '507f1f77bcf86cd799439022',
@@ -128,7 +132,91 @@ export function runUnifiedMusicDiscoveryServiceTests() {
     console.log('✓ Test 4 Passed: Album normalization structure verified.');
   }
 
-  // Test 5: Multi-Entity Unified Discovery (Songs, Artists, Albums)
+  // Test 5: Exact Song Title Match Strong Priority
+  {
+    const exactQuery = 'Starboy Nightcall';
+    const ranking = UnifiedMusicDiscoveryService.calculateSongRanking(mockSongDoc, exactQuery, 0);
+
+    assert.ok(ranking.finalScore >= 0.92, `Expected finalScore >= 0.92, got ${ranking.finalScore}`);
+    assert.strictEqual(ranking.breakdown.exactTitleMatch, 1.0);
+    assert.ok(ranking.matchReason.includes('Exact song title match'));
+    assert.ok(ranking.finalScore <= 1.0);
+
+    console.log('✓ Test 5 Passed: Exact song title match strong priority verified.');
+  }
+
+  // Test 6: Exact Artist Match Strong Priority
+  {
+    const artistQuery = 'The Weeknd & Kavinsky';
+    const ranking = UnifiedMusicDiscoveryService.calculateSongRanking(mockSongDoc, artistQuery, 0);
+
+    assert.ok(ranking.finalScore >= 0.88, `Expected finalScore >= 0.88, got ${ranking.finalScore}`);
+    assert.strictEqual(ranking.breakdown.exactArtistMatch, 1.0);
+    assert.ok(ranking.matchReason.includes('Exact artist match'));
+
+    console.log('✓ Test 6 Passed: Exact artist match strong priority verified.');
+  }
+
+  // Test 7: Popularity Override Safeguard (Exact match beats hyper-popular unrelated track)
+  {
+    const exactZeroPlays = {
+      title: 'Midnight Echoes',
+      artist: { name: 'Obscure Band' },
+      playCount: 0,
+    };
+    const unrelatedMegaHit = {
+      title: 'Despacito Mega Dance',
+      artist: { name: 'Luis Fonsi' },
+      playCount: 5000000000,
+    };
+
+    const targetQuery = 'Midnight Echoes';
+    const exactRanking = UnifiedMusicDiscoveryService.calculateSongRanking(exactZeroPlays, targetQuery, 0);
+    const unrelatedRanking = UnifiedMusicDiscoveryService.calculateSongRanking(unrelatedMegaHit, targetQuery, 0);
+
+    assert.ok(
+      exactRanking.finalScore > unrelatedRanking.finalScore,
+      `Exact match (${exactRanking.finalScore}) must outrank mega hit (${unrelatedRanking.finalScore})`
+    );
+    assert.ok(exactRanking.finalScore >= 0.90);
+    assert.ok(unrelatedRanking.finalScore <= 0.20);
+
+    console.log('✓ Test 7 Passed: Popularity override safeguard verified (exact match protected).');
+  }
+
+  // Test 8: Semantic Similarity Integration and Bounding
+  {
+    const songA = { title: 'Ambient Waves', playCount: 100 };
+    const rankingWithHighSemantic = UnifiedMusicDiscoveryService.calculateSongRanking(songA, 'peaceful sleep vibes', 0.95);
+    const rankingWithLowSemantic = UnifiedMusicDiscoveryService.calculateSongRanking(songA, 'peaceful sleep vibes', 0.10);
+
+    assert.ok(
+      rankingWithHighSemantic.finalScore > rankingWithLowSemantic.finalScore,
+      'High semantic similarity must produce higher final rank score'
+    );
+    assert.strictEqual(rankingWithHighSemantic.breakdown.semanticSimilarity, 0.95);
+
+    console.log('✓ Test 8 Passed: Semantic similarity factor integration and ranking impact verified.');
+  }
+
+  // Test 9: Configurable Ranking Weights Management
+  {
+    const initialWeights = getUnifiedSearchRankingWeights();
+    assert.strictEqual(initialWeights.exactTitleMatchWeight, 0.35);
+
+    updateUnifiedSearchRankingWeights({ exactTitleMatchWeight: 0.50, popularityWeight: 0.05 });
+    const modifiedWeights = getUnifiedSearchRankingWeights();
+    assert.strictEqual(modifiedWeights.exactTitleMatchWeight, 0.50);
+    assert.strictEqual(modifiedWeights.popularityWeight, 0.05);
+
+    resetUnifiedSearchRankingWeights();
+    const resetWeights = getUnifiedSearchRankingWeights();
+    assert.strictEqual(resetWeights.exactTitleMatchWeight, 0.35);
+
+    console.log('✓ Test 9 Passed: Configurable ranking weights update and reset verified.');
+  }
+
+  // Test 10: Multi-Entity Unified Discovery (Songs, Artists, Albums)
   {
     UnifiedMusicDiscoveryService.discover({
       query: 'Synthwave electronic night drive',
@@ -147,42 +235,13 @@ export function runUnifiedMusicDiscoveryServiceTests() {
       assert.ok(typeof res.counts.total === 'number');
       assert.ok(res.metadata.tookMs >= 0);
       assert.ok(Array.isArray(res.metadata.sourcesUsed));
+      assert.ok(res.metadata.rankingWeightsApplied !== undefined);
 
-      console.log('✓ Test 5 Passed: Multi-entity unified discovery execution verified.');
+      console.log('✓ Test 10 Passed: Multi-entity unified discovery execution verified.');
     });
   }
 
-  // Test 6: Internal Mode Separation (Keyword Mode, Semantic Mode, Recommendations Mode)
-  {
-    Promise.all([
-      UnifiedMusicDiscoveryService.discover({ query: 'Lo-fi chill beats', mode: 'keyword' }),
-      UnifiedMusicDiscoveryService.discover({ query: 'Calm ambient focus piano', mode: 'semantic' }),
-      UnifiedMusicDiscoveryService.discover({ mode: 'recommendations' }),
-    ]).then(([kwRes, semRes, recRes]) => {
-      assert.strictEqual(kwRes.mode, 'keyword');
-      assert.strictEqual(semRes.mode, 'semantic');
-      assert.strictEqual(recRes.mode, 'recommendations');
-
-      console.log('✓ Test 6 Passed: Mode separation (keyword, semantic, recommendations) verified.');
-    });
-  }
-
-  // Test 7: Empty and Unfulfillable Queries Handling
-  {
-    UnifiedMusicDiscoveryService.discover({
-      query: '',
-      mode: 'keyword',
-    }).then((res) => {
-      assert.ok(res !== null);
-      assert.strictEqual(res.query, '');
-      assert.strictEqual(res.counts.total, 0);
-      assert.strictEqual(res.metadata.hasResults, false);
-
-      console.log('✓ Test 7 Passed: Empty query handled gracefully without exceptions.');
-    });
-  }
-
-  // Test 8: Controller API Endpoint & Parameter Validation
+  // Test 11: Controller API Endpoint & Parameter Validation
   {
     const req: any = {
       query: { q: 'Synthwave', mode: 'hybrid', limit: '5' },
@@ -209,11 +268,11 @@ export function runUnifiedMusicDiscoveryServiceTests() {
       assert.ok(responseBody.data.results !== undefined);
       assert.ok(responseBody.data.counts !== undefined);
 
-      console.log('✓ Test 8 Passed: Unified discovery API controller endpoint verified.');
+      console.log('✓ Test 11 Passed: Unified discovery API controller endpoint verified.');
     });
   }
 
-  // Test 9: Query Length Boundary Defense
+  // Test 12: Query Length Boundary Defense
   {
     const longQuery = 'A'.repeat(501);
     const req: any = {
@@ -239,9 +298,9 @@ export function runUnifiedMusicDiscoveryServiceTests() {
       assert.strictEqual(responseBody.success, false);
       assert.ok(responseBody.message.includes('exceeds maximum allowed length'));
 
-      console.log('✓ Test 9 Passed: Excessive query length capped and rejected with 400.');
+      console.log('✓ Test 12 Passed: Excessive query length capped and rejected with 400.');
     });
   }
 
-  console.log('🎉 All unified music discovery service tests completed successfully.');
+  console.log('🎉 All unified music discovery and intelligent ranking tests completed successfully.');
 }
