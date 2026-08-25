@@ -8,6 +8,8 @@ import { ColdStartRecommendationService } from './coldStartRecommendationService
 
 export type DiscoverySourceType = 'keyword_search' | 'semantic_search' | 'recommendation' | 'trending' | 'hybrid';
 
+export type DiscoveryMode = 'all' | 'keyword' | 'semantic' | 'recommendations' | 'hybrid';
+
 export interface NormalizedArtistSummary {
   id: string;
   name: string;
@@ -96,28 +98,51 @@ export interface NormalizedAlbumItem {
 
 export interface UnifiedDiscoveryOptions {
   query?: string;
-  mode?: 'all' | 'keyword' | 'semantic' | 'recommendations' | 'hybrid';
+  mode?: DiscoveryMode;
   userId?: string;
   seedSongId?: string;
+  page?: number;
   limit?: number;
-  includeEntities?: ('songs' | 'artists' | 'albums')[];
+  includeEntities?: ('songs' | 'artists' | 'albums' | 'recommendedSongs')[];
   customRankingWeights?: Partial<UnifiedSearchRankingWeights>;
+}
+
+export interface UnifiedDiscoveryResults {
+  artists: NormalizedArtistItem[];
+  albums: NormalizedAlbumItem[];
+  songs: NormalizedSongItem[];
+  recommendedSongs: NormalizedSongItem[];
+}
+
+export interface UnifiedDiscoveryPagination {
+  page: number;
+  limit: number;
+  totalPages: {
+    artists: number;
+    albums: number;
+    songs: number;
+    recommendedSongs: number;
+  };
+  hasMore: {
+    artists: boolean;
+    albums: boolean;
+    songs: boolean;
+    recommendedSongs: boolean;
+  };
 }
 
 export interface UnifiedDiscoveryResponse {
   query: string;
-  mode: 'all' | 'keyword' | 'semantic' | 'recommendations' | 'hybrid';
-  results: {
-    songs: NormalizedSongItem[];
-    artists: NormalizedArtistItem[];
-    albums: NormalizedAlbumItem[];
-  };
+  mode: DiscoveryMode;
+  results: UnifiedDiscoveryResults;
   counts: {
-    songs: number;
     artists: number;
     albums: number;
+    songs: number;
+    recommendedSongs: number;
     total: number;
   };
+  pagination: UnifiedDiscoveryPagination;
   metadata: {
     executedAt: string;
     sourcesUsed: DiscoverySourceType[];
@@ -126,6 +151,7 @@ export interface UnifiedDiscoveryResponse {
     fallbackApplied: boolean;
     userState?: string;
     rankingWeightsApplied: UnifiedSearchRankingWeights;
+    isAuthenticated: boolean;
   };
 }
 
@@ -487,7 +513,8 @@ export class UnifiedMusicDiscoveryService {
   }
 
   /**
-   * Normalize any Song document into the unified NormalizedSongItem structure
+   * Public-Safe Normalization for Songs:
+   * Strips internal database fields like `vectorEmbedding`, `__v`, internal MongoDB tokens.
    */
   public static normalizeSong(
     songDoc: any,
@@ -577,12 +604,12 @@ export class UnifiedMusicDiscoveryService {
       rankingBreakdown: breakdown,
       source,
       sources: [source],
-      raw: songDoc,
     };
   }
 
   /**
-   * Normalize any Artist document into the unified NormalizedArtistItem structure
+   * Public-Safe Normalization for Artists:
+   * Strips internal database fields like `__v`, internal MongoDB IDs.
    */
   public static normalizeArtist(
     artistDoc: any,
@@ -619,12 +646,12 @@ export class UnifiedMusicDiscoveryService {
       rankingBreakdown: breakdown,
       source,
       sources: [source],
-      raw: artistDoc,
     };
   }
 
   /**
-   * Normalize any Album document into the unified NormalizedAlbumItem structure
+   * Public-Safe Normalization for Albums:
+   * Strips internal database fields like `__v`, internal vectors.
    */
   public static normalizeAlbum(
     albumDoc: any,
@@ -686,14 +713,13 @@ export class UnifiedMusicDiscoveryService {
       rankingBreakdown: breakdown,
       source,
       sources: [source],
-      raw: albumDoc,
     };
   }
 
   /**
    * Main unified discovery entrypoint.
    * Coordinates keyword search, semantic search, and recommendation services,
-   * applying multi-factor intelligent ranking, deduplication, and normalized formatting.
+   * returning public-safe grouped results for artists, albums, songs, and recommendedSongs with pagination.
    */
   public static async discover(options: UnifiedDiscoveryOptions = {}): Promise<UnifiedDiscoveryResponse> {
     const startTime = Date.now();
@@ -702,8 +728,9 @@ export class UnifiedMusicDiscoveryService {
       mode = 'all',
       userId,
       seedSongId,
+      page = 1,
       limit = 10,
-      includeEntities = ['songs', 'artists', 'albums'],
+      includeEntities = ['artists', 'albums', 'songs', 'recommendedSongs'],
       customRankingWeights,
     } = options;
 
@@ -713,10 +740,12 @@ export class UnifiedMusicDiscoveryService {
     };
 
     const trimmedQuery = (query || '').trim();
-    const safeLimit = Math.max(1, Math.min(50, limit));
+    const safePage = Math.max(1, Math.floor(page));
+    const safeLimit = Math.max(1, Math.min(50, Math.floor(limit)));
     const sourcesUsed: DiscoverySourceType[] = [];
 
     const songsMap = new Map<string, NormalizedSongItem>();
+    const recommendedSongsMap = new Map<string, NormalizedSongItem>();
     const artistsMap = new Map<string, NormalizedArtistItem>();
     const albumsMap = new Map<string, NormalizedAlbumItem>();
 
@@ -726,11 +755,24 @@ export class UnifiedMusicDiscoveryService {
     const searchSongs = includeEntities.includes('songs');
     const searchArtists = includeEntities.includes('artists');
     const searchAlbums = includeEntities.includes('albums');
+    const searchRecommended = includeEntities.includes('recommendedSongs');
 
-    // 1. Keyword Search Execution (if mode is 'all', 'keyword', or 'hybrid')
-    if (trimmedQuery && (mode === 'all' || mode === 'keyword' || mode === 'hybrid')) {
+    const internalFetchLimit = safeLimit * safePage * 3;
+
+    const currentMode: string = mode || 'all';
+    const executeKeyword = Boolean(trimmedQuery && (currentMode === 'all' || currentMode === 'keyword' || currentMode === 'hybrid'));
+    const executeSemantic = Boolean(trimmedQuery && (currentMode === 'all' || currentMode === 'semantic' || currentMode === 'hybrid'));
+    const executeRecommendations = Boolean(
+      currentMode === 'recommendations' ||
+      currentMode === 'all' ||
+      currentMode === 'hybrid' ||
+      (!trimmedQuery && (currentMode === 'all' || currentMode === 'hybrid' || currentMode === 'recommendations'))
+    );
+
+    // 1. Keyword Search Execution
+    if (executeKeyword) {
       try {
-        const keywordResults: GroupedSearchResults = await searchCatalog(trimmedQuery, safeLimit * 2);
+        const keywordResults: GroupedSearchResults = await searchCatalog(trimmedQuery, internalFetchLimit);
         sourcesUsed.push('keyword_search');
 
         if (searchSongs && Array.isArray(keywordResults.songs)) {
@@ -782,12 +824,12 @@ export class UnifiedMusicDiscoveryService {
       }
     }
 
-    // 2. Semantic Search Execution (if mode is 'all', 'semantic', or 'hybrid')
-    if (trimmedQuery && (mode === 'all' || mode === 'semantic' || mode === 'hybrid')) {
+    // 2. Semantic Search Execution
+    if (executeSemantic) {
       try {
         const semanticResults: SemanticSearchResult[] = await SemanticSearchService.searchSongsBySemanticQuery(
           trimmedQuery,
-          safeLimit * 2
+          internalFetchLimit
         );
 
         if (Array.isArray(semanticResults) && semanticResults.length > 0) {
@@ -854,17 +896,12 @@ export class UnifiedMusicDiscoveryService {
       }
     }
 
-    // 3. Recommendation Services Execution (if mode is 'all', 'recommendations', or 'hybrid', or if query is empty)
-    const shouldRunRecommendations =
-      mode === 'recommendations' ||
-      (!trimmedQuery && (mode === 'all' || mode === 'hybrid')) ||
-      (mode === 'all' && (userId || seedSongId));
-
-    if (shouldRunRecommendations && searchSongs) {
+    // 3. Recommendation Services Execution (for recommendedSongs / recommendations mode)
+    if (executeRecommendations && (searchRecommended || searchSongs)) {
       // 3A. Seed Song Recommendations
       if (seedSongId && Types.ObjectId.isValid(seedSongId)) {
         try {
-          const recSongs = await ContentRecommendationService.getRecommendationsForSong(seedSongId, safeLimit);
+          const recSongs = await ContentRecommendationService.getRecommendationsForSong(seedSongId, internalFetchLimit);
           if (Array.isArray(recSongs) && recSongs.length > 0) {
             sourcesUsed.push('recommendation');
             recSongs.forEach((s) => {
@@ -883,7 +920,10 @@ export class UnifiedMusicDiscoveryService {
                 breakdown
               );
               if (normalized) {
-                this.mergeSong(songsMap, normalized);
+                if (mode === 'recommendations' || !trimmedQuery) {
+                  this.mergeSong(songsMap, normalized);
+                }
+                this.mergeSong(recommendedSongsMap, normalized);
               }
             });
           }
@@ -892,12 +932,12 @@ export class UnifiedMusicDiscoveryService {
         }
       }
 
-      // 3B. Personalized User Hybrid Recommendations
+      // 3B. Personalized User Hybrid Recommendations (Authenticated User)
       if (userId && Types.ObjectId.isValid(userId)) {
         try {
           const hybridRes = await HybridRecommendationService.getHybridRecommendations({
             userId,
-            limit: safeLimit,
+            limit: internalFetchLimit,
           });
 
           userState = hybridRes.userClassification;
@@ -919,7 +959,10 @@ export class UnifiedMusicDiscoveryService {
                 breakdown
               );
               if (normalized) {
-                this.mergeSong(songsMap, normalized);
+                if (mode === 'recommendations' || !trimmedQuery) {
+                  this.mergeSong(songsMap, normalized);
+                }
+                this.mergeSong(recommendedSongsMap, normalized);
               }
             });
           }
@@ -928,11 +971,11 @@ export class UnifiedMusicDiscoveryService {
         }
       }
 
-      // 3C. Trending / Cold Start Catalog Fallback if maps are empty and no query was given
-      if (songsMap.size === 0 && !trimmedQuery) {
+      // 3C. Public Trending / Cold-Start Catalog Fallback (Unauthenticated or cold-start)
+      if (recommendedSongsMap.size === 0 || (songsMap.size === 0 && !trimmedQuery)) {
         try {
           fallbackApplied = true;
-          const trendingSongs = await TrendingService.getTrendingSongs(safeLimit);
+          const trendingSongs = await TrendingService.getTrendingSongs(internalFetchLimit);
           if (Array.isArray(trendingSongs) && trendingSongs.length > 0) {
             sourcesUsed.push('trending');
             trendingSongs.forEach((s) => {
@@ -944,7 +987,10 @@ export class UnifiedMusicDiscoveryService {
               );
               const normalized = this.normalizeSong(s, 'trending', finalScore, 'Trending popular track', breakdown);
               if (normalized) {
-                this.mergeSong(songsMap, normalized);
+                if (!trimmedQuery || mode === 'recommendations') {
+                  this.mergeSong(songsMap, normalized);
+                }
+                this.mergeSong(recommendedSongsMap, normalized);
               }
             });
           }
@@ -954,35 +1000,66 @@ export class UnifiedMusicDiscoveryService {
       }
     }
 
-    // 4. Sort and Limit Final Normalized Collections by Intelligent Ranking Score Descending
-    const sortedSongs = Array.from(songsMap.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, safeLimit);
+    // Filter recommendedSongs to avoid duplicating songs already in primary songs list
+    for (const songKey of songsMap.keys()) {
+      if (trimmedQuery) {
+        recommendedSongsMap.delete(songKey);
+      }
+    }
 
-    const sortedArtists = Array.from(artistsMap.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, safeLimit);
+    // 4. Sort and Paginate Normalized Collections
+    const allSortedArtists = Array.from(artistsMap.values()).sort((a, b) => b.score - a.score);
+    const allSortedAlbums = Array.from(albumsMap.values()).sort((a, b) => b.score - a.score);
+    const allSortedSongs = Array.from(songsMap.values()).sort((a, b) => b.score - a.score);
+    const allSortedRecommended = Array.from(recommendedSongsMap.values()).sort((a, b) => b.score - a.score);
 
-    const sortedAlbums = Array.from(albumsMap.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, safeLimit);
+    const startIndex = (safePage - 1) * safeLimit;
+    const endIndex = safePage * safeLimit;
 
-    const totalCount = sortedSongs.length + sortedArtists.length + sortedAlbums.length;
+    const pagedArtists = allSortedArtists.slice(startIndex, endIndex);
+    const pagedAlbums = allSortedAlbums.slice(startIndex, endIndex);
+    const pagedSongs = allSortedSongs.slice(startIndex, endIndex);
+    const pagedRecommended = allSortedRecommended.slice(startIndex, endIndex);
+
+    const totalArtists = allSortedArtists.length;
+    const totalAlbums = allSortedAlbums.length;
+    const totalSongs = allSortedSongs.length;
+    const totalRecommended = allSortedRecommended.length;
+    const totalCount = totalArtists + totalAlbums + totalSongs + totalRecommended;
+
     const tookMs = Date.now() - startTime;
 
     return {
       query: trimmedQuery,
       mode,
       results: {
-        songs: sortedSongs,
-        artists: sortedArtists,
-        albums: sortedAlbums,
+        artists: pagedArtists,
+        albums: pagedAlbums,
+        songs: pagedSongs,
+        recommendedSongs: pagedRecommended,
       },
       counts: {
-        songs: sortedSongs.length,
-        artists: sortedArtists.length,
-        albums: sortedAlbums.length,
+        artists: totalArtists,
+        albums: totalAlbums,
+        songs: totalSongs,
+        recommendedSongs: totalRecommended,
         total: totalCount,
+      },
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        totalPages: {
+          artists: Math.ceil(totalArtists / safeLimit) || 1,
+          albums: Math.ceil(totalAlbums / safeLimit) || 1,
+          songs: Math.ceil(totalSongs / safeLimit) || 1,
+          recommendedSongs: Math.ceil(totalRecommended / safeLimit) || 1,
+        },
+        hasMore: {
+          artists: endIndex < totalArtists,
+          albums: endIndex < totalAlbums,
+          songs: endIndex < totalSongs,
+          recommendedSongs: endIndex < totalRecommended,
+        },
       },
       metadata: {
         executedAt: new Date().toISOString(),
@@ -992,6 +1069,7 @@ export class UnifiedMusicDiscoveryService {
         fallbackApplied,
         userState,
         rankingWeightsApplied: rankingWeights,
+        isAuthenticated: Boolean(userId),
       },
     };
   }

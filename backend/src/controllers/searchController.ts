@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import { searchCatalog } from '../services/searchService.js';
 import { SemanticSearchService } from '../services/semanticSearchService.js';
-import { UnifiedMusicDiscoveryService } from '../services/unifiedMusicDiscoveryService.js';
+import {
+  UnifiedMusicDiscoveryService,
+  DiscoveryMode,
+} from '../services/unifiedMusicDiscoveryService.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
 import { extractQueryParams } from '../utils/validators.js';
 
@@ -51,25 +54,39 @@ export const semanticSearch = controllerWrapper(async (req: Request, res: Respon
   });
 });
 
+const ALLOWED_DISCOVERY_MODES: DiscoveryMode[] = ['all', 'keyword', 'semantic', 'recommendations', 'hybrid'];
+
 export const unifiedDiscovery = controllerWrapper(async (req: Request, res: Response) => {
-  const query = String(req.query.q || req.query.query || '');
-  const mode = (req.query.mode as any) || 'all';
-  const seedSongId = req.query.seedSongId ? String(req.query.seedSongId) : undefined;
-  const userId = req.user ? String(req.user._id) : (req.query.userId ? String(req.query.userId) : undefined);
+  const rawQuery = String(req.query.q || req.query.query || '');
+  const trimmedQuery = rawQuery.trim();
 
-  const q = extractQueryParams(req, { limit: 'int' });
-  const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 10 : Math.min(50, q.limit);
-
-  if (query.trim().length > 500) {
+  if (trimmedQuery.length > 500) {
     throw new ControllerError(400, 'Search query exceeds maximum allowed length of 500 characters');
   }
 
+  const rawMode = req.query.mode ? String(req.query.mode).toLowerCase() : 'all';
+  if (!ALLOWED_DISCOVERY_MODES.includes(rawMode as DiscoveryMode)) {
+    throw new ControllerError(
+      400,
+      `Invalid search mode '${rawMode}'. Supported modes: ${ALLOWED_DISCOVERY_MODES.join(', ')}`
+    );
+  }
+  const mode = rawMode as DiscoveryMode;
+
+  const q = extractQueryParams(req, { limit: 'int', page: 'int' });
+  const page = !isNaN(q.page) && q.page > 0 ? q.page : 1;
+  const limit = !isNaN(q.limit) && q.limit > 0 ? Math.min(50, q.limit) : 10;
+
+  const seedSongId = req.query.seedSongId ? String(req.query.seedSongId) : undefined;
+  const userId = req.user ? String(req.user._id) : (req.query.userId ? String(req.query.userId) : undefined);
+
   const discoveryResult = await UnifiedMusicDiscoveryService.discover({
-    query: query.trim(),
+    query: trimmedQuery,
     mode,
     userId,
     seedSongId,
-    limit: parsedLimit,
+    page,
+    limit,
   });
 
   res.status(200).json({

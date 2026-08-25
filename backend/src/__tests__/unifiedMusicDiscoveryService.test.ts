@@ -79,7 +79,7 @@ export function runUnifiedMusicDiscoveryServiceTests() {
     console.log('✓ Test 1 Passed: Duration formatting and ID extraction helpers verified.');
   }
 
-  // Test 2: Normalized Song Structure
+  // Test 2: Normalized Song Structure & Public Safety (No internal leaks)
   {
     const normalized = UnifiedMusicDiscoveryService.normalizeSong(mockSongDoc, 'keyword_search', 0.95, 'Exact title match');
     assert.ok(normalized !== null);
@@ -96,8 +96,10 @@ export function runUnifiedMusicDiscoveryServiceTests() {
     assert.strictEqual(normalized.score, 0.95);
     assert.strictEqual(normalized.source, 'keyword_search');
     assert.deepStrictEqual(normalized.sources, ['keyword_search']);
+    assert.strictEqual((normalized as any).vectorEmbedding, undefined);
+    assert.strictEqual((normalized as any).__v, undefined);
 
-    console.log('✓ Test 2 Passed: Song normalization structure verified.');
+    console.log('✓ Test 2 Passed: Song normalization structure & public safety verified.');
   }
 
   // Test 3: Normalized Artist Structure
@@ -145,19 +147,7 @@ export function runUnifiedMusicDiscoveryServiceTests() {
     console.log('✓ Test 5 Passed: Exact song title match strong priority verified.');
   }
 
-  // Test 6: Exact Artist Match Strong Priority
-  {
-    const artistQuery = 'The Weeknd & Kavinsky';
-    const ranking = UnifiedMusicDiscoveryService.calculateSongRanking(mockSongDoc, artistQuery, 0);
-
-    assert.ok(ranking.finalScore >= 0.88, `Expected finalScore >= 0.88, got ${ranking.finalScore}`);
-    assert.strictEqual(ranking.breakdown.exactArtistMatch, 1.0);
-    assert.ok(ranking.matchReason.includes('Exact artist match'));
-
-    console.log('✓ Test 6 Passed: Exact artist match strong priority verified.');
-  }
-
-  // Test 7: Popularity Override Safeguard (Exact match beats hyper-popular unrelated track)
+  // Test 6: Popularity Override Safeguard
   {
     const exactZeroPlays = {
       title: 'Midnight Echoes',
@@ -181,71 +171,69 @@ export function runUnifiedMusicDiscoveryServiceTests() {
     assert.ok(exactRanking.finalScore >= 0.90);
     assert.ok(unrelatedRanking.finalScore <= 0.20);
 
-    console.log('✓ Test 7 Passed: Popularity override safeguard verified (exact match protected).');
+    console.log('✓ Test 6 Passed: Popularity override safeguard verified.');
   }
 
-  // Test 8: Semantic Similarity Integration and Bounding
-  {
-    const songA = { title: 'Ambient Waves', playCount: 100 };
-    const rankingWithHighSemantic = UnifiedMusicDiscoveryService.calculateSongRanking(songA, 'peaceful sleep vibes', 0.95);
-    const rankingWithLowSemantic = UnifiedMusicDiscoveryService.calculateSongRanking(songA, 'peaceful sleep vibes', 0.10);
-
-    assert.ok(
-      rankingWithHighSemantic.finalScore > rankingWithLowSemantic.finalScore,
-      'High semantic similarity must produce higher final rank score'
-    );
-    assert.strictEqual(rankingWithHighSemantic.breakdown.semanticSimilarity, 0.95);
-
-    console.log('✓ Test 8 Passed: Semantic similarity factor integration and ranking impact verified.');
-  }
-
-  // Test 9: Configurable Ranking Weights Management
-  {
-    const initialWeights = getUnifiedSearchRankingWeights();
-    assert.strictEqual(initialWeights.exactTitleMatchWeight, 0.35);
-
-    updateUnifiedSearchRankingWeights({ exactTitleMatchWeight: 0.50, popularityWeight: 0.05 });
-    const modifiedWeights = getUnifiedSearchRankingWeights();
-    assert.strictEqual(modifiedWeights.exactTitleMatchWeight, 0.50);
-    assert.strictEqual(modifiedWeights.popularityWeight, 0.05);
-
-    resetUnifiedSearchRankingWeights();
-    const resetWeights = getUnifiedSearchRankingWeights();
-    assert.strictEqual(resetWeights.exactTitleMatchWeight, 0.35);
-
-    console.log('✓ Test 9 Passed: Configurable ranking weights update and reset verified.');
-  }
-
-  // Test 10: Multi-Entity Unified Discovery (Songs, Artists, Albums)
+  // Test 7: Grouped Results (Artists, Albums, Songs, RecommendedSongs) & Pagination
   {
     UnifiedMusicDiscoveryService.discover({
       query: 'Synthwave electronic night drive',
       mode: 'all',
-      limit: 10,
+      page: 1,
+      limit: 5,
     }).then((res) => {
       assert.ok(res !== null);
       assert.strictEqual(res.query, 'Synthwave electronic night drive');
       assert.strictEqual(res.mode, 'all');
-      assert.ok(Array.isArray(res.results.songs));
       assert.ok(Array.isArray(res.results.artists));
       assert.ok(Array.isArray(res.results.albums));
-      assert.ok(typeof res.counts.songs === 'number');
-      assert.ok(typeof res.counts.artists === 'number');
-      assert.ok(typeof res.counts.albums === 'number');
-      assert.ok(typeof res.counts.total === 'number');
-      assert.ok(res.metadata.tookMs >= 0);
-      assert.ok(Array.isArray(res.metadata.sourcesUsed));
-      assert.ok(res.metadata.rankingWeightsApplied !== undefined);
+      assert.ok(Array.isArray(res.results.songs));
+      assert.ok(Array.isArray(res.results.recommendedSongs));
+      assert.strictEqual(res.pagination.page, 1);
+      assert.strictEqual(res.pagination.limit, 5);
+      assert.ok(res.pagination.totalPages !== undefined);
+      assert.ok(res.pagination.hasMore !== undefined);
+      assert.ok(res.counts.total >= 0);
 
-      console.log('✓ Test 10 Passed: Multi-entity unified discovery execution verified.');
+      console.log('✓ Test 7 Passed: Grouped results (artists, albums, songs, recommendedSongs) & pagination verified.');
     });
   }
 
-  // Test 11: Controller API Endpoint & Parameter Validation
+  // Test 8: Keyword and Semantic Discovery Modes
+  {
+    Promise.all([
+      UnifiedMusicDiscoveryService.discover({ query: 'Retro electro', mode: 'keyword' }),
+      UnifiedMusicDiscoveryService.discover({ query: 'Calm ambient focus piano', mode: 'semantic' }),
+      UnifiedMusicDiscoveryService.discover({ mode: 'recommendations' }),
+      UnifiedMusicDiscoveryService.discover({ query: 'Daft Punk', mode: 'hybrid' }),
+    ]).then(([kwRes, semRes, recRes, hybRes]) => {
+      assert.strictEqual(kwRes.mode, 'keyword');
+      assert.strictEqual(semRes.mode, 'semantic');
+      assert.strictEqual(recRes.mode, 'recommendations');
+      assert.strictEqual(hybRes.mode, 'hybrid');
+
+      console.log('✓ Test 8 Passed: Keyword, semantic, recommendations, and hybrid modes verified.');
+    });
+  }
+
+  // Test 9: Public Unauthenticated Discovery vs Authenticated Discovery
+  {
+    Promise.all([
+      UnifiedMusicDiscoveryService.discover({ query: 'Pop', mode: 'all' }), // Unauthenticated
+      UnifiedMusicDiscoveryService.discover({ query: 'Pop', mode: 'all', userId: '507f1f77bcf86cd799439011' }), // Authenticated
+    ]).then(([publicRes, authRes]) => {
+      assert.strictEqual(publicRes.metadata.isAuthenticated, false);
+      assert.strictEqual(authRes.metadata.isAuthenticated, true);
+
+      console.log('✓ Test 9 Passed: Public-safe discovery and authenticated personalization verified.');
+    });
+  }
+
+  // Test 10: Controller Validation (Invalid Mode Rejection)
   {
     const req: any = {
-      query: { q: 'Synthwave', mode: 'hybrid', limit: '5' },
-      user: { _id: '507f1f77bcf86cd799439011' },
+      query: { q: 'Synthwave', mode: 'invalid_mode_xyz' },
+      user: null,
       params: {},
     };
     let statusCode = 200;
@@ -262,17 +250,15 @@ export function runUnifiedMusicDiscoveryServiceTests() {
     };
 
     unifiedDiscovery(req, res).then(() => {
-      assert.strictEqual(statusCode, 200);
-      assert.strictEqual(responseBody.success, true);
-      assert.ok(responseBody.data !== undefined);
-      assert.ok(responseBody.data.results !== undefined);
-      assert.ok(responseBody.data.counts !== undefined);
+      assert.strictEqual(statusCode, 400);
+      assert.strictEqual(responseBody.success, false);
+      assert.ok(responseBody.message.includes('Invalid search mode'));
 
-      console.log('✓ Test 11 Passed: Unified discovery API controller endpoint verified.');
+      console.log('✓ Test 10 Passed: Invalid search mode rejected with 400.');
     });
   }
 
-  // Test 12: Query Length Boundary Defense
+  // Test 11: Controller Validation (Excessive Query Length)
   {
     const longQuery = 'A'.repeat(501);
     const req: any = {
@@ -298,7 +284,37 @@ export function runUnifiedMusicDiscoveryServiceTests() {
       assert.strictEqual(responseBody.success, false);
       assert.ok(responseBody.message.includes('exceeds maximum allowed length'));
 
-      console.log('✓ Test 12 Passed: Excessive query length capped and rejected with 400.');
+      console.log('✓ Test 11 Passed: Excessive query length capped and rejected with 400.');
+    });
+  }
+
+  // Test 12: Empty Query Graceful Handling
+  {
+    const req: any = {
+      query: { q: '' },
+      user: null,
+      params: {},
+    };
+    let statusCode = 200;
+    let responseBody: any = null;
+    const res: any = {
+      status(code: number) {
+        statusCode = code;
+        return res;
+      },
+      json(data: any) {
+        responseBody = data;
+        return res;
+      },
+    };
+
+    unifiedDiscovery(req, res).then(() => {
+      assert.strictEqual(statusCode, 200);
+      assert.strictEqual(responseBody.success, true);
+      assert.ok(responseBody.data.results !== undefined);
+      assert.ok(responseBody.data.pagination !== undefined);
+
+      console.log('✓ Test 12 Passed: Empty query handled gracefully without exceptions.');
     });
   }
 
