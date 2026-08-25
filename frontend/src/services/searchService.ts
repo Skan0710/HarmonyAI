@@ -139,6 +139,32 @@ export interface UnifiedDiscoveryApiResponse {
   message?: string;
 }
 
+export type SuggestionEntityType = 'artist' | 'song' | 'album';
+export type SuggestionMatchType = 'exact_prefix' | 'word_prefix' | 'substring';
+
+export interface SearchSuggestionItem {
+  id: string;
+  title: string;
+  type: SuggestionEntityType;
+  subtitle?: string;
+  coverImage?: string;
+  avatar?: string;
+  score: number;
+  matchType: SuggestionMatchType;
+}
+
+export interface SearchSuggestionResponse {
+  query: string;
+  suggestions: SearchSuggestionItem[];
+  total: number;
+}
+
+export interface SearchSuggestionApiResponse {
+  success: boolean;
+  data?: SearchSuggestionResponse;
+  message?: string;
+}
+
 export const searchGlobal = async (
   query: string,
   limit: number = 10
@@ -180,4 +206,21 @@ export const searchUnifiedDiscovery = async (
 
   const res = extractEnvelopeData<UnifiedDiscoveryResponse>(response, 'Failed to discover music');
   return { discovery: res.data, error: res.error };
+};
+
+export const getSearchSuggestions = async (
+  query: string,
+  limit: number = 6
+): Promise<{ suggestions: SearchSuggestionItem[]; error: string | null }> => {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return { suggestions: [], error: null };
+  }
+
+  const response = await apiClient<SearchSuggestionApiResponse>(
+    `/search/suggestions?q=${encodeURIComponent(trimmed)}&limit=${limit}`
+  );
+
+  const res = extractEnvelopeData<SearchSuggestionResponse>(response, 'Failed to get suggestions');
+  return { suggestions: res.data?.suggestions || [], error: res.error };
 };

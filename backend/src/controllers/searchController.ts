@@ -5,6 +5,7 @@ import {
   UnifiedMusicDiscoveryService,
   DiscoveryMode,
 } from '../services/unifiedMusicDiscoveryService.js';
+import { SearchSuggestionService } from '../services/searchSuggestionService.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
 import { extractQueryParams } from '../utils/validators.js';
 
@@ -92,5 +93,27 @@ export const unifiedDiscovery = controllerWrapper(async (req: Request, res: Resp
   res.status(200).json({
     success: true,
     data: discoveryResult,
+  });
+});
+
+export const searchSuggestions = controllerWrapper(async (req: Request, res: Response) => {
+  const rawQuery = String(req.query.q || req.query.query || '');
+  const trimmedQuery = rawQuery.trim();
+
+  if (trimmedQuery.length > 200) {
+    throw new ControllerError(400, 'Suggestion query exceeds maximum allowed length of 200 characters');
+  }
+
+  const q = extractQueryParams(req, { limit: 'int' });
+  const limit = !isNaN(q.limit) && q.limit > 0 ? Math.min(20, q.limit) : 6;
+
+  const results = await SearchSuggestionService.getSuggestions({
+    query: trimmedQuery,
+    limit,
+  });
+
+  res.status(200).json({
+    success: true,
+    data: results,
   });
 });
