@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { globalSearch, semanticSearch } from '../controllers/searchController.js';
+import { globalSearch, semanticSearch, unifiedDiscovery } from '../controllers/searchController.js';
+import { optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
@@ -8,5 +9,9 @@ router.get('/', globalSearch);
 
 // GET /api/search/semantic?q=query&limit=10 (Natural-Language Semantic Vector Search)
 router.get('/semantic', semanticSearch);
+
+// GET /api/search/discover?q=query&mode=all&limit=10 (Unified Music Discovery: Keyword + Semantic + Recommendations)
+router.get('/discover', optionalAuth, unifiedDiscovery);
+router.get('/unified', optionalAuth, unifiedDiscovery);
 
 export default router;
