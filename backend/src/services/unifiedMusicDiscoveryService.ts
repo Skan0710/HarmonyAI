@@ -356,12 +356,15 @@ export class UnifiedMusicDiscoveryService {
 
     let finalScore = totalWeights > 0 ? weightedSum / totalWeights : 0.5;
 
-    // Exact Match Strong Priority Guard:
+    // Exact Match & Partial Match Priority Guards:
     // If exact title or exact artist matches the query, guarantee strong score >= 0.90
+    // If partial text matches well, ensure baseline in [0.50, 0.85]
     if (isExactTitle) {
       finalScore = Math.max(finalScore, 0.92 + 0.08 * popularityScore);
     } else if (isExactArtist) {
       finalScore = Math.max(finalScore, 0.88 + 0.08 * popularityScore);
+    } else if (partialTextScore >= 0.70) {
+      finalScore = Math.max(finalScore, 0.50 + 0.20 * partialTextScore + 0.05 * popularityScore);
     }
 
     // Strictly bound score in [0.0, 1.0]
