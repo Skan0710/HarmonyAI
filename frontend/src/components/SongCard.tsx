@@ -4,7 +4,7 @@ import type { Song } from '../types/music';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { AddToPlaylistModal } from './AddToPlaylistModal';
-import { RecommendationExplanationModal } from './RecommendationExplanationModal';
+import { WhyThisSongModal } from './RecommendationExplanationModal';
 import { trackRecommendationInteraction } from '../services/recommendationTrackingService';
 import { formatTime, formatCount } from '../utils/formatters';
 
@@ -32,7 +32,9 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
     Boolean((song as any).componentScores) ||
     Boolean((song as any).explanation) ||
     Boolean((song as any).hybridScore) ||
-    Boolean((song as any).recommendationScore);
+    Boolean((song as any).recommendationScore) ||
+    Boolean((song as any).sources) ||
+    Boolean((song as any).matchReason);
 
   const recommendationSource = ((song as any).sources && (song as any).sources[0]) || 'hybrid';
 
@@ -230,7 +232,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
       />
 
       {/* Recommendation Explanation Modal Dialog */}
-      <RecommendationExplanationModal
+      <WhyThisSongModal
         song={song}
         isOpen={isExplanationModalOpen}
         onClose={() => setIsExplanationModalOpen(false)}
