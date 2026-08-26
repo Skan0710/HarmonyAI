@@ -1,19 +1,21 @@
-export type RecommendationExplanationType =
+export type RecommendationReasonType =
+  | 'SIMILAR_TO_LIKED_SONGS'
+  | 'SIMILAR_ARTIST'
+  | 'PREFERRED_GENRE'
+  | 'PREFERRED_MOOD'
+  | 'PREFERRED_ENERGY'
+  | 'SESSION_PREFERENCE'
+  | 'DISCOVERY_OPPORTUNITY'
+  | 'NOVELTY'
+  | 'COLLABORATIVE_SIMILARITY'
   | 'USER_TASTE_SIMILARITY'
   | 'CONTENT_SIMILARITY'
-  | 'COLLABORATIVE_FILTERING'
-  | 'GENRE_PREFERENCE'
-  | 'ARTIST_PREFERENCE'
-  | 'MOOD_MATCH'
-  | 'ENERGY_MATCH'
-  | 'TEMPO_MATCH'
-  | 'SESSION_RELEVANCE'
-  | 'NOVELTY'
-  | 'DIVERSITY'
   | 'POPULARITY';
 
+export type RecommendationExplanationType = RecommendationReasonType;
+
 export interface ExplanationItem {
-  type: RecommendationExplanationType;
+  type: RecommendationReasonType;
   message: string;
   supportingValue?: number | string | Record<string, any>;
   importanceScore: number; // 0.0 to 1.0
@@ -24,8 +26,55 @@ export interface RecommendationExplanation {
   songId: string;
   primaryExplanation: string;
   explanations: ExplanationItem[];
+  reasons: ExplanationItem[];
   summary: string;
   confidenceScore: number;
+}
+
+export interface ExplanationThresholdConfig {
+  minTasteAffinityThreshold: number;
+  minContentSimilarityThreshold: number;
+  minCollaborativeThreshold: number;
+  minNoveltyThreshold: number;
+  minSessionThreshold: number;
+  minGenreAffinityThreshold: number;
+  minArtistAffinityThreshold: number;
+  minEnergyProximityThreshold: number;
+  maxReasonsReturned: number;
+  contradictionSuppression: boolean;
+}
+
+export const DEFAULT_EXPLANATION_THRESHOLDS: ExplanationThresholdConfig = {
+  minTasteAffinityThreshold: 0.50,
+  minContentSimilarityThreshold: 0.50,
+  minCollaborativeThreshold: 0.50,
+  minNoveltyThreshold: 0.50,
+  minSessionThreshold: 0.50,
+  minGenreAffinityThreshold: 0.40,
+  minArtistAffinityThreshold: 0.40,
+  minEnergyProximityThreshold: 0.25,
+  maxReasonsReturned: 3,
+  contradictionSuppression: true,
+};
+
+let activeExplanationThresholds: ExplanationThresholdConfig = { ...DEFAULT_EXPLANATION_THRESHOLDS };
+
+export function getExplanationThresholds(): ExplanationThresholdConfig {
+  return { ...activeExplanationThresholds };
+}
+
+export function updateExplanationThresholds(
+  newThresholds: Partial<ExplanationThresholdConfig>
+): ExplanationThresholdConfig {
+  activeExplanationThresholds = {
+    ...activeExplanationThresholds,
+    ...newThresholds,
+  };
+  return { ...activeExplanationThresholds };
+}
+
+export function resetExplanationThresholds(): void {
+  activeExplanationThresholds = { ...DEFAULT_EXPLANATION_THRESHOLDS };
 }
 
 export interface ExplanationSignalInput {
@@ -39,11 +88,14 @@ export interface ExplanationSignalInput {
     noveltyScore?: number;
     sessionScore?: number;
     diversityScore?: number;
+    genreScore?: number;
+    artistScore?: number;
     [key: string]: any;
   };
   sources?: string[];
   similarityScore?: number;
   seedSong?: any;
+  likedSongsSample?: any[];
   tasteProfile?: {
     combinedGenres?: { genreId?: string; name?: string; affinityScore?: number }[];
     combinedArtists?: { artistId?: string; name?: string; affinityScore?: number }[];
@@ -61,6 +113,8 @@ export interface ExplanationSignalInput {
   noveltyScore?: number;
   diversityAdjustment?: number;
   matchReason?: string;
+  isDiscoveryOpportunity?: boolean;
+  similarArtistName?: string;
 }
 
 export class RecommendationExplanationService {
@@ -92,248 +146,281 @@ export class RecommendationExplanationService {
   }
 
   /**
-   * Explains why a single song was recommended based on its scores, metadata, and user profile signals.
-   * Keeps explanation generation strictly separate from candidate ranking.
+   * Identifies and extracts the strongest, most meaningful reasons behind a recommendation.
+   * Ranks explanation reasons by importance and prevents contradictory claims.
    */
-  public static explainSong(input: ExplanationSignalInput): RecommendationExplanation {
+  public static extractStrongestReasons(
+    input: ExplanationSignalInput,
+    customThresholds?: Partial<ExplanationThresholdConfig>
+  ): ExplanationItem[] {
+    const thresholds: ExplanationThresholdConfig = {
+      ...activeExplanationThresholds,
+      ...customThresholds,
+    };
+
     const {
       song,
       componentScores = {},
       sources = [],
       similarityScore,
       seedSong,
+      likedSongsSample = [],
       tasteProfile,
       sessionPreferences,
       noveltyScore,
       diversityAdjustment,
-      matchReason,
+      isDiscoveryOpportunity,
+      similarArtistName,
     } = input;
 
-    const songId = String(song?._id || song?.id || '');
-    const songTitle = song?.title || 'This track';
     const artistName = this.extractArtistName(song?.artist);
     const genreName = this.extractGenreName(song?.genre);
     const audioFeatures = song?.audioFeatures || {};
 
-    const explanations: ExplanationItem[] = [];
+    const rawReasons: ExplanationItem[] = [];
 
-    // 1. User Taste Similarity Signal
-    const userTasteScore =
-      componentScores.userTasteAffinityScore ??
-      componentScores.userTasteScore ??
-      (sources.includes('hybrid') ? 0.85 : 0);
-
-    if (userTasteScore > 0.3) {
-      const pct = this.toPercent(userTasteScore);
-      explanations.push({
-        type: 'USER_TASTE_SIMILARITY',
-        message: `Matches your overall music taste profile (${pct}% affinity).`,
-        supportingValue: userTasteScore,
-        importanceScore: Number((userTasteScore * 0.95).toFixed(4)),
-        metadata: { affinityPercent: pct },
-      });
-    }
-
-    // 2. Genre Preference Signal
-    if (genreName && tasteProfile?.combinedGenres && Array.isArray(tasteProfile.combinedGenres)) {
-      const matchedGenre = tasteProfile.combinedGenres.find(
-        (g) => g.name?.toLowerCase() === genreName.toLowerCase() || g.genreId === String(song?.genre?._id || song?.genre)
-      );
-      if (matchedGenre && (matchedGenre.affinityScore || 0) > 0.2) {
-        const score = matchedGenre.affinityScore || 0.8;
-        const pct = this.toPercent(score);
-        explanations.push({
-          type: 'GENRE_PREFERENCE',
-          message: `Features ${genreName}, one of your most listened-to genres (${pct}% affinity).`,
-          supportingValue: genreName,
-          importanceScore: Number((score * 0.90).toFixed(4)),
-          metadata: { genre: genreName, affinityScore: score },
-        });
-      }
-    } else if (genreName && (sources.includes('genre') || componentScores.genreScore)) {
-      const score = componentScores.genreScore || 0.75;
-      explanations.push({
-        type: 'GENRE_PREFERENCE',
-        message: `Aligned with your ${genreName} genre preferences.`,
-        supportingValue: genreName,
-        importanceScore: Number((score * 0.80).toFixed(4)),
-        metadata: { genre: genreName },
-      });
-    }
-
-    // 3. Artist Preference Signal
-    if (artistName && tasteProfile?.combinedArtists && Array.isArray(tasteProfile.combinedArtists)) {
-      const matchedArtist = tasteProfile.combinedArtists.find(
-        (a) => a.name?.toLowerCase() === artistName.toLowerCase() || a.artistId === String(song?.artist?._id || song?.artist)
-      );
-      if (matchedArtist && (matchedArtist.affinityScore || 0) > 0.2) {
-        const score = matchedArtist.affinityScore || 0.85;
-        const pct = this.toPercent(score);
-        explanations.push({
-          type: 'ARTIST_PREFERENCE',
-          message: `By ${artistName}, an artist you listen to frequently (${pct}% affinity).`,
-          supportingValue: artistName,
-          importanceScore: Number((score * 0.92).toFixed(4)),
-          metadata: { artist: artistName, affinityScore: score },
-        });
-      }
-    }
-
-    // 4. Content & Acoustic Similarity Signal
-    const contentScore =
+    // 1. Similar to Songs the User Liked
+    const contentVal =
       similarityScore ??
       componentScores.contentScore ??
       componentScores.contentSimilarity ??
-      (sources.includes('content') || sources.includes('seed_similarity') ? 0.80 : 0);
+      (sources.includes('content') || sources.includes('seed_similarity') ? 0.85 : 0);
 
-    if (contentScore > 0.35) {
-      const pct = this.toPercent(contentScore);
-      let seedMsg = '';
-      if (seedSong && seedSong.title) {
-        seedMsg = ` to "${seedSong.title}"`;
+    if (contentVal >= thresholds.minContentSimilarityThreshold) {
+      const pct = this.toPercent(contentVal);
+      let refSongName = '';
+      if (seedSong?.title) {
+        refSongName = ` like "${seedSong.title}"`;
+      } else if (Array.isArray(likedSongsSample) && likedSongsSample.length > 0 && likedSongsSample[0]?.title) {
+        refSongName = ` like "${likedSongsSample[0].title}"`;
       }
-      explanations.push({
-        type: 'CONTENT_SIMILARITY',
-        message: `Shares strong acoustic signature and style similarity${seedMsg} (${pct}% match).`,
-        supportingValue: contentScore,
-        importanceScore: Number((contentScore * 0.88).toFixed(4)),
+      rawReasons.push({
+        type: 'SIMILAR_TO_LIKED_SONGS',
+        message: `Similar acoustic style and vibe to songs you liked${refSongName} (${pct}% match).`,
+        supportingValue: contentVal,
+        importanceScore: Number((contentVal * 0.95).toFixed(4)),
         metadata: {
-          similarityScore: contentScore,
-          seedSongTitle: seedSong?.title,
+          similarityScore: contentVal,
+          referenceSong: seedSong?.title || (likedSongsSample[0]?.title ?? undefined),
         },
       });
     }
 
-    // 5. Collaborative Filtering Signal
-    const collabScore = componentScores.collaborativeScore ?? (sources.includes('collaborative') ? 0.82 : 0);
-    if (collabScore > 0.3) {
-      const pct = this.toPercent(collabScore);
-      explanations.push({
-        type: 'COLLABORATIVE_FILTERING',
-        message: `Listeners with musical tastes similar to yours frequently replay this song (${pct}% match).`,
-        supportingValue: collabScore,
-        importanceScore: Number((collabScore * 0.85).toFixed(4)),
-        metadata: { collaborativeScore: collabScore },
+    // 2. Similar Artist / Favorite Artist
+    let artistAffinity = 0;
+    if (artistName && tasteProfile?.combinedArtists && Array.isArray(tasteProfile.combinedArtists)) {
+      const matchedArtist = tasteProfile.combinedArtists.find(
+        (a) => a.name?.toLowerCase() === artistName.toLowerCase() || a.artistId === String(song?.artist?._id || song?.artist)
+      );
+      if (matchedArtist && (matchedArtist.affinityScore || 0) >= thresholds.minArtistAffinityThreshold) {
+        artistAffinity = matchedArtist.affinityScore || 0.85;
+      }
+    }
+
+    if (artistAffinity >= thresholds.minArtistAffinityThreshold) {
+      const pct = this.toPercent(artistAffinity);
+      rawReasons.push({
+        type: 'SIMILAR_ARTIST',
+        message: `By ${artistName}, an artist in your top listening rotation (${pct}% affinity).`,
+        supportingValue: artistName,
+        importanceScore: Number((artistAffinity * 0.92).toFixed(4)),
+        metadata: { artist: artistName, affinityScore: artistAffinity, isDirectArtist: true },
+      });
+    } else if (similarArtistName || componentScores.artistScore) {
+      const score = componentScores.artistScore || 0.78;
+      const ref = similarArtistName ? ` to ${similarArtistName}` : '';
+      rawReasons.push({
+        type: 'SIMILAR_ARTIST',
+        message: `Shares a musical style and production similar${ref}.`,
+        supportingValue: similarArtistName || artistName,
+        importanceScore: Number((score * 0.85).toFixed(4)),
+        metadata: { similarArtist: similarArtistName },
       });
     }
 
-    // 6. Session Relevance Signal
-    const sessionScore = componentScores.sessionScore ?? (sessionPreferences ? 0.78 : 0);
-    if (sessionScore > 0.3) {
-      explanations.push({
-        type: 'SESSION_RELEVANCE',
-        message: `Fits the mood and rhythm of your current listening session.`,
-        supportingValue: sessionScore,
-        importanceScore: Number((sessionScore * 0.75).toFixed(4)),
-        metadata: { sessionScore },
+    // 3. Preferred Genre
+    let genreAffinity = 0;
+    if (genreName && tasteProfile?.combinedGenres && Array.isArray(tasteProfile.combinedGenres)) {
+      const matchedGenre = tasteProfile.combinedGenres.find(
+        (g) => g.name?.toLowerCase() === genreName.toLowerCase() || g.genreId === String(song?.genre?._id || song?.genre)
+      );
+      if (matchedGenre && (matchedGenre.affinityScore || 0) >= thresholds.minGenreAffinityThreshold) {
+        genreAffinity = matchedGenre.affinityScore || 0.80;
+      }
+    } else if (genreName && (sources.includes('genre') || componentScores.genreScore)) {
+      genreAffinity = componentScores.genreScore || 0.70;
+    }
+
+    if (genreAffinity >= thresholds.minGenreAffinityThreshold) {
+      const pct = this.toPercent(genreAffinity);
+      rawReasons.push({
+        type: 'PREFERRED_GENRE',
+        message: `Features ${genreName}, one of your preferred genres (${pct}% affinity).`,
+        supportingValue: genreName,
+        importanceScore: Number((genreAffinity * 0.90).toFixed(4)),
+        metadata: { genre: genreName, affinityScore: genreAffinity },
       });
     }
 
-    // 7. Mood & Activity Match Signal
-    const targetMood = sessionPreferences?.activeMood || (song?.mood ? String(song.mood) : undefined);
-    if (targetMood) {
-      explanations.push({
-        type: 'MOOD_MATCH',
-        message: `Matches the ${targetMood.toLowerCase()} mood vibe.`,
-        supportingValue: targetMood,
-        importanceScore: 0.72,
-        metadata: { mood: targetMood },
+    // 4. Collaborative Similarity
+    const collabVal = componentScores.collaborativeScore ?? (sources.includes('collaborative') ? 0.80 : 0);
+    if (collabVal >= thresholds.minCollaborativeThreshold) {
+      const pct = this.toPercent(collabVal);
+      rawReasons.push({
+        type: 'COLLABORATIVE_SIMILARITY',
+        message: `Highly played and replayed by listeners with similar musical taste (${pct}% match).`,
+        supportingValue: collabVal,
+        importanceScore: Number((collabVal * 0.86).toFixed(4)),
+        metadata: { collaborativeScore: collabVal },
       });
     }
 
-    // 8. Energy Match Signal
+    // 5. Session Preference
+    const sessionVal = componentScores.sessionScore ?? (sessionPreferences ? 0.75 : 0);
+    if (sessionVal >= thresholds.minSessionThreshold) {
+      rawReasons.push({
+        type: 'SESSION_PREFERENCE',
+        message: `Fits seamlessly into the flow of your active listening session.`,
+        supportingValue: sessionVal,
+        importanceScore: Number((sessionVal * 0.80).toFixed(4)),
+        metadata: { sessionScore: sessionVal },
+      });
+    }
+
+    // 6. Preferred Mood
+    const activeMood = sessionPreferences?.activeMood || (song?.mood ? String(song.mood) : undefined);
+    if (activeMood) {
+      rawReasons.push({
+        type: 'PREFERRED_MOOD',
+        message: `Matches your current ${activeMood.toLowerCase()} mood vibe.`,
+        supportingValue: activeMood,
+        importanceScore: 0.75,
+        metadata: { mood: activeMood },
+      });
+    }
+
+    // 7. Preferred Energy
     if (typeof audioFeatures?.energy === 'number') {
       const energyLevel = audioFeatures.energy >= 0.7 ? 'high-energy' : audioFeatures.energy <= 0.4 ? 'calm' : 'moderate';
       if (sessionPreferences?.targetEnergy !== undefined) {
         const diff = Math.abs(audioFeatures.energy - sessionPreferences.targetEnergy);
-        if (diff <= 0.25) {
-          explanations.push({
-            type: 'ENERGY_MATCH',
-            message: `Energy level (${energyLevel}, ${Math.round(audioFeatures.energy * 100)}%) aligns with your desired listening pace.`,
+        if (diff <= thresholds.minEnergyProximityThreshold) {
+          rawReasons.push({
+            type: 'PREFERRED_ENERGY',
+            message: `Energy pace (${energyLevel}, ${Math.round(audioFeatures.energy * 100)}%) aligns with your preferred session intensity.`,
             supportingValue: audioFeatures.energy,
-            importanceScore: 0.70,
+            importanceScore: 0.72,
             metadata: { energy: audioFeatures.energy, energyLevel },
           });
         }
       }
     }
 
-    // 9. Tempo Match Signal
-    if (typeof audioFeatures?.tempo === 'number' && audioFeatures.tempo > 0) {
-      const bpm = Math.round(audioFeatures.tempo);
-      if (sessionPreferences?.targetTempo !== undefined) {
-        const diff = Math.abs(bpm - sessionPreferences.targetTempo);
-        if (diff <= 15) {
-          explanations.push({
-            type: 'TEMPO_MATCH',
-            message: `Rhythm matches your active tempo target around ${bpm} BPM.`,
-            supportingValue: bpm,
-            importanceScore: 0.65,
-            metadata: { bpm },
-          });
-        }
-      }
-    }
-
-    // 10. Novelty Signal
+    // 8. Novelty
     const noveltyVal = noveltyScore ?? componentScores.noveltyScore;
-    if (typeof noveltyVal === 'number' && noveltyVal > 0.4) {
-      explanations.push({
+    if (typeof noveltyVal === 'number' && noveltyVal >= thresholds.minNoveltyThreshold) {
+      rawReasons.push({
         type: 'NOVELTY',
-        message: `A fresh discovery you haven't listened to yet.`,
+        message: `A fresh release and novel sound you haven't explored yet.`,
         supportingValue: noveltyVal,
-        importanceScore: Number((noveltyVal * 0.68).toFixed(4)),
+        importanceScore: Number((noveltyVal * 0.78).toFixed(4)),
         metadata: { noveltyScore: noveltyVal },
       });
     }
 
-    // 11. Diversity Signal
-    const diversityVal = diversityAdjustment ?? componentScores.diversityScore;
-    if (typeof diversityVal === 'number' && Math.abs(diversityVal) > 0.05) {
-      explanations.push({
-        type: 'DIVERSITY',
-        message: `Adds curated variety to balance your listening experience.`,
-        supportingValue: diversityVal,
-        importanceScore: 0.60,
-        metadata: { diversityAdjustment: diversityVal },
+    // 9. Discovery Opportunity
+    const isDiscovery = Boolean(
+      isDiscoveryOpportunity ||
+      (typeof diversityAdjustment === 'number' && diversityAdjustment > 0.08) ||
+      (sources.includes('discovery') && artistAffinity < 0.3)
+    );
+    if (isDiscovery) {
+      rawReasons.push({
+        type: 'DISCOVERY_OPPORTUNITY',
+        message: genreName
+          ? `Curated to expand your musical horizons in ${genreName}.`
+          : `Curated discovery to introduce you to new emerging sounds.`,
+        supportingValue: genreName,
+        importanceScore: 0.74,
+        metadata: { genre: genreName },
       });
     }
 
-    // 12. Community Popularity Signal
-    const popScore = componentScores.popularityScore ?? (song?.playCount ? Math.min(1.0, song.playCount / 100000) : 0);
-    if (popScore > 0.4) {
-      explanations.push({
-        type: 'POPULARITY',
-        message: `Popular community hit with high engagement across the network.`,
-        supportingValue: popScore,
-        importanceScore: Number((popScore * 0.55).toFixed(4)),
-        metadata: { popularityScore: popScore },
+    // 10. Contradiction Resolution & Filtering
+    let filteredReasons = rawReasons;
+    if (thresholds.contradictionSuppression) {
+      filteredReasons = this.resolveContradictions(rawReasons, {
+        artistAffinity,
+        genreAffinity,
+        audioEnergy: audioFeatures?.energy,
       });
     }
 
-    // Fallback if no specific signals matched
-    if (explanations.length === 0) {
-      explanations.push({
+    // Sort reasons descending by importance score
+    filteredReasons.sort((a, b) => b.importanceScore - a.importanceScore);
+
+    // Limit to the most meaningful reasons (configured max)
+    const finalReasons = filteredReasons.slice(0, Math.max(1, thresholds.maxReasonsReturned));
+
+    // Fallback if no specific threshold was crossed
+    if (finalReasons.length === 0) {
+      finalReasons.push({
         type: 'USER_TASTE_SIMILARITY',
-        message: matchReason || 'Recommended based on your personalized HarmonyAI taste profile.',
+        message: input.matchReason || 'Matches your general music preferences.',
         importanceScore: 0.50,
       });
     }
 
-    // Sort explanations descending by importance score
-    explanations.sort((a, b) => b.importanceScore - a.importanceScore);
+    return finalReasons;
+  }
 
-    const primaryExplanation = explanations[0]?.message || 'Recommended for you.';
-    const confidenceScore = explanations[0]?.importanceScore || 0.75;
+  /**
+   * Resolves contradictory reasons (e.g. Novelty/Discovery vs Familiar Favorite Artist).
+   */
+  private static resolveContradictions(
+    reasons: ExplanationItem[],
+    context: { artistAffinity: number; genreAffinity: number; audioEnergy?: number }
+  ): ExplanationItem[] {
+    const hasFamiliarArtist = context.artistAffinity >= 0.70;
+    const hasDiscovery = reasons.some((r) => r.type === 'DISCOVERY_OPPORTUNITY');
+    const hasNovelty = reasons.some((r) => r.type === 'NOVELTY');
 
-    // Compose rich multi-factor summary
-    const topPoints = explanations.slice(0, 2).map((e) => e.message);
+    return reasons.filter((r) => {
+      // Contradiction 1: If it's a known heavy favorite artist, don't claim it's a "discovery opportunity in unfamiliar territory"
+      if (hasFamiliarArtist && r.type === 'DISCOVERY_OPPORTUNITY') {
+        return false;
+      }
+      // Contradiction 2: If it's pure novel discovery with 0 familiarity, don't claim familiar artist affinity
+      if (!hasFamiliarArtist && hasDiscovery && hasNovelty && r.type === 'SIMILAR_ARTIST' && r.metadata?.isDirectArtist) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  /**
+   * Explains why a single song was recommended based on its scores, metadata, and user profile signals.
+   * Keeps explanation generation strictly separate from candidate ranking.
+   */
+  public static explainSong(
+    input: ExplanationSignalInput,
+    customThresholds?: Partial<ExplanationThresholdConfig>
+  ): RecommendationExplanation {
+    const songId = String(input.song?._id || input.song?.id || '');
+    const reasons = this.extractStrongestReasons(input, customThresholds);
+
+    const primaryExplanation = reasons[0]?.message || 'Recommended for you.';
+    const confidenceScore = reasons[0]?.importanceScore || 0.75;
+
+    // Compose concise, natural-language multi-reason summary
+    const topPoints = reasons.slice(0, 2).map((e) => e.message);
     const summary = topPoints.join(' ');
 
     return {
       songId,
       primaryExplanation,
-      explanations,
+      explanations: reasons,
+      reasons,
       summary,
       confidenceScore,
     };
@@ -343,9 +430,10 @@ export class RecommendationExplanationService {
    * Batch generation of explanations for an array of songs/candidates.
    */
   public static explainBatch(
-    items: ExplanationSignalInput[]
+    items: ExplanationSignalInput[],
+    customThresholds?: Partial<ExplanationThresholdConfig>
   ): RecommendationExplanation[] {
     if (!Array.isArray(items)) return [];
-    return items.map((item) => this.explainSong(item));
+    return items.map((item) => this.explainSong(item, customThresholds));
   }
 }

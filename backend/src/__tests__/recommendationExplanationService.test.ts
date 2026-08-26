@@ -2,224 +2,246 @@ import assert from 'node:assert';
 import {
   RecommendationExplanationService,
   ExplanationSignalInput,
+  getExplanationThresholds,
+  updateExplanationThresholds,
+  resetExplanationThresholds,
 } from '../services/recommendationExplanationService.js';
 
 export function runRecommendationExplanationServiceTests() {
-  console.log('[Recommendation Explanation Service Test Suite] Starting tests...');
+  console.log('[Recommendation Explanation & Reason Extraction Test Suite] Starting tests...');
 
-  // Test 1: User Taste & Genre Preference Explanations
+  // Test 1: Similar to Songs User Liked Reason Extraction
   {
     const input: ExplanationSignalInput = {
       song: {
         _id: '507f1f77bcf86cd799439011',
         title: 'Midnight City',
-        artist: { name: 'M83' },
-        genre: { name: 'Synthwave' },
       },
-      componentScores: {
-        userTasteAffinityScore: 0.92,
-      },
-      tasteProfile: {
-        combinedGenres: [
-          { name: 'Synthwave', affinityScore: 0.95 },
-          { name: 'Indie Rock', affinityScore: 0.60 },
-        ],
-      },
+      similarityScore: 0.90,
+      likedSongsSample: [{ title: 'Intro (by The xx)' }],
     };
 
-    const explanation = RecommendationExplanationService.explainSong(input);
+    const reasons = RecommendationExplanationService.extractStrongestReasons(input);
+    const likedReason = reasons.find((r) => r.type === 'SIMILAR_TO_LIKED_SONGS');
 
-    assert.strictEqual(explanation.songId, '507f1f77bcf86cd799439011');
-    assert.ok(explanation.explanations.length >= 2);
+    assert.ok(likedReason !== undefined);
+    assert.ok(likedReason.message.includes('Intro (by The xx)'));
+    assert.ok(likedReason.message.includes('90% match'));
+    assert.strictEqual(likedReason.supportingValue, 0.90);
 
-    const tasteExp = explanation.explanations.find((e) => e.type === 'USER_TASTE_SIMILARITY');
-    const genreExp = explanation.explanations.find((e) => e.type === 'GENRE_PREFERENCE');
-
-    assert.ok(tasteExp !== undefined);
-    assert.ok(tasteExp.message.includes('92% affinity'));
-    assert.ok(genreExp !== undefined);
-    assert.ok(genreExp.message.includes('Synthwave'));
-    assert.ok(genreExp.message.includes('95% affinity'));
-
-    console.log('✓ Test 1 Passed: User taste and genre preference explanations verified.');
+    console.log('✓ Test 1 Passed: Similar to liked songs reason extraction verified.');
   }
 
-  // Test 2: Content & Seed Song Similarity Explanation
+  // Test 2: Similar Artist & Favorite Artist Reason Extraction
   {
     const input: ExplanationSignalInput = {
       song: {
         _id: '507f1f77bcf86cd799439012',
-        title: 'Nightcall',
-        artist: { name: 'Kavinsky' },
-      },
-      similarityScore: 0.88,
-      seedSong: {
-        title: 'Tech Noir',
-      },
-    };
-
-    const explanation = RecommendationExplanationService.explainSong(input);
-    const contentExp = explanation.explanations.find((e) => e.type === 'CONTENT_SIMILARITY');
-
-    assert.ok(contentExp !== undefined);
-    assert.ok(contentExp.message.includes('"Tech Noir"'));
-    assert.ok(contentExp.message.includes('88% match'));
-    assert.strictEqual(contentExp.supportingValue, 0.88);
-
-    console.log('✓ Test 2 Passed: Content and seed song similarity explanation verified.');
-  }
-
-  // Test 3: Collaborative Filtering Explanation
-  {
-    const input: ExplanationSignalInput = {
-      song: {
-        _id: '507f1f77bcf86cd799439013',
-        title: 'Get Lucky',
-        artist: { name: 'Daft Punk' },
-      },
-      componentScores: {
-        collaborativeScore: 0.85,
-      },
-    };
-
-    const explanation = RecommendationExplanationService.explainSong(input);
-    const collabExp = explanation.explanations.find((e) => e.type === 'COLLABORATIVE_FILTERING');
-
-    assert.ok(collabExp !== undefined);
-    assert.ok(collabExp.message.includes('Listeners with musical tastes similar to yours'));
-    assert.ok(collabExp.message.includes('85% match'));
-
-    console.log('✓ Test 3 Passed: Collaborative filtering explanation verified.');
-  }
-
-  // Test 4: Artist Preference Explanation
-  {
-    const input: ExplanationSignalInput = {
-      song: {
-        _id: '507f1f77bcf86cd799439014',
         title: 'Starboy',
         artist: { name: 'The Weeknd' },
       },
       tasteProfile: {
-        combinedArtists: [
-          { name: 'The Weeknd', affinityScore: 0.90 },
-        ],
+        combinedArtists: [{ name: 'The Weeknd', affinityScore: 0.92 }],
       },
     };
 
-    const explanation = RecommendationExplanationService.explainSong(input);
-    const artistExp = explanation.explanations.find((e) => e.type === 'ARTIST_PREFERENCE');
+    const reasons = RecommendationExplanationService.extractStrongestReasons(input);
+    const artistReason = reasons.find((r) => r.type === 'SIMILAR_ARTIST');
 
-    assert.ok(artistExp !== undefined);
-    assert.ok(artistExp.message.includes('The Weeknd'));
-    assert.ok(artistExp.message.includes('90% affinity'));
+    assert.ok(artistReason !== undefined);
+    assert.ok(artistReason.message.includes('The Weeknd'));
+    assert.ok(artistReason.message.includes('92% affinity'));
 
-    console.log('✓ Test 4 Passed: Artist preference explanation verified.');
+    console.log('✓ Test 2 Passed: Similar / favorite artist reason extraction verified.');
   }
 
-  // Test 5: Mood, Energy, and Tempo Alignment
+  // Test 3: Preferred Genre Reason Extraction
   {
     const input: ExplanationSignalInput = {
       song: {
-        _id: '507f1f77bcf86cd799439015',
-        title: 'High Voltage Rhythm',
-        audioFeatures: {
-          energy: 0.85,
-          tempo: 128,
-        },
+        _id: '507f1f77bcf86cd799439013',
+        title: 'Nightcall',
+        genre: { name: 'Synthwave' },
       },
-      sessionPreferences: {
-        activeMood: 'Energetic',
-        targetEnergy: 0.80,
-        targetTempo: 125,
+      tasteProfile: {
+        combinedGenres: [{ name: 'Synthwave', affinityScore: 0.88 }],
       },
     };
 
-    const explanation = RecommendationExplanationService.explainSong(input);
+    const reasons = RecommendationExplanationService.extractStrongestReasons(input);
+    const genreReason = reasons.find((r) => r.type === 'PREFERRED_GENRE');
 
-    const moodExp = explanation.explanations.find((e) => e.type === 'MOOD_MATCH');
-    const energyExp = explanation.explanations.find((e) => e.type === 'ENERGY_MATCH');
-    const tempoExp = explanation.explanations.find((e) => e.type === 'TEMPO_MATCH');
+    assert.ok(genreReason !== undefined);
+    assert.ok(genreReason.message.includes('Synthwave'));
+    assert.ok(genreReason.message.includes('88% affinity'));
 
-    assert.ok(moodExp !== undefined && moodExp.message.includes('energetic'));
-    assert.ok(energyExp !== undefined && energyExp.message.includes('high-energy'));
-    assert.ok(tempoExp !== undefined && tempoExp.message.includes('128 BPM'));
-
-    console.log('✓ Test 5 Passed: Mood, energy, and tempo explanations verified.');
+    console.log('✓ Test 3 Passed: Preferred genre reason extraction verified.');
   }
 
-  // Test 6: Novelty and Diversity Signals
+  // Test 4: Preferred Mood and Preferred Energy Extraction
+  {
+    const input: ExplanationSignalInput = {
+      song: {
+        _id: '507f1f77bcf86cd799439014',
+        title: 'Power Run',
+        audioFeatures: { energy: 0.85, tempo: 130 },
+      },
+      sessionPreferences: {
+        activeMood: 'Focus',
+        targetEnergy: 0.80,
+      },
+    };
+
+    const reasons = RecommendationExplanationService.extractStrongestReasons(input);
+    const moodReason = reasons.find((r) => r.type === 'PREFERRED_MOOD');
+    const energyReason = reasons.find((r) => r.type === 'PREFERRED_ENERGY');
+
+    assert.ok(moodReason !== undefined && moodReason.message.includes('focus'));
+    assert.ok(energyReason !== undefined && energyReason.message.includes('high-energy'));
+
+    console.log('✓ Test 4 Passed: Preferred mood and energy reason extraction verified.');
+  }
+
+  // Test 5: Session Preference, Novelty, and Collaborative Similarity
+  {
+    const input: ExplanationSignalInput = {
+      song: { _id: '507f1f77bcf86cd799439015', title: 'Late Night Flow' },
+      componentScores: {
+        sessionScore: 0.85,
+        collaborativeScore: 0.80,
+      },
+      noveltyScore: 0.75,
+    };
+
+    const reasons = RecommendationExplanationService.extractStrongestReasons(input);
+    const sessionReason = reasons.find((r) => r.type === 'SESSION_PREFERENCE');
+    const noveltyReason = reasons.find((r) => r.type === 'NOVELTY');
+    const collabReason = reasons.find((r) => r.type === 'COLLABORATIVE_SIMILARITY');
+
+    assert.ok(sessionReason !== undefined);
+    assert.ok(noveltyReason !== undefined);
+    assert.ok(collabReason !== undefined);
+
+    console.log('✓ Test 5 Passed: Session, novelty, and collaborative similarity extraction verified.');
+  }
+
+  // Test 6: Discovery Opportunity Extraction
   {
     const input: ExplanationSignalInput = {
       song: {
         _id: '507f1f77bcf86cd799439016',
-        title: 'Underground Gem',
+        title: 'Nordic Chill',
+        genre: { name: 'Ambient Lo-Fi' },
       },
-      noveltyScore: 0.85,
-      diversityAdjustment: 0.12,
+      isDiscoveryOpportunity: true,
+      diversityAdjustment: 0.15,
     };
 
-    const explanation = RecommendationExplanationService.explainSong(input);
+    const reasons = RecommendationExplanationService.extractStrongestReasons(input);
+    const discoveryReason = reasons.find((r) => r.type === 'DISCOVERY_OPPORTUNITY');
 
-    const noveltyExp = explanation.explanations.find((e) => e.type === 'NOVELTY');
-    const diversityExp = explanation.explanations.find((e) => e.type === 'DIVERSITY');
+    assert.ok(discoveryReason !== undefined);
+    assert.ok(discoveryReason.message.includes('Ambient Lo-Fi'));
 
-    assert.ok(noveltyExp !== undefined);
-    assert.ok(noveltyExp.message.includes('fresh discovery'));
-    assert.ok(diversityExp !== undefined);
-    assert.ok(diversityExp.message.includes('curated variety'));
-
-    console.log('✓ Test 6 Passed: Novelty and diversity explanations verified.');
+    console.log('✓ Test 6 Passed: Discovery opportunity reason extraction verified.');
   }
 
-  // Test 7: Batch Explanations Processing
+  // Test 7: Contradiction Avoidance (Known Favorite vs Discovery)
   {
-    const batchInput: ExplanationSignalInput[] = [
-      {
-        song: { _id: '1', title: 'Song One' },
-        componentScores: { userTasteAffinityScore: 0.8 },
+    const contradictoryInput: ExplanationSignalInput = {
+      song: {
+        _id: '507f1f77bcf86cd799439017',
+        title: 'Harder, Better, Faster, Stronger',
+        artist: { name: 'Daft Punk' },
       },
-      {
-        song: { _id: '2', title: 'Song Two' },
-        componentScores: { collaborativeScore: 0.9 },
+      tasteProfile: {
+        combinedArtists: [{ name: 'Daft Punk', affinityScore: 0.95 }],
       },
-    ];
+      isDiscoveryOpportunity: true, // artificially conflicting flag
+    };
 
-    const batchResults = RecommendationExplanationService.explainBatch(batchInput);
+    const reasons = RecommendationExplanationService.extractStrongestReasons(contradictoryInput);
+    const hasFavoriteArtist = reasons.some((r) => r.type === 'SIMILAR_ARTIST');
+    const hasDiscovery = reasons.some((r) => r.type === 'DISCOVERY_OPPORTUNITY');
 
-    assert.strictEqual(batchResults.length, 2);
-    assert.strictEqual(batchResults[0].songId, '1');
-    assert.strictEqual(batchResults[1].songId, '2');
+    // Due to contradiction suppression, familiar heavy favorite artist suppresses discovery claim
+    assert.strictEqual(hasFavoriteArtist, true);
+    assert.strictEqual(hasDiscovery, false, 'Known favorite artist must suppress contradictory discovery claim');
 
-    console.log('✓ Test 7 Passed: Batch explanations processing verified.');
+    console.log('✓ Test 7 Passed: Contradiction resolution between favorite artist and discovery verified.');
   }
 
-  // Test 8: Structured Explanation Format & Importance Sorting
+  // Test 8: Rank by Importance & Return Only Top Configured Reasons
+  {
+    const multiSignalInput: ExplanationSignalInput = {
+      song: {
+        _id: '507f1f77bcf86cd799439018',
+        title: 'Multi Signal Track',
+        artist: { name: 'Kavinsky' },
+        genre: { name: 'Synthwave' },
+        audioFeatures: { energy: 0.85 },
+      },
+      similarityScore: 0.92,
+      tasteProfile: {
+        combinedArtists: [{ name: 'Kavinsky', affinityScore: 0.90 }],
+        combinedGenres: [{ name: 'Synthwave', affinityScore: 0.85 }],
+      },
+      componentScores: {
+        collaborativeScore: 0.80,
+        sessionScore: 0.75,
+      },
+      sessionPreferences: {
+        activeMood: 'Driving',
+        targetEnergy: 0.80,
+      },
+      noveltyScore: 0.70,
+    };
+
+    const topReasons = RecommendationExplanationService.extractStrongestReasons(multiSignalInput, {
+      maxReasonsReturned: 3,
+    });
+
+    assert.strictEqual(topReasons.length, 3, 'Must return strictly top 3 most meaningful reasons');
+    assert.ok(topReasons[0].importanceScore >= topReasons[1].importanceScore);
+    assert.ok(topReasons[1].importanceScore >= topReasons[2].importanceScore);
+
+    console.log('✓ Test 8 Passed: Reason ranking by importance and max count limit verified.');
+  }
+
+  // Test 9: Configurable Thresholds Support
+  {
+    const defaultThresholds = getExplanationThresholds();
+    assert.strictEqual(defaultThresholds.maxReasonsReturned, 3);
+
+    updateExplanationThresholds({ maxReasonsReturned: 2, minContentSimilarityThreshold: 0.75 });
+    const updated = getExplanationThresholds();
+    assert.strictEqual(updated.maxReasonsReturned, 2);
+    assert.strictEqual(updated.minContentSimilarityThreshold, 0.75);
+
+    resetExplanationThresholds();
+    const restored = getExplanationThresholds();
+    assert.strictEqual(restored.maxReasonsReturned, 3);
+
+    console.log('✓ Test 9 Passed: Configurable explanation thresholds verified.');
+  }
+
+  // Test 10: Deterministic and Testable Execution
   {
     const input: ExplanationSignalInput = {
-      song: { _id: '100', title: 'Ranked Track' },
-      componentScores: {
-        userTasteAffinityScore: 0.95,
-        popularityScore: 0.50,
-      },
+      song: { _id: '507f1f77bcf86cd799439020', title: 'Deterministic Song' },
+      similarityScore: 0.82,
     };
 
-    const explanation = RecommendationExplanationService.explainSong(input);
+    const run1 = RecommendationExplanationService.explainSong(input);
+    const run2 = RecommendationExplanationService.explainSong(input);
 
-    assert.ok(explanation.primaryExplanation.length > 0);
-    assert.ok(explanation.summary.length > 0);
-    assert.ok(explanation.confidenceScore >= 0 && explanation.confidenceScore <= 1.0);
+    assert.strictEqual(run1.primaryExplanation, run2.primaryExplanation);
+    assert.strictEqual(run1.confidenceScore, run2.confidenceScore);
+    assert.strictEqual(run1.summary, run2.summary);
+    assert.strictEqual(run1.reasons.length, run2.reasons.length);
 
-    // Verify importance sorting descending
-    for (let i = 0; i < explanation.explanations.length - 1; i++) {
-      assert.ok(
-        explanation.explanations[i].importanceScore >= explanation.explanations[i + 1].importanceScore,
-        'Explanations must be sorted descending by importanceScore'
-      );
-    }
-
-    console.log('✓ Test 8 Passed: Structured format and importance score ordering verified.');
+    console.log('✓ Test 10 Passed: Deterministic and reproducible explanation generation verified.');
   }
 
-  console.log('🎉 All 8 recommendation explanation service tests completed successfully.');
+  console.log('🎉 All 10 recommendation reason extraction tests completed successfully.');
 }
