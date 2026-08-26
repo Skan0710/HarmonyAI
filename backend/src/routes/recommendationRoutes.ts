@@ -7,6 +7,7 @@ import {
   processContextualAssistantRequest,
   getSessionRecommendations,
   getSmartAutoplayCandidates,
+  getRecommendationExplanation,
 } from '../controllers/recommendationController.js';
 import {
   trackInteraction,
@@ -17,6 +18,11 @@ import {
 import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// GET /api/recommendations/explain/:songId (Protected JWT - Recommendation Explanations)
+router.get('/explain/:songId', protect, getRecommendationExplanation);
+router.get('/explanation/:songId', protect, getRecommendationExplanation);
+router.get('/:songId/explanation', protect, getRecommendationExplanation);
 
 // GET /api/recommendations/autoplay?limit=5&lastPlayedArtistId=...&excludeQueue=id1,id2 (Protected JWT)
 router.get('/autoplay', protect, getSmartAutoplayCandidates);
