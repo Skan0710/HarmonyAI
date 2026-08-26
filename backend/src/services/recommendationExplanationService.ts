@@ -268,14 +268,16 @@ export class RecommendationExplanationService {
       });
     } else if (similarArtistName || typeof componentScores.artistScore === 'number') {
       const score = this.clampScore(componentScores.artistScore ?? 0.78);
-      const ref = similarArtistName ? ` to ${similarArtistName}` : '';
-      rawReasons.push({
-        type: 'SIMILAR_ARTIST',
-        message: `Shares a musical style and production similar${ref}.`,
-        supportingValue: similarArtistName || artistName,
-        importanceScore: this.clampScore(Number((score * 0.85).toFixed(4))),
-        metadata: { similarArtist: similarArtistName },
-      });
+      if (score >= thresholds.minArtistAffinityThreshold) {
+        const ref = similarArtistName ? ` to ${similarArtistName}` : '';
+        rawReasons.push({
+          type: 'SIMILAR_ARTIST',
+          message: `Shares a musical style and production similar${ref}.`,
+          supportingValue: similarArtistName || artistName,
+          importanceScore: this.clampScore(Number((score * 0.85).toFixed(4))),
+          metadata: { similarArtist: similarArtistName },
+        });
+      }
     }
 
     // 3. Preferred Genre (With complete fallback when combinedGenres doesn't match or is below threshold)
