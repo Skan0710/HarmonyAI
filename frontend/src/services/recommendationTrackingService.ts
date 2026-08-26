@@ -1,6 +1,14 @@
 import { apiClient } from './api';
 import { extractEnvelopeData } from '../utils/apiHelpers';
 
+export type ExplanationFeedbackType =
+  | 'helpful'
+  | 'not_relevant'
+  | 'too_similar'
+  | 'not_my_style'
+  | 'thumbs_up'
+  | 'thumbs_down';
+
 export type RecommendationActionType =
   | 'impression'
   | 'click'
@@ -8,7 +16,8 @@ export type RecommendationActionType =
   | 'like'
   | 'skip'
   | 'thumbs_up'
-  | 'thumbs_down';
+  | 'thumbs_down'
+  | 'explanation_feedback';
 
 /**
  * Lightweight, non-blocking service for recording recommendation interaction events
@@ -17,7 +26,8 @@ export type RecommendationActionType =
 export const trackRecommendationInteraction = async (
   songId: string,
   action: RecommendationActionType,
-  recommendationSource = 'hybrid'
+  recommendationSource = 'hybrid',
+  metadata?: Record<string, any>
 ): Promise<void> => {
   if (!songId || !action) return;
 
@@ -28,20 +38,22 @@ export const trackRecommendationInteraction = async (
         songId,
         action,
         recommendationSource,
+        metadata,
       }),
     });
-  } catch (err) {
+  } catch {
     // Non-blocking catch: swallow tracking errors silently
   }
 };
 
 /**
- * Submits thumbs_up or thumbs_down feedback for a recommended song.
+ * Submits feedback (helpful, not_relevant, too_similar, not_my_style, thumbs_up, thumbs_down) for a recommended song explanation.
  */
 export const submitRecommendationFeedbackApi = async (
   songId: string,
-  feedback: 'thumbs_up' | 'thumbs_down',
-  recommendationSource = 'hybrid'
+  feedback: ExplanationFeedbackType,
+  recommendationSource = 'hybrid',
+  explanationContext?: Record<string, any>
 ): Promise<{ success: boolean; error: string | null }> => {
   if (!songId || !feedback) return { success: false, error: 'Invalid parameters' };
 
@@ -52,38 +64,21 @@ export const submitRecommendationFeedbackApi = async (
         songId,
         feedback,
         recommendationSource,
+        explanationContext,
       }),
     });
 
     const result = extractEnvelopeData(response, 'Failed to submit feedback');
     return { success: !result.error, error: result.error };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Failed to submit feedback' };
+    return { success: false, error: err?.message || 'Network error submitting feedback' };
   }
 };
 
 /**
- * Retrieves a user's recommendation feedback history (thumbs_up and thumbs_down).
+ * Records multiple recommendation impressions in a single bulk request.
  */
-export const fetchUserRecommendationFeedbackApi = async (
-  limit = 50
-): Promise<{ feedback: any[]; error: string | null }> => {
-  try {
-    const response = await apiClient<any>(`/recommendations/feedback?limit=${limit}`, {
-      method: 'GET',
-    });
-
-    const result = extractEnvelopeData<any[]>(response, 'Failed to fetch feedback history');
-    return { feedback: Array.isArray(result.data) ? result.data : [], error: result.error };
-  } catch (err: any) {
-    return { feedback: [], error: err.message || 'Failed to fetch feedback history' };
-  }
-};
-
-/**
- * Records impression events in bulk when a list/carousel of recommendations is displayed.
- */
-export const trackRecommendationBulkImpressions = async (
+export const trackBulkRecommendationImpressions = async (
   songIds: string[],
   recommendationSource = 'hybrid'
 ): Promise<void> => {
@@ -97,7 +92,9 @@ export const trackRecommendationBulkImpressions = async (
         recommendationSource,
       }),
     });
-  } catch (err) {
-    // Non-blocking catch
+  } catch {
+    // Non-blocking catch: swallow tracking errors silently
   }
 };
+
+export const trackRecommendationBulkImpressions = trackBulkRecommendationImpressions;
