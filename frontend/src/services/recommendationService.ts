@@ -220,3 +220,47 @@ export const fetchSmartAutoplayApi = async (params: {
 
   return { songs, rawCandidates, error: result.error };
 };
+
+export interface RecommendationExplanationResponse {
+  song: Song;
+  isCurrentlyRecommended: boolean;
+  recommendationScore: number;
+  primaryExplanation: string;
+  topReasons: {
+    type: string;
+    message: string;
+    importanceScore: number;
+    supportingValue?: any;
+    metadata?: Record<string, any>;
+  }[];
+  contributingSignals: {
+    userTasteAffinityScore?: number;
+    contentSimilarity?: number;
+    collaborativeScore?: number;
+    genreAffinity?: number;
+    artistAffinity?: number;
+    popularityScore?: number;
+    sources?: string[];
+    [key: string]: any;
+  };
+  summary: string;
+  confidenceScore: number;
+}
+
+export const fetchRecommendationExplanationApi = async (
+  songId: string
+): Promise<{
+  data: RecommendationExplanationResponse | null;
+  error: string | null;
+}> => {
+  const response = await apiClient<{ success: boolean; data?: RecommendationExplanationResponse; message?: string }>(
+    `/recommendations/explain/${songId}`,
+    { method: 'GET' }
+  );
+
+  const result = extractEnvelopeData(response, 'Failed to fetch recommendation explanation');
+  return {
+    data: result.data || null,
+    error: result.error,
+  };
+};

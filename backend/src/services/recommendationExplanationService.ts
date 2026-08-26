@@ -18,7 +18,7 @@ export interface ExplanationItem {
   type: RecommendationReasonType;
   message: string;
   supportingValue?: number | string | Record<string, any>;
-  importanceScore: number; // 0.0 to 1.0
+  importanceScore: number; // strictly bounded to [0.0, 1.0]
   metadata?: Record<string, any>;
 }
 
@@ -28,7 +28,7 @@ export interface RecommendationExplanation {
   explanations: ExplanationItem[];
   reasons: ExplanationItem[];
   summary: string;
-  confidenceScore: number;
+  confidenceScore: number; // strictly bounded to [0.0, 1.0]
 }
 
 export interface ExplanationThresholdConfig {
@@ -39,6 +39,7 @@ export interface ExplanationThresholdConfig {
   minSessionThreshold: number;
   minGenreAffinityThreshold: number;
   minArtistAffinityThreshold: number;
+  minMoodMatchThreshold: number;
   minEnergyProximityThreshold: number;
   maxReasonsReturned: number;
   contradictionSuppression: boolean;
@@ -52,6 +53,7 @@ export const DEFAULT_EXPLANATION_THRESHOLDS: ExplanationThresholdConfig = {
   minSessionThreshold: 0.50,
   minGenreAffinityThreshold: 0.40,
   minArtistAffinityThreshold: 0.40,
+  minMoodMatchThreshold: 0.50,
   minEnergyProximityThreshold: 0.25,
   maxReasonsReturned: 3,
   contradictionSuppression: true,
@@ -90,6 +92,7 @@ export interface ExplanationSignalInput {
     diversityScore?: number;
     genreScore?: number;
     artistScore?: number;
+    moodScore?: number;
     [key: string]: any;
   };
   sources?: string[];
@@ -99,12 +102,12 @@ export interface ExplanationSignalInput {
   tasteProfile?: {
     combinedGenres?: { genreId?: string; name?: string; affinityScore?: number }[];
     combinedArtists?: { artistId?: string; name?: string; affinityScore?: number }[];
-    preferredMoods?: string[];
+    preferredMoods?: (string | { name?: string; label?: string; title?: string })[];
     preferredLanguages?: string[];
     [key: string]: any;
   } | null;
   sessionPreferences?: {
-    activeMood?: string;
+    activeMood?: string | { name?: string; label?: string; title?: string };
     targetEnergy?: number;
     targetTempo?: number;
     sessionGenres?: string[];
@@ -119,12 +122,23 @@ export interface ExplanationSignalInput {
 
 export class RecommendationExplanationService {
   /**
+   * Helper: Clamps and validates any score or numeric signal to a safe, finite [0.0, 1.0] range.
+   * Handles non-finite values (NaN, Infinity, -Infinity), null, and out-of-range inputs safely.
+   */
+  public static clampScore(val: any, defaultVal: number = 0.0): number {
+    if (typeof val !== 'number' || !Number.isFinite(val) || Number.isNaN(val)) {
+      return Math.max(0.0, Math.min(1.0, defaultVal));
+    }
+    return Math.max(0.0, Math.min(1.0, val));
+  }
+
+  /**
    * Helper: Extracts artist name from song document or string
    */
   public static extractArtistName(artist: any): string {
     if (!artist) return '';
-    if (typeof artist === 'string') return artist;
-    if (typeof artist === 'object' && artist.name) return artist.name;
+    if (typeof artist === 'string') return artist.trim();
+    if (typeof artist === 'object' && artist.name) return String(artist.name).trim();
     return '';
   }
 
@@ -133,21 +147,37 @@ export class RecommendationExplanationService {
    */
   public static extractGenreName(genre: any): string {
     if (!genre) return '';
-    if (typeof genre === 'string') return genre;
-    if (typeof genre === 'object' && genre.name) return genre.name;
+    if (typeof genre === 'string') return genre.trim();
+    if (typeof genre === 'object' && genre.name) return String(genre.name).trim();
+    return '';
+  }
+
+  /**
+   * Helper: Extracts human-readable mood name from string, object, or document
+   */
+  public static extractMoodName(mood: any): string {
+    if (!mood) return '';
+    if (typeof mood === 'string') return mood.trim();
+    if (typeof mood === 'object') {
+      if (mood.name) return String(mood.name).trim();
+      if (mood.label) return String(mood.label).trim();
+      if (mood.title) return String(mood.title).trim();
+    }
     return '';
   }
 
   /**
    * Helper: Formats percentage integer from 0-1 float
    */
-  public static toPercent(val: number): number {
-    return Math.max(0, Math.min(100, Math.round(val * 100)));
+  public static toPercent(val: any): number {
+    const clamped = this.clampScore(val);
+    return Math.round(clamped * 100);
   }
 
   /**
    * Identifies and extracts the strongest, most meaningful reasons behind a recommendation.
-   * Ranks explanation reasons by importance and prevents contradictory claims.
+   * Clamps all input signals to [0.0, 1.0], computes explicit attribute match scores,
+   * ranks reasons by importance, and prevents contradictory claims.
    */
   public static extractStrongestReasons(
     input: ExplanationSignalInput,
@@ -175,16 +205,20 @@ export class RecommendationExplanationService {
 
     const artistName = this.extractArtistName(song?.artist);
     const genreName = this.extractGenreName(song?.genre);
+    const songMood = this.extractMoodName(song?.mood);
+    const activeSessionMood = this.extractMoodName(sessionPreferences?.activeMood);
     const audioFeatures = song?.audioFeatures || {};
 
     const rawReasons: ExplanationItem[] = [];
 
-    // 1. Similar to Songs the User Liked
-    const contentVal =
+    // 1. Similar to Songs the User Liked (Content & Acoustic Signature)
+    const rawContentVal =
       similarityScore ??
       componentScores.contentScore ??
       componentScores.contentSimilarity ??
       (sources.includes('content') || sources.includes('seed_similarity') ? 0.85 : 0);
+
+    const contentVal = this.clampScore(rawContentVal);
 
     if (contentVal >= thresholds.minContentSimilarityThreshold) {
       const pct = this.toPercent(contentVal);
@@ -198,7 +232,7 @@ export class RecommendationExplanationService {
         type: 'SIMILAR_TO_LIKED_SONGS',
         message: `Similar acoustic style and vibe to songs you liked${refSongName} (${pct}% match).`,
         supportingValue: contentVal,
-        importanceScore: Number((contentVal * 0.95).toFixed(4)),
+        importanceScore: this.clampScore(Number((contentVal * 0.95).toFixed(4))),
         metadata: {
           similarityScore: contentVal,
           referenceSong: seedSong?.title || (likedSongsSample[0]?.title ?? undefined),
@@ -208,47 +242,62 @@ export class RecommendationExplanationService {
 
     // 2. Similar Artist / Favorite Artist
     let artistAffinity = 0;
+    let isDirectArtistMatch = false;
+
     if (artistName && tasteProfile?.combinedArtists && Array.isArray(tasteProfile.combinedArtists)) {
       const matchedArtist = tasteProfile.combinedArtists.find(
         (a) => a.name?.toLowerCase() === artistName.toLowerCase() || a.artistId === String(song?.artist?._id || song?.artist)
       );
-      if (matchedArtist && (matchedArtist.affinityScore || 0) >= thresholds.minArtistAffinityThreshold) {
-        artistAffinity = matchedArtist.affinityScore || 0.85;
+      if (matchedArtist && typeof matchedArtist.affinityScore === 'number') {
+        const score = this.clampScore(matchedArtist.affinityScore);
+        if (score >= thresholds.minArtistAffinityThreshold) {
+          artistAffinity = score;
+          isDirectArtistMatch = true;
+        }
       }
     }
 
-    if (artistAffinity >= thresholds.minArtistAffinityThreshold) {
+    if (isDirectArtistMatch && artistAffinity >= thresholds.minArtistAffinityThreshold) {
       const pct = this.toPercent(artistAffinity);
       rawReasons.push({
         type: 'SIMILAR_ARTIST',
         message: `By ${artistName}, an artist in your top listening rotation (${pct}% affinity).`,
         supportingValue: artistName,
-        importanceScore: Number((artistAffinity * 0.92).toFixed(4)),
+        importanceScore: this.clampScore(Number((artistAffinity * 0.92).toFixed(4))),
         metadata: { artist: artistName, affinityScore: artistAffinity, isDirectArtist: true },
       });
-    } else if (similarArtistName || componentScores.artistScore) {
-      const score = componentScores.artistScore || 0.78;
+    } else if (similarArtistName || typeof componentScores.artistScore === 'number') {
+      const score = this.clampScore(componentScores.artistScore ?? 0.78);
       const ref = similarArtistName ? ` to ${similarArtistName}` : '';
       rawReasons.push({
         type: 'SIMILAR_ARTIST',
         message: `Shares a musical style and production similar${ref}.`,
         supportingValue: similarArtistName || artistName,
-        importanceScore: Number((score * 0.85).toFixed(4)),
+        importanceScore: this.clampScore(Number((score * 0.85).toFixed(4))),
         metadata: { similarArtist: similarArtistName },
       });
     }
 
-    // 3. Preferred Genre
+    // 3. Preferred Genre (With complete fallback when combinedGenres doesn't match or is below threshold)
     let genreAffinity = 0;
+    let isDirectGenreMatch = false;
+
     if (genreName && tasteProfile?.combinedGenres && Array.isArray(tasteProfile.combinedGenres)) {
       const matchedGenre = tasteProfile.combinedGenres.find(
         (g) => g.name?.toLowerCase() === genreName.toLowerCase() || g.genreId === String(song?.genre?._id || song?.genre)
       );
-      if (matchedGenre && (matchedGenre.affinityScore || 0) >= thresholds.minGenreAffinityThreshold) {
-        genreAffinity = matchedGenre.affinityScore || 0.80;
+      if (matchedGenre && typeof matchedGenre.affinityScore === 'number') {
+        const score = this.clampScore(matchedGenre.affinityScore);
+        if (score >= thresholds.minGenreAffinityThreshold) {
+          genreAffinity = score;
+          isDirectGenreMatch = true;
+        }
       }
-    } else if (genreName && (sources.includes('genre') || componentScores.genreScore)) {
-      genreAffinity = componentScores.genreScore || 0.70;
+    }
+
+    // Fallback if no matching genre met the threshold in combinedGenres
+    if (!isDirectGenreMatch && genreName && (sources.includes('genre') || typeof componentScores.genreScore === 'number')) {
+      genreAffinity = this.clampScore(componentScores.genreScore ?? 0.70);
     }
 
     if (genreAffinity >= thresholds.minGenreAffinityThreshold) {
@@ -257,81 +306,170 @@ export class RecommendationExplanationService {
         type: 'PREFERRED_GENRE',
         message: `Features ${genreName}, one of your preferred genres (${pct}% affinity).`,
         supportingValue: genreName,
-        importanceScore: Number((genreAffinity * 0.90).toFixed(4)),
-        metadata: { genre: genreName, affinityScore: genreAffinity },
+        importanceScore: this.clampScore(Number((genreAffinity * 0.90).toFixed(4))),
+        metadata: { genre: genreName, affinityScore: genreAffinity, isDirectGenreMatch },
       });
     }
 
     // 4. Collaborative Similarity
-    const collabVal = componentScores.collaborativeScore ?? (sources.includes('collaborative') ? 0.80 : 0);
+    const rawCollab = componentScores.collaborativeScore ?? (sources.includes('collaborative') ? 0.80 : 0);
+    const collabVal = this.clampScore(rawCollab);
     if (collabVal >= thresholds.minCollaborativeThreshold) {
       const pct = this.toPercent(collabVal);
       rawReasons.push({
         type: 'COLLABORATIVE_SIMILARITY',
         message: `Highly played and replayed by listeners with similar musical taste (${pct}% match).`,
         supportingValue: collabVal,
-        importanceScore: Number((collabVal * 0.86).toFixed(4)),
+        importanceScore: this.clampScore(Number((collabVal * 0.86).toFixed(4))),
         metadata: { collaborativeScore: collabVal },
       });
     }
 
-    // 5. Session Preference
-    const sessionVal = componentScores.sessionScore ?? (sessionPreferences ? 0.75 : 0);
+    // 5. Session Preference (Compute explicit match score from song attributes vs session preferences)
+    let sessionVal = typeof componentScores.sessionScore === 'number' && Number.isFinite(componentScores.sessionScore)
+      ? this.clampScore(componentScores.sessionScore)
+      : 0;
+
+    if (sessionVal === 0 && sessionPreferences) {
+      let sessionMatchScore = 0;
+      let sessionChecks = 0;
+
+      // Check mood match
+      if (activeSessionMood && songMood) {
+        sessionChecks++;
+        if (songMood.toLowerCase() === activeSessionMood.toLowerCase()) {
+          sessionMatchScore += 1.0;
+        }
+      }
+
+      // Check energy proximity
+      if (typeof sessionPreferences.targetEnergy === 'number' && typeof audioFeatures?.energy === 'number') {
+        sessionChecks++;
+        const targetEnergy = this.clampScore(sessionPreferences.targetEnergy);
+        const songEnergy = this.clampScore(audioFeatures.energy);
+        const diff = Math.abs(songEnergy - targetEnergy);
+        if (diff <= thresholds.minEnergyProximityThreshold) {
+          sessionMatchScore += 1.0 - (diff / thresholds.minEnergyProximityThreshold) * 0.4;
+        }
+      }
+
+      // Check tempo proximity
+      if (typeof sessionPreferences.targetTempo === 'number' && typeof audioFeatures?.tempo === 'number' && audioFeatures.tempo > 0) {
+        sessionChecks++;
+        const diff = Math.abs(audioFeatures.tempo - sessionPreferences.targetTempo);
+        if (diff <= 15) {
+          sessionMatchScore += 1.0 - (diff / 15) * 0.4;
+        }
+      }
+
+      // Check session genre match
+      if (Array.isArray(sessionPreferences.sessionGenres) && sessionPreferences.sessionGenres.length > 0 && genreName) {
+        sessionChecks++;
+        if (sessionPreferences.sessionGenres.some((g: string) => g.toLowerCase() === genreName.toLowerCase())) {
+          sessionMatchScore += 1.0;
+        }
+      }
+
+      if (sessionChecks > 0) {
+        sessionVal = this.clampScore(sessionMatchScore / sessionChecks);
+      }
+    }
+
     if (sessionVal >= thresholds.minSessionThreshold) {
       rawReasons.push({
         type: 'SESSION_PREFERENCE',
         message: `Fits seamlessly into the flow of your active listening session.`,
         supportingValue: sessionVal,
-        importanceScore: Number((sessionVal * 0.80).toFixed(4)),
+        importanceScore: this.clampScore(Number((sessionVal * 0.80).toFixed(4))),
         metadata: { sessionScore: sessionVal },
       });
     }
 
     // 6. Preferred Mood
-    const activeMood = sessionPreferences?.activeMood || (song?.mood ? String(song.mood) : undefined);
-    if (activeMood) {
-      rawReasons.push({
-        type: 'PREFERRED_MOOD',
-        message: `Matches your current ${activeMood.toLowerCase()} mood vibe.`,
-        supportingValue: activeMood,
-        importanceScore: 0.75,
-        metadata: { mood: activeMood },
-      });
+    // 6A. Current Mood: ONLY emitted when sessionPreferences.activeMood is present and matches the song's mood
+    if (activeSessionMood && songMood && songMood.toLowerCase() === activeSessionMood.toLowerCase()) {
+      const moodScore = 0.90;
+      if (moodScore >= thresholds.minMoodMatchThreshold) {
+        rawReasons.push({
+          type: 'PREFERRED_MOOD',
+          message: `Matches your current ${activeSessionMood.toLowerCase()} mood vibe.`,
+          supportingValue: activeSessionMood,
+          importanceScore: this.clampScore(Number((moodScore * 0.82).toFixed(4))),
+          metadata: { mood: activeSessionMood, moodScore, isCurrentSessionMood: true },
+        });
+      }
+    }
+    // 6B. Song-Based Mood: Emitted when song.mood aligns with long-term preferred moods or component scores (without active session mood match)
+    else if (songMood) {
+      let songMoodScore = 0;
+      let matchedProfileMood = songMood;
+
+      if (tasteProfile?.preferredMoods && Array.isArray(tasteProfile.preferredMoods)) {
+        const found = tasteProfile.preferredMoods.find(
+          (m) => this.extractMoodName(m).toLowerCase() === songMood.toLowerCase()
+        );
+        if (found) {
+          songMoodScore = 0.80;
+          matchedProfileMood = this.extractMoodName(found) || songMood;
+        }
+      }
+
+      if (songMoodScore === 0 && typeof componentScores.moodScore === 'number') {
+        songMoodScore = this.clampScore(componentScores.moodScore);
+      }
+
+      if (songMoodScore >= thresholds.minMoodMatchThreshold) {
+        rawReasons.push({
+          type: 'PREFERRED_MOOD',
+          message: `Captures the ${matchedProfileMood.toLowerCase()} mood you often enjoy.`,
+          supportingValue: matchedProfileMood,
+          importanceScore: this.clampScore(Number((songMoodScore * 0.78).toFixed(4))),
+          metadata: { mood: matchedProfileMood, moodScore: songMoodScore, isTasteProfileMood: true },
+        });
+      }
     }
 
     // 7. Preferred Energy
-    if (typeof audioFeatures?.energy === 'number') {
-      const energyLevel = audioFeatures.energy >= 0.7 ? 'high-energy' : audioFeatures.energy <= 0.4 ? 'calm' : 'moderate';
-      if (sessionPreferences?.targetEnergy !== undefined) {
-        const diff = Math.abs(audioFeatures.energy - sessionPreferences.targetEnergy);
+    if (typeof audioFeatures?.energy === 'number' && Number.isFinite(audioFeatures.energy)) {
+      const clampedEnergy = this.clampScore(audioFeatures.energy);
+      const energyLevel = clampedEnergy >= 0.7 ? 'high-energy' : clampedEnergy <= 0.4 ? 'calm' : 'moderate';
+
+      if (typeof sessionPreferences?.targetEnergy === 'number' && Number.isFinite(sessionPreferences.targetEnergy)) {
+        const targetEnergy = this.clampScore(sessionPreferences.targetEnergy);
+        const diff = Math.abs(clampedEnergy - targetEnergy);
+
         if (diff <= thresholds.minEnergyProximityThreshold) {
+          const energyImportance = this.clampScore(0.75 - diff * 0.5);
           rawReasons.push({
             type: 'PREFERRED_ENERGY',
-            message: `Energy pace (${energyLevel}, ${Math.round(audioFeatures.energy * 100)}%) aligns with your preferred session intensity.`,
-            supportingValue: audioFeatures.energy,
-            importanceScore: 0.72,
-            metadata: { energy: audioFeatures.energy, energyLevel },
+            message: `Energy pace (${energyLevel}, ${Math.round(clampedEnergy * 100)}%) aligns with your preferred session intensity.`,
+            supportingValue: clampedEnergy,
+            importanceScore: energyImportance,
+            metadata: { energy: clampedEnergy, energyLevel },
           });
         }
       }
     }
 
     // 8. Novelty
-    const noveltyVal = noveltyScore ?? componentScores.noveltyScore;
-    if (typeof noveltyVal === 'number' && noveltyVal >= thresholds.minNoveltyThreshold) {
-      rawReasons.push({
-        type: 'NOVELTY',
-        message: `A fresh release and novel sound you haven't explored yet.`,
-        supportingValue: noveltyVal,
-        importanceScore: Number((noveltyVal * 0.78).toFixed(4)),
-        metadata: { noveltyScore: noveltyVal },
-      });
+    const rawNovelty = noveltyScore ?? componentScores.noveltyScore;
+    if (typeof rawNovelty === 'number' && Number.isFinite(rawNovelty)) {
+      const noveltyVal = this.clampScore(rawNovelty);
+      if (noveltyVal >= thresholds.minNoveltyThreshold) {
+        rawReasons.push({
+          type: 'NOVELTY',
+          message: `A fresh release and novel sound you haven't explored yet.`,
+          supportingValue: noveltyVal,
+          importanceScore: this.clampScore(Number((noveltyVal * 0.78).toFixed(4))),
+          metadata: { noveltyScore: noveltyVal },
+        });
+      }
     }
 
     // 9. Discovery Opportunity
     const isDiscovery = Boolean(
       isDiscoveryOpportunity ||
-      (typeof diversityAdjustment === 'number' && diversityAdjustment > 0.08) ||
+      (typeof diversityAdjustment === 'number' && Number.isFinite(diversityAdjustment) && diversityAdjustment > 0.08) ||
       (sources.includes('discovery') && artistAffinity < 0.3)
     );
     if (isDiscovery) {
@@ -352,7 +490,7 @@ export class RecommendationExplanationService {
       filteredReasons = this.resolveContradictions(rawReasons, {
         artistAffinity,
         genreAffinity,
-        audioEnergy: audioFeatures?.energy,
+        audioEnergy: typeof audioFeatures?.energy === 'number' ? this.clampScore(audioFeatures.energy) : undefined,
       });
     }
 
@@ -364,10 +502,14 @@ export class RecommendationExplanationService {
 
     // Fallback if no specific threshold was crossed
     if (finalReasons.length === 0) {
+      const userTasteScore = this.clampScore(
+        componentScores.userTasteAffinityScore ?? componentScores.userTasteScore,
+        0.50
+      );
       finalReasons.push({
         type: 'USER_TASTE_SIMILARITY',
         message: input.matchReason || 'Matches your general music preferences.',
-        importanceScore: 0.50,
+        importanceScore: userTasteScore,
       });
     }
 
@@ -410,7 +552,8 @@ export class RecommendationExplanationService {
     const reasons = this.extractStrongestReasons(input, customThresholds);
 
     const primaryExplanation = reasons[0]?.message || 'Recommended for you.';
-    const confidenceScore = reasons[0]?.importanceScore || 0.75;
+    const rawConfidence = reasons[0]?.importanceScore ?? 0.75;
+    const confidenceScore = this.clampScore(rawConfidence, 0.75);
 
     // Compose concise, natural-language multi-reason summary
     const topPoints = reasons.slice(0, 2).map((e) => e.message);

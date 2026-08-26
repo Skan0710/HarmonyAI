@@ -78,12 +78,13 @@ export function runRecommendationExplanationServiceTests() {
     console.log('✓ Test 3 Passed: Preferred genre reason extraction verified.');
   }
 
-  // Test 4: Preferred Mood and Preferred Energy Extraction
+  // Test 4: Preferred Mood and Preferred Energy Extraction (Current Mood with Explicit Session Match)
   {
     const input: ExplanationSignalInput = {
       song: {
         _id: '507f1f77bcf86cd799439014',
         title: 'Power Run',
+        mood: 'Focus',
         audioFeatures: { energy: 0.85, tempo: 130 },
       },
       sessionPreferences: {
@@ -96,16 +97,23 @@ export function runRecommendationExplanationServiceTests() {
     const moodReason = reasons.find((r) => r.type === 'PREFERRED_MOOD');
     const energyReason = reasons.find((r) => r.type === 'PREFERRED_ENERGY');
 
-    assert.ok(moodReason !== undefined && moodReason.message.includes('focus'));
+    assert.ok(moodReason !== undefined && moodReason.message.includes('current focus mood'));
     assert.ok(energyReason !== undefined && energyReason.message.includes('high-energy'));
 
-    console.log('✓ Test 4 Passed: Preferred mood and energy reason extraction verified.');
+    console.log('✓ Test 4 Passed: Current mood and energy reason extraction verified.');
   }
 
-  // Test 5: Session Preference, Novelty, and Collaborative Similarity
+  // Test 5: Session Preference, Novelty, and Collaborative Similarity (No MOOD_MATCH when song lacks mood)
   {
     const input: ExplanationSignalInput = {
-      song: { _id: '507f1f77bcf86cd799439015', title: 'Late Night Flow' },
+      song: {
+        _id: '507f1f77bcf86cd799439015',
+        title: 'Late Night Flow',
+        // song has no mood attribute
+      },
+      sessionPreferences: {
+        activeMood: 'Energetic',
+      },
       componentScores: {
         sessionScore: 0.85,
         collaborativeScore: 0.80,
@@ -117,12 +125,14 @@ export function runRecommendationExplanationServiceTests() {
     const sessionReason = reasons.find((r) => r.type === 'SESSION_PREFERENCE');
     const noveltyReason = reasons.find((r) => r.type === 'NOVELTY');
     const collabReason = reasons.find((r) => r.type === 'COLLABORATIVE_SIMILARITY');
+    const moodReason = reasons.find((r) => r.type === 'PREFERRED_MOOD');
 
-    assert.ok(sessionReason !== undefined);
-    assert.ok(noveltyReason !== undefined);
-    assert.ok(collabReason !== undefined);
+    assert.ok(sessionReason !== undefined, 'Explicit sessionScore should emit SESSION_PREFERENCE');
+    assert.ok(noveltyReason !== undefined, 'Novelty score should emit NOVELTY');
+    assert.ok(collabReason !== undefined, 'Collaborative score should emit COLLABORATIVE_SIMILARITY');
+    assert.strictEqual(moodReason, undefined, 'Song without a mood attribute must not emit PREFERRED_MOOD');
 
-    console.log('✓ Test 5 Passed: Session, novelty, and collaborative similarity extraction verified.');
+    console.log('✓ Test 5 Passed: Session preference, novelty, and collaborative extraction verified (with mood omitted).');
   }
 
   // Test 6: Discovery Opportunity Extraction
@@ -179,6 +189,7 @@ export function runRecommendationExplanationServiceTests() {
         title: 'Multi Signal Track',
         artist: { name: 'Kavinsky' },
         genre: { name: 'Synthwave' },
+        mood: 'Driving',
         audioFeatures: { energy: 0.85 },
       },
       similarityScore: 0.92,
@@ -243,5 +254,104 @@ export function runRecommendationExplanationServiceTests() {
     console.log('✓ Test 10 Passed: Deterministic and reproducible explanation generation verified.');
   }
 
-  console.log('🎉 All 10 recommendation reason extraction tests completed successfully.');
+  // Test 11: Regression Coverage for Scores Above 1 and Non-Finite Inputs
+  {
+    const outOfBoundsInput: ExplanationSignalInput = {
+      song: {
+        _id: '507f1f77bcf86cd799439021',
+        title: 'Unbounded Track',
+        artist: { name: 'Overclocker' },
+        genre: { name: 'Electro' },
+        mood: { name: 'Fast' },
+        audioFeatures: { energy: 2.5, tempo: Infinity },
+      },
+      similarityScore: 1.85,
+      componentScores: {
+        collaborativeScore: Infinity,
+        userTasteAffinityScore: NaN,
+        noveltyScore: 3.2,
+        sessionScore: -0.5,
+      },
+      tasteProfile: {
+        combinedArtists: [{ name: 'Overclocker', affinityScore: 4.5 }],
+        combinedGenres: [{ name: 'Electro', affinityScore: -10 }],
+      },
+    };
+
+    const explanation = RecommendationExplanationService.explainSong(outOfBoundsInput);
+
+    assert.ok(explanation.confidenceScore >= 0.0 && explanation.confidenceScore <= 1.0);
+    assert.ok(Number.isFinite(explanation.confidenceScore));
+
+    for (const item of explanation.reasons) {
+      assert.ok(
+        item.importanceScore >= 0.0 && item.importanceScore <= 1.0,
+        `Reason ${item.type} importanceScore (${item.importanceScore}) must be clamped in [0.0, 1.0]`
+      );
+      assert.ok(Number.isFinite(item.importanceScore), `Reason ${item.type} importanceScore must be finite`);
+      if (typeof item.supportingValue === 'number') {
+        assert.ok(
+          item.supportingValue >= 0.0 && item.supportingValue <= 1.0,
+          `Numeric supportingValue (${item.supportingValue}) must be clamped in [0.0, 1.0]`
+        );
+      }
+    }
+
+    console.log('✓ Test 11 Passed: Regression coverage for out-of-bounds (>1) and non-finite scores verified.');
+  }
+
+  // Test 12: Genre-Affinity Fallback when combinedGenres exists but has no matching genre
+  {
+    const fallbackInput: ExplanationSignalInput = {
+      song: {
+        _id: '507f1f77bcf86cd799439022',
+        title: 'Deep In The Night',
+        genre: { name: 'House' },
+      },
+      tasteProfile: {
+        combinedGenres: [
+          { name: 'Synthwave', affinityScore: 0.90 },
+          { name: 'Rock', affinityScore: 0.80 },
+        ], // House is not in user's top combinedGenres
+      },
+      componentScores: {
+        genreScore: 0.75, // Upstream candidate generator scored House as 0.75
+      },
+    };
+
+    const reasons = RecommendationExplanationService.extractStrongestReasons(fallbackInput);
+    const genreReason = reasons.find((r) => r.type === 'PREFERRED_GENRE');
+
+    assert.ok(genreReason !== undefined, 'Should fall back to componentScores.genreScore when combinedGenres does not match');
+    assert.ok(genreReason.message.includes('House'));
+    assert.ok(genreReason.message.includes('75% affinity'));
+
+    console.log('✓ Test 12 Passed: Genre-affinity fallback when combinedGenres exists but has no match verified.');
+  }
+
+  // Test 13: Song-Based Mood vs Current Session Mood Separation & Object Normalization
+  {
+    // Song-based taste profile mood match (without sessionPreferences.activeMood)
+    const songMoodInput: ExplanationSignalInput = {
+      song: {
+        _id: '507f1f77bcf86cd799439023',
+        title: 'Chill Sunset',
+        mood: { name: 'Chill' }, // Object-structured mood
+      },
+      tasteProfile: {
+        preferredMoods: [{ name: 'Chill' }, { name: 'Relaxed' }],
+      },
+    };
+
+    const reasons = RecommendationExplanationService.extractStrongestReasons(songMoodInput);
+    const moodReason = reasons.find((r) => r.type === 'PREFERRED_MOOD');
+
+    assert.ok(moodReason !== undefined);
+    assert.ok(moodReason.message.includes('Captures the chill mood you often enjoy'));
+    assert.strictEqual(moodReason.supportingValue, 'Chill');
+
+    console.log('✓ Test 13 Passed: Song-based mood vs current session mood separation and object mood normalization verified.');
+  }
+
+  console.log('🎉 All 13 recommendation reason extraction and validation tests completed successfully.');
 }

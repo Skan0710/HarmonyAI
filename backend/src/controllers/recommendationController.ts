@@ -1,5 +1,9 @@
 import { Request, Response } from 'express';
 import { Types } from 'mongoose';
+import { Song } from '../models/Song.js';
+import { User } from '../models/User.js';
+import { ListeningSession } from '../models/ListeningSession.js';
+import { RecommendationInteraction } from '../models/RecommendationInteraction.js';
 import { ContentRecommendationService } from '../services/recommendationService.js';
 import { CollaborativeFilteringService } from '../services/collaborativeFilteringService.js';
 import { HybridRecommendationService } from '../services/hybridRecommendationService.js';
@@ -7,6 +11,10 @@ import { ContextAwareRecommendationService } from '../services/contextAwareRecom
 import { ContextualAssistantService } from '../services/contextualAssistantService.js';
 import { SessionRecommendationService } from '../services/sessionRecommendationService.js';
 import { SmartAutoplayService } from '../services/smartAutoplayService.js';
+import { ContentSimilarityService } from '../services/similarityService.js';
+import { SongFeatureExtractionService } from '../services/songFeatureExtractionService.js';
+import { UserTasteProfileService } from '../services/userTasteProfileService.js';
+import { RecommendationExplanationService } from '../services/recommendationExplanationService.js';
 import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
 import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
 
@@ -272,4 +280,219 @@ export const getSmartAutoplayCandidates = controllerWrapper(async (req: Request,
       message: error.message || 'Smart autoplay generated fallback response',
     });
   }
+});
+
+export const getRecommendationExplanation = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
+
+  const { songId } = req.params;
+
+  if (!songId || !Types.ObjectId.isValid(songId)) {
+    throw new ControllerError(400, 'Invalid song ID format');
+  }
+
+  // 1. Fetch song with populated artist and genre
+  const song = await Song.findById(songId)
+    .populate('artist', 'name image bio genres')
+    .populate('genre', 'name description')
+    .lean();
+
+  if (!song) {
+    throw new ControllerError(404, 'Song not found');
+  }
+
+  const userId = user._id.toString();
+
+  // 2. Fetch User Taste Profile
+  let tasteProfile: any = null;
+  try {
+    tasteProfile = await UserTasteProfileService.generateTasteProfile(userId);
+  } catch {
+    // Graceful fallback if user has no taste profile yet
+  }
+
+  // 3. Fetch Active Listening Session if available
+  let activeSessionPreferences: any = null;
+  try {
+    const activeSession = await ListeningSession.findOne({ user: user._id, status: 'active' }).lean();
+    if (activeSession && activeSession.contextSnapshot) {
+      activeSessionPreferences = {
+        activeMood: activeSession.contextSnapshot.mood,
+        targetEnergy: activeSession.contextSnapshot.energyLevel,
+        sessionGenres: activeSession.contextSnapshot.activity ? [activeSession.contextSnapshot.activity] : [],
+      };
+    }
+  } catch {
+    // Continue safely
+  }
+
+  // 4. Fetch Recent Recommendation Interactions for this song
+  let recentInteractions: any[] = [];
+  try {
+    recentInteractions = await RecommendationInteraction.find({
+      user: user._id,
+      song: song._id,
+    })
+      .sort({ timestamp: -1 })
+      .limit(5)
+      .lean();
+  } catch {
+    // Continue safely
+  }
+
+  // 5. Fetch Liked Songs Sample for acoustic content comparison
+  let likedSongsSample: any[] = [];
+  try {
+    const userDoc = await User.findById(userId)
+      .select('likedSongs')
+      .populate({
+        path: 'likedSongs',
+        select: 'title artist genre audioFeatures mood language',
+        options: { limit: 5, sort: { createdAt: -1 } },
+      })
+      .lean();
+    likedSongsSample = (userDoc?.likedSongs as any[]) || [];
+  } catch {
+    // Continue safely
+  }
+
+  // 6. Calculate or retrieve existing component scores from recommendation context
+  const artistName = RecommendationExplanationService.extractArtistName(song.artist);
+  const genreName = RecommendationExplanationService.extractGenreName(song.genre);
+
+  // Genre affinity
+  let genreAffinity = 0;
+  if (genreName && tasteProfile?.combinedGenres && Array.isArray(tasteProfile.combinedGenres)) {
+    const matchedGenre = tasteProfile.combinedGenres.find(
+      (g: any) => g.name?.toLowerCase() === genreName.toLowerCase() || g.genreId === String((song.genre as any)?._id || song.genre)
+    );
+    if (matchedGenre && typeof matchedGenre.affinityScore === 'number') {
+      genreAffinity = RecommendationExplanationService.clampScore(matchedGenre.affinityScore);
+    }
+  }
+
+  // Artist affinity
+  let artistAffinity = 0;
+  if (artistName && tasteProfile?.combinedArtists && Array.isArray(tasteProfile.combinedArtists)) {
+    const matchedArtist = tasteProfile.combinedArtists.find(
+      (a: any) => a.name?.toLowerCase() === artistName.toLowerCase() || a.artistId === String((song.artist as any)?._id || song.artist)
+    );
+    if (matchedArtist && typeof matchedArtist.affinityScore === 'number') {
+      artistAffinity = RecommendationExplanationService.clampScore(matchedArtist.affinityScore);
+    }
+  }
+
+  // User Taste Overall Affinity
+  const userTasteAffinityScore = RecommendationExplanationService.clampScore(
+    Math.max(genreAffinity, artistAffinity, (genreAffinity + artistAffinity) / 2)
+  );
+
+  // Content similarity score with user's liked songs
+  let contentSimilarityScore = 0;
+  if (likedSongsSample.length > 0) {
+    try {
+      const songFeatures = SongFeatureExtractionService.extractFeatures(song);
+      const similarities = likedSongsSample.map((likedSong) => {
+        try {
+          const likedFeatures = SongFeatureExtractionService.extractFeatures(likedSong);
+          return ContentSimilarityService.calculateSimilarity(likedFeatures, songFeatures);
+        } catch {
+          return 0.5;
+        }
+      });
+      contentSimilarityScore = Math.max(...similarities);
+    } catch {
+      contentSimilarityScore = 0.5;
+    }
+  }
+
+  // Collaborative signal from interactions or interaction matrix
+  let collaborativeScore = 0;
+  if (recentInteractions.length > 0) {
+    collaborativeScore = 0.80;
+  }
+
+  // Popularity signal
+  const popularityScore = song.playCount ? Math.min(1.0, song.playCount / 50000) : 0.4;
+
+  const componentScores = {
+    contentScore: contentSimilarityScore,
+    collaborativeScore,
+    userTasteAffinityScore,
+    popularityScore,
+    genreScore: genreAffinity,
+    artistScore: artistAffinity,
+  };
+
+  const sources: string[] = [];
+  if (recentInteractions.length > 0) {
+    sources.push(recentInteractions[0].recommendationSource || 'hybrid');
+  } else {
+    if (genreAffinity > 0.5) sources.push('genre');
+    if (artistAffinity > 0.5) sources.push('artist');
+    if (contentSimilarityScore > 0.6) sources.push('content');
+    if (sources.length === 0) sources.push('hybrid');
+  }
+
+  // Determine overall recommendation score without recalculating unrelated scores
+  const recommendationScore = RecommendationExplanationService.clampScore(
+    userTasteAffinityScore * 0.4 +
+    contentSimilarityScore * 0.3 +
+    collaborativeScore * 0.2 +
+    popularityScore * 0.1
+  );
+
+  // Determine if song is currently recommended / has valid recommendation context
+  const isCurrentlyRecommended = Boolean(
+    recentInteractions.length > 0 ||
+    recommendationScore >= 0.35 ||
+    genreAffinity >= 0.40 ||
+    artistAffinity >= 0.40 ||
+    contentSimilarityScore >= 0.50
+  );
+
+  // Generate structured explanation
+  const explanation = RecommendationExplanationService.explainSong({
+    song,
+    componentScores,
+    sources,
+    similarityScore: contentSimilarityScore,
+    likedSongsSample,
+    tasteProfile,
+    sessionPreferences: activeSessionPreferences,
+  });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      song: {
+        _id: song._id,
+        title: song.title,
+        artist: song.artist,
+        genre: song.genre,
+        duration: song.duration,
+        coverImage: song.coverImage,
+        audioUrl: song.audioUrl,
+        audioFeatures: song.audioFeatures,
+        mood: song.mood,
+        playCount: song.playCount,
+      },
+      isCurrentlyRecommended,
+      recommendationScore,
+      primaryExplanation: isCurrentlyRecommended ? explanation.primaryExplanation : 'This song is not currently in your active recommendations.',
+      topReasons: isCurrentlyRecommended ? explanation.reasons : [],
+      contributingSignals: {
+        userTasteAffinityScore,
+        contentSimilarity: contentSimilarityScore,
+        collaborativeScore,
+        genreAffinity,
+        artistAffinity,
+        popularityScore,
+        sources,
+      },
+      summary: isCurrentlyRecommended ? explanation.summary : 'Not currently recommended based on your recent listening profile.',
+      confidenceScore: isCurrentlyRecommended ? explanation.confidenceScore : 0,
+    },
+  });
 });
