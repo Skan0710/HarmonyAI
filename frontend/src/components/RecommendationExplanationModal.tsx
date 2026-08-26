@@ -28,7 +28,9 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [explanationData, setExplanationData] = useState<RecommendationExplanationResponse | null>(null);
-  const [activeFeedback, setActiveFeedback] = useState<'thumbs_up' | 'thumbs_down' | null>(null);
+  const [activeFeedback, setActiveFeedback] = useState<
+    'helpful' | 'not_relevant' | 'too_similar' | 'not_my_style' | 'thumbs_up' | 'thumbs_down' | null
+  >(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -87,11 +89,17 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
     return String(song.artist);
   };
 
-  const handleFeedback = async (feedback: 'thumbs_up' | 'thumbs_down') => {
+  const handleFeedback = async (
+    feedback: 'helpful' | 'not_relevant' | 'too_similar' | 'not_my_style' | 'thumbs_up' | 'thumbs_down'
+  ) => {
     if (!song._id || submitting) return;
     setSubmitting(true);
     setActiveFeedback(feedback);
-    await submitRecommendationFeedbackApi(song._id, feedback, recommendationSource);
+    await submitRecommendationFeedbackApi(song._id, feedback, recommendationSource, {
+      primaryExplanation: explanationData?.primaryExplanation,
+      reasonsCount: explanationData?.topReasons?.length,
+      recommendationScore: explanationData?.recommendationScore,
+    });
     setSubmitting(false);
   };
 
@@ -403,34 +411,78 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
           </div>
         )}
 
-        {/* Thumbs Up / Thumbs Down Feedback Section */}
-        <div className="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between">
-          <span className="text-xs font-medium text-slate-300">Was this recommendation helpful?</span>
-          <div className="flex items-center gap-2">
+        {/* Recommendation Feedback Section */}
+        <div className="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-200">How did we do with this recommendation?</span>
+            {submitting && (
+              <span className="text-[11px] text-indigo-400 font-medium animate-pulse">Saving feedback...</span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button
-              onClick={() => handleFeedback('thumbs_up')}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                activeFeedback === 'thumbs_up'
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-md shadow-emerald-500/10'
-                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-emerald-500/40 hover:text-white'
+              onClick={() => handleFeedback('helpful')}
+              disabled={submitting}
+              className={`px-2.5 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                activeFeedback === 'helpful' || activeFeedback === 'thumbs_up'
+                  ? 'bg-emerald-500/25 text-emerald-300 border-emerald-500/50 shadow-md shadow-emerald-500/10 scale-[1.02]'
+                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-emerald-500/40 hover:text-white'
               }`}
-              title="Helpful recommendation"
+              title="Helpful & spot on"
             >
-              👍 Thumbs Up
+              <span>🌟</span>
+              <span>Helpful</span>
             </button>
 
             <button
-              onClick={() => handleFeedback('thumbs_down')}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                activeFeedback === 'thumbs_down'
-                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-md shadow-rose-500/10'
-                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-rose-500/40 hover:text-white'
+              onClick={() => handleFeedback('not_relevant')}
+              disabled={submitting}
+              className={`px-2.5 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                activeFeedback === 'not_relevant'
+                  ? 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-md shadow-amber-500/10 scale-[1.02]'
+                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-amber-500/40 hover:text-white'
               }`}
-              title="Not helpful"
+              title="Not relevant right now"
             >
-              👎 Thumbs Down
+              <span>🎯</span>
+              <span>Not Relevant</span>
+            </button>
+
+            <button
+              onClick={() => handleFeedback('too_similar')}
+              disabled={submitting}
+              className={`px-2.5 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                activeFeedback === 'too_similar'
+                  ? 'bg-cyan-500/25 text-cyan-300 border-cyan-500/50 shadow-md shadow-cyan-500/10 scale-[1.02]'
+                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-cyan-500/40 hover:text-white'
+              }`}
+              title="Too similar or repetitive"
+            >
+              <span>🔁</span>
+              <span>Too Similar</span>
+            </button>
+
+            <button
+              onClick={() => handleFeedback('not_my_style')}
+              disabled={submitting}
+              className={`px-2.5 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                activeFeedback === 'not_my_style' || activeFeedback === 'thumbs_down'
+                  ? 'bg-rose-500/25 text-rose-300 border-rose-500/50 shadow-md shadow-rose-500/10 scale-[1.02]'
+                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-rose-500/40 hover:text-white'
+              }`}
+              title="Not my style"
+            >
+              <span>🚫</span>
+              <span>Not My Style</span>
             </button>
           </div>
+
+          {activeFeedback && (
+            <p className="text-[11px] text-emerald-400/90 font-medium text-center pt-1 animate-in fade-in">
+              ✓ Thank you! Your feedback helps HarmonyAI tune your recommendations.
+            </p>
+          )}
         </div>
 
         {/* Footer */}

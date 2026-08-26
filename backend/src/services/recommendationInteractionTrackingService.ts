@@ -4,6 +4,7 @@ import {
   IRecommendationInteraction,
   RecommendationActionType,
   RecommendationSourceType,
+  ExplanationFeedbackType,
 } from '../models/RecommendationInteraction.js';
 
 export interface RecordInteractionParams {
@@ -11,16 +12,26 @@ export interface RecordInteractionParams {
   songId: string;
   action: RecommendationActionType;
   recommendationSource?: RecommendationSourceType;
+  explanationFeedback?: ExplanationFeedbackType | string;
+  metadata?: Record<string, any>;
+}
+
+export interface RecordExplanationFeedbackParams {
+  userId: string;
+  songId: string;
+  feedback: ExplanationFeedbackType | string;
+  recommendationSource?: RecommendationSourceType;
+  explanationContext?: Record<string, any>;
 }
 
 export class RecommendationInteractionTrackingService {
   /**
-   * Records a recommendation interaction event (impression, click, play, like, skip, thumbs_up, thumbs_down).
+   * Records a recommendation interaction event (impression, click, play, like, skip, thumbs_up, thumbs_down, explanation_feedback).
    */
   static async recordInteraction(
     params: RecordInteractionParams
   ): Promise<IRecommendationInteraction> {
-    const { userId, songId, action, recommendationSource = 'hybrid' } = params;
+    const { userId, songId, action, recommendationSource = 'hybrid', explanationFeedback, metadata } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
       throw new Error('Invalid user ID');
@@ -37,6 +48,7 @@ export class RecommendationInteractionTrackingService {
       'skip',
       'thumbs_up',
       'thumbs_down',
+      'explanation_feedback',
     ];
     if (!validActions.includes(action)) {
       throw new Error(`Invalid interaction action: ${action}`);
@@ -46,7 +58,71 @@ export class RecommendationInteractionTrackingService {
       user: new Types.ObjectId(userId),
       song: new Types.ObjectId(songId),
       action,
+      explanationFeedback,
+      metadata: metadata || {},
       recommendationSource,
+      timestamp: new Date(),
+    });
+
+    return await interaction.save();
+  }
+
+  /**
+   * Records specific explanation feedback ('helpful', 'not_relevant', 'too_similar', 'not_my_style', 'thumbs_up', 'thumbs_down').
+   * Prevents duplicate feedback and stores rich contextual metadata for future Music DNA learning.
+   */
+  static async recordExplanationFeedback(
+    params: RecordExplanationFeedbackParams
+  ): Promise<IRecommendationInteraction> {
+    const { userId, songId, feedback, recommendationSource = 'hybrid', explanationContext = {} } = params;
+
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new Error('Invalid user ID');
+    }
+    if (!Types.ObjectId.isValid(songId)) {
+      throw new Error('Invalid song ID');
+    }
+
+    const validFeedbackTypes: string[] = [
+      'helpful',
+      'not_relevant',
+      'too_similar',
+      'not_my_style',
+      'thumbs_up',
+      'thumbs_down',
+    ];
+
+    if (!validFeedbackTypes.includes(feedback)) {
+      throw new Error(`Invalid explanation feedback: ${feedback}`);
+    }
+
+    const userObjId = new Types.ObjectId(userId);
+    const songObjId = new Types.ObjectId(songId);
+
+    // 1. Remove previous explanation feedback for this song by this user to avoid stale duplicates
+    await RecommendationInteraction.deleteMany({
+      user: userObjId,
+      song: songObjId,
+      action: 'explanation_feedback',
+    });
+
+    // 2. Map high-level thumbs actions if user supplied legacy feedback
+    let actionType: RecommendationActionType = 'explanation_feedback';
+    if (feedback === 'thumbs_up' || feedback === 'thumbs_down') {
+      actionType = feedback;
+    }
+
+    // 3. Save new explanation feedback interaction with extensible metadata
+    const interaction = new RecommendationInteraction({
+      user: userObjId,
+      song: songObjId,
+      action: actionType,
+      explanationFeedback: feedback,
+      recommendationSource,
+      metadata: {
+        ...explanationContext,
+        feedbackRecordedAt: new Date(),
+      },
       timestamp: new Date(),
     });
 
@@ -97,6 +173,7 @@ export class RecommendationInteractionTrackingService {
       userId,
       songId,
       action: feedback,
+      explanationFeedback: feedback,
       recommendationSource,
     });
   }
@@ -139,39 +216,42 @@ export class RecommendationInteractionTrackingService {
     actionFilter?: RecommendationActionType
   ): Promise<IRecommendationInteraction[]> {
     if (!Types.ObjectId.isValid(userId)) {
-      throw new Error('Invalid user ID');
+      return [];
     }
 
-    const query: any = { user: new Types.ObjectId(userId) };
+    const query: Record<string, any> = {
+      user: new Types.ObjectId(userId),
+    };
+
     if (actionFilter) {
       query.action = actionFilter;
     }
 
-    return (await RecommendationInteraction.find(query)
-      .populate('song', 'title artist coverImage genre releaseYear playCount')
+    return await RecommendationInteraction.find(query)
       .sort({ timestamp: -1 })
-      .limit(Math.max(1, limit))
-      .lean()) as any;
+      .limit(Math.min(200, Math.max(1, limit)))
+      .populate('song', 'title artist genre coverImage duration audioUrl audioFeatures mood playCount')
+      .lean();
   }
 
   /**
-   * Retrieves all recommendation feedback (thumbs_up and thumbs_down) for a specific user.
+   * Retrieves user feedback history (thumbs_up, thumbs_down, explanation_feedback) for a user.
    */
   static async getUserRecommendationFeedback(
     userId: string,
     limit = 50
   ): Promise<IRecommendationInteraction[]> {
     if (!Types.ObjectId.isValid(userId)) {
-      throw new Error('Invalid user ID');
+      return [];
     }
 
-    return (await RecommendationInteraction.find({
+    return await RecommendationInteraction.find({
       user: new Types.ObjectId(userId),
-      action: { $in: ['thumbs_up', 'thumbs_down'] },
+      action: { $in: ['thumbs_up', 'thumbs_down', 'explanation_feedback'] },
     })
-      .populate('song', 'title artist coverImage genre releaseYear playCount')
       .sort({ timestamp: -1 })
-      .limit(Math.max(1, limit))
-      .lean()) as any;
+      .limit(Math.min(200, Math.max(1, limit)))
+      .populate('song', 'title artist genre coverImage duration audioUrl')
+      .lean();
   }
 }

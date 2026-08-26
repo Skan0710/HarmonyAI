@@ -1,16 +1,20 @@
 import { Request, Response } from 'express';
 import { RecommendationInteractionTrackingService } from '../services/recommendationInteractionTrackingService.js';
 import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
-import { extractQueryParams } from '../utils/validators.js';
+import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
 
 export const trackInteraction = controllerWrapper(async (req: Request, res: Response) => {
   const user = ensureAuth(req, res);
   if (!user) return;
 
-  const { songId, action, recommendationSource = 'hybrid' } = req.body;
+  const { songId, action, recommendationSource = 'hybrid', metadata } = req.body;
 
   if (!songId || !action) {
     throw new ControllerError(400, 'songId and action are required');
+  }
+
+  if (!isValidObjectId(songId)) {
+    throw new ControllerError(400, 'Invalid songId format');
   }
 
   const record = await RecommendationInteractionTrackingService.recordInteraction({
@@ -18,6 +22,7 @@ export const trackInteraction = controllerWrapper(async (req: Request, res: Resp
     songId,
     action,
     recommendationSource,
+    metadata,
   });
 
   res.status(201).json({ success: true, data: record });
@@ -27,18 +32,40 @@ export const submitFeedback = controllerWrapper(async (req: Request, res: Respon
   const user = ensureAuth(req, res);
   if (!user) return;
 
-  const { songId, feedback, recommendationSource = 'hybrid' } = req.body;
-
-  if (!songId || !['thumbs_up', 'thumbs_down'].includes(feedback)) {
-    throw new ControllerError(400, 'songId and valid feedback (thumbs_up or thumbs_down) are required');
-  }
-
-  const record = await RecommendationInteractionTrackingService.recordFeedback(
-    user._id.toString(),
+  const {
     songId,
     feedback,
-    recommendationSource
-  );
+    recommendationSource = 'hybrid',
+    explanationContext,
+  } = req.body;
+
+  const validFeedback = [
+    'helpful',
+    'not_relevant',
+    'too_similar',
+    'not_my_style',
+    'thumbs_up',
+    'thumbs_down',
+  ];
+
+  if (!songId || !feedback || !validFeedback.includes(feedback)) {
+    throw new ControllerError(
+      400,
+      'songId and valid feedback (helpful, not_relevant, too_similar, not_my_style, thumbs_up, thumbs_down) are required'
+    );
+  }
+
+  if (!isValidObjectId(songId)) {
+    throw new ControllerError(400, 'Invalid songId format');
+  }
+
+  const record = await RecommendationInteractionTrackingService.recordExplanationFeedback({
+    userId: user._id.toString(),
+    songId,
+    feedback,
+    recommendationSource,
+    explanationContext,
+  });
 
   res.status(200).json({
     success: true,
@@ -46,6 +73,8 @@ export const submitFeedback = controllerWrapper(async (req: Request, res: Respon
     data: record,
   });
 });
+
+export const submitExplanationFeedback = submitFeedback;
 
 export const getUserFeedback = controllerWrapper(async (req: Request, res: Response) => {
   const user = ensureAuth(req, res);
@@ -61,7 +90,8 @@ export const getUserFeedback = controllerWrapper(async (req: Request, res: Respo
 
   res.status(200).json({
     success: true,
-    data: feedbackList || [],
+    count: feedbackList.length,
+    data: feedbackList,
   });
 });
 
@@ -72,7 +102,7 @@ export const trackBulkImpressions = controllerWrapper(async (req: Request, res: 
   const { songIds, recommendationSource = 'hybrid' } = req.body;
 
   if (!Array.isArray(songIds) || songIds.length === 0) {
-    throw new ControllerError(400, 'songIds array required');
+    throw new ControllerError(400, 'songIds array is required');
   }
 
   const count = await RecommendationInteractionTrackingService.recordBulkImpressions(
@@ -81,5 +111,9 @@ export const trackBulkImpressions = controllerWrapper(async (req: Request, res: 
     recommendationSource
   );
 
-  res.status(201).json({ success: true, count });
+  res.status(201).json({
+    success: true,
+    message: `Recorded ${count} impressions`,
+    count,
+  });
 });
