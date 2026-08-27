@@ -15,6 +15,8 @@ import { ContentSimilarityService } from '../services/similarityService.js';
 import { SongFeatureExtractionService } from '../services/songFeatureExtractionService.js';
 import { UserTasteProfileService } from '../services/userTasteProfileService.js';
 import { RecommendationExplanationService } from '../services/recommendationExplanationService.js';
+import { validateAndSanitizeRecommendationContext } from '../schemas/recommendationContextSchema.js';
+import { ContextPreferenceMappingService } from '../services/contextPreferenceMappingService.js';
 import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
 import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
 
@@ -521,3 +523,116 @@ export const getRecommendationExplanation = controllerWrapper(async (req: Reques
     },
   });
 });
+
+export const getContextAwareRecommendations = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
+
+  const rawSituation = req.query.context || req.query.situation || req.body?.context || req.body?.situation;
+  const rawMood = req.query.mood || req.body?.mood;
+  const rawEnergy = req.query.energy || req.query.desiredEnergy || req.body?.energy || req.body?.desiredEnergy;
+  const rawTempo = req.query.tempo || req.query.desiredTempo || req.body?.tempo || req.body?.desiredTempo;
+  const rawGenre = req.query.genre || req.query.genres || req.query.preferredGenres || req.body?.genre || req.body?.genres || req.body?.preferredGenres;
+  const rawDiscovery = req.query.discoveryLevel || req.query.discovery || req.body?.discoveryLevel || req.body?.discovery;
+  const rawLimit = req.query.limit || req.body?.limit;
+
+  const parsedLimit = rawLimit && !isNaN(parseInt(String(rawLimit), 10))
+    ? Math.min(50, Math.max(1, parseInt(String(rawLimit), 10)))
+    : 10;
+
+  // 1. Validate & Sanitize Context Attributes
+  const validation = validateAndSanitizeRecommendationContext({
+    situation: rawSituation,
+    mood: rawMood,
+    desiredEnergy: rawEnergy,
+    desiredTempo: rawTempo,
+    preferredGenres: typeof rawGenre === 'string' ? rawGenre.split(',').map((g) => g.trim()).filter(Boolean) : rawGenre,
+    discoveryLevel: rawDiscovery,
+  });
+
+  if (!validation.isValid && validation.errors.length > 0) {
+    throw new ControllerError(400, validation.errors.join('; '));
+  }
+
+  const sanitizedContext = validation.sanitized;
+  const derivedPreferences = ContextPreferenceMappingService.mapContextToPreferences(sanitizedContext);
+
+  try {
+    // 2. Fetch Hybrid Recommendations with Contextual Modulation
+    const result = await HybridRecommendationService.getHybridRecommendations({
+      userId: user._id.toString(),
+      limit: parsedLimit,
+      context: sanitizedContext,
+    });
+
+    // 3. Attach Explanations & Context Fit Metadata
+    const enrichedRecommendations = (result.recommendations || []).map((item) => {
+      const explanation = RecommendationExplanationService.explainSong({
+        song: item.song,
+        componentScores: item.componentScores,
+        sources: item.sources,
+        sessionPreferences: {
+          activeMood: derivedPreferences.targetMood,
+          targetEnergy: derivedPreferences.targetEnergy,
+          targetTempo: derivedPreferences.targetTempo,
+          sessionGenres: derivedPreferences.preferredGenres,
+        },
+      });
+
+      return {
+        song: item.song,
+        hybridScore: item.hybridScore,
+        recommendationScore: item.finalScore ?? item.hybridScore,
+        primaryExplanation: explanation.primaryExplanation,
+        topReasons: explanation.reasons || explanation.explanations,
+        componentScores: item.componentScores,
+        sources: item.sources,
+        metadata: item.metadata,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      context: {
+        situation: derivedPreferences.situation,
+        mood: derivedPreferences.targetMood,
+        desiredEnergy: derivedPreferences.targetEnergy,
+        desiredTempo: derivedPreferences.targetTempo,
+        preferredGenres: derivedPreferences.preferredGenres,
+        discoveryLevel: derivedPreferences.noveltyPreference,
+        derivedPreferences: {
+          targetEnergy: derivedPreferences.targetEnergy,
+          targetTempo: derivedPreferences.targetTempo,
+          targetMood: derivedPreferences.targetMood,
+          preferredGenres: derivedPreferences.preferredGenres,
+          noveltyPreference: derivedPreferences.noveltyPreference,
+          rankingWeights: derivedPreferences.rankingWeights,
+        },
+        appliedOverrides: derivedPreferences.appliedOverrides,
+      },
+      strategyUsed: result.strategyUsed,
+      userClassification: result.userClassification,
+      count: enrichedRecommendations.length,
+      data: enrichedRecommendations,
+    });
+  } catch (error: any) {
+    // Graceful fallback on empty or failed query
+    res.status(200).json({
+      success: true,
+      context: {
+        situation: derivedPreferences.situation,
+        mood: derivedPreferences.targetMood,
+        desiredEnergy: derivedPreferences.targetEnergy,
+        desiredTempo: derivedPreferences.targetTempo,
+        preferredGenres: derivedPreferences.preferredGenres,
+        discoveryLevel: derivedPreferences.noveltyPreference,
+      },
+      strategyUsed: 'COLD_START',
+      userClassification: 'NEW',
+      count: 0,
+      data: [],
+      message: error.message || 'No context-aware recommendations available for this profile.',
+    });
+  }
+});
+

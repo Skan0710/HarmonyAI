@@ -264,3 +264,90 @@ export const fetchRecommendationExplanationApi = async (
     error: result.error,
   };
 };
+
+export interface ContextAwareRecommendationItem {
+  song: Song;
+  hybridScore: number;
+  recommendationScore: number;
+  primaryExplanation?: string;
+  topReasons?: {
+    type: string;
+    message: string;
+    importanceScore: number;
+    supportingValue?: any;
+    metadata?: Record<string, any>;
+  }[];
+  componentScores: {
+    contentScore: number;
+    collaborativeScore: number;
+    userTasteAffinityScore: number;
+    popularityScore: number;
+    recencyScore: number;
+    contextScore?: number;
+  };
+  sources: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface ContextAwareApiResponse {
+  success: boolean;
+  context: {
+    situation: string;
+    mood?: string;
+    desiredEnergy?: number;
+    desiredTempo?: number;
+    preferredGenres?: string[];
+    discoveryLevel?: number;
+    derivedPreferences?: Record<string, any>;
+    appliedOverrides?: string[];
+  };
+  strategyUsed?: string;
+  userClassification?: string;
+  count: number;
+  data: ContextAwareRecommendationItem[];
+  message?: string;
+}
+
+export const fetchContextAwareRecommendationsApi = async (params: {
+  context?: string;
+  mood?: string;
+  energy?: number;
+  tempo?: number;
+  genres?: string[];
+  discoveryLevel?: number;
+  limit?: number;
+}): Promise<{
+  data: ContextAwareRecommendationItem[];
+  contextInfo: ContextAwareApiResponse['context'] | null;
+  error: string | null;
+}> => {
+  const queryParams = new URLSearchParams();
+  if (params.context) queryParams.append('context', params.context);
+  if (params.mood) queryParams.append('mood', params.mood);
+  if (params.energy !== undefined) queryParams.append('energy', String(params.energy));
+  if (params.tempo !== undefined) queryParams.append('tempo', String(params.tempo));
+  if (params.genres && params.genres.length > 0) queryParams.append('genres', params.genres.join(','));
+  if (params.discoveryLevel !== undefined) queryParams.append('discoveryLevel', String(params.discoveryLevel));
+  if (params.limit) queryParams.append('limit', String(params.limit));
+
+  try {
+    const response = await apiClient<ContextAwareApiResponse>(
+      `/recommendations/context?${queryParams.toString()}`,
+      { method: 'GET' }
+    );
+
+    const result = extractEnvelopeData(response, 'Failed to fetch context-aware recommendations');
+    return {
+      data: result.data || [],
+      contextInfo: (response as any)?.context || null,
+      error: result.error,
+    };
+  } catch (err: any) {
+    return {
+      data: [],
+      contextInfo: null,
+      error: err?.message || 'Network error fetching context-aware recommendations',
+    };
+  }
+};
+
