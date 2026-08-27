@@ -235,3 +235,34 @@ export const resetRepetitionConfig = (): RecommendationRepetitionConfig => {
   currentRepetitionConfig = { ...DEFAULT_REPETITION_CONFIG };
   return { ...currentRepetitionConfig };
 };
+
+export interface ContextInfluenceConfig {
+  defaultContextInfluence: number; // default: 0.25 (25% context influence, 75% personalized signal)
+  maxContextInfluence: number;     // default: 0.40 (ensures personalized score remains primary signal >= 60%)
+  minContextInfluence: number;     // default: 0.00
+}
+
+export const DEFAULT_CONTEXT_INFLUENCE_CONFIG: ContextInfluenceConfig = {
+  defaultContextInfluence: 0.25,
+  maxContextInfluence: 0.40,
+  minContextInfluence: 0.00,
+};
+
+let currentContextInfluenceConfig: ContextInfluenceConfig = { ...DEFAULT_CONTEXT_INFLUENCE_CONFIG };
+
+export const getContextInfluenceConfig = (): ContextInfluenceConfig => {
+  return { ...currentContextInfluenceConfig };
+};
+
+export const updateContextInfluenceConfig = (
+  newConfig: Partial<ContextInfluenceConfig>
+): ContextInfluenceConfig => {
+  currentContextInfluenceConfig = { ...currentContextInfluenceConfig, ...newConfig };
+  return { ...currentContextInfluenceConfig };
+};
+
+export const resetContextInfluenceConfig = (): ContextInfluenceConfig => {
+  currentContextInfluenceConfig = { ...DEFAULT_CONTEXT_INFLUENCE_CONFIG };
+  return { ...currentContextInfluenceConfig };
+};
+
