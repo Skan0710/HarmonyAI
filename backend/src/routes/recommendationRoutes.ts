@@ -8,6 +8,7 @@ import {
   getSessionRecommendations,
   getSmartAutoplayCandidates,
   getRecommendationExplanation,
+  getContextAwareRecommendations,
 } from '../controllers/recommendationController.js';
 import {
   trackInteraction,
@@ -18,6 +19,11 @@ import {
 import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// GET & POST /api/recommendations/context (Protected JWT - Context-Aware Recommendations)
+router.get('/context', protect, getContextAwareRecommendations);
+router.post('/context', protect, getContextAwareRecommendations);
+router.get('/context-aware', protect, getContextAwareRecommendations);
 
 // GET /api/recommendations/explain/:songId (Protected JWT - Recommendation Explanations)
 router.get('/explain/:songId', protect, getRecommendationExplanation);
