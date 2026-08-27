@@ -97,11 +97,36 @@ export const getHybridRecommendations = controllerWrapper(async (req: Request, r
     throw new ControllerError(400, 'Invalid seed song ID format');
   }
 
+  // Optional Context Support (preserves backward compatibility when absent)
+  const situation = req.query.situation || req.query.context;
+  const mood = req.query.mood ? String(req.query.mood) : undefined;
+  const energyParam = req.query.energy || req.query.desiredEnergy || req.query.energyLevel;
+  const desiredEnergy = energyParam && !isNaN(parseFloat(String(energyParam))) ? parseFloat(String(energyParam)) : undefined;
+  const tempoParam = req.query.tempo || req.query.desiredTempo;
+  const desiredTempo = tempoParam && !isNaN(parseFloat(String(tempoParam))) ? parseFloat(String(tempoParam)) : undefined;
+  const genresParam = req.query.genres || req.query.preferredGenres;
+  const preferredGenres = typeof genresParam === 'string' ? genresParam.split(',').map((g) => g.trim()).filter(Boolean) : undefined;
+  const influenceParam = req.query.contextInfluence;
+  const contextInfluence = influenceParam && !isNaN(parseFloat(String(influenceParam))) ? parseFloat(String(influenceParam)) : undefined;
+
+  let contextObj: any = undefined;
+  if (situation || mood || desiredEnergy !== undefined || desiredTempo !== undefined || preferredGenres) {
+    contextObj = {
+      situation: situation ? String(situation) : undefined,
+      mood,
+      desiredEnergy,
+      desiredTempo,
+      preferredGenres,
+    };
+  }
+
   try {
     const result = await HybridRecommendationService.getHybridRecommendations({
       userId: user._id.toString(),
       seedSongId,
       limit: parsedLimit,
+      context: contextObj,
+      contextInfluence,
     });
 
     res.status(200).json({

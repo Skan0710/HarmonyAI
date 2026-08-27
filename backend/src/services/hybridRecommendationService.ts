@@ -7,6 +7,7 @@ import {
   HybridScoringWeights,
   getHybridConfigWeights,
 } from '../config/recommendationConfig.js';
+import { RecommendationContextAttributes } from '../schemas/recommendationContextSchema.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
@@ -21,6 +22,7 @@ export class HybridRecommendationService {
    * Generates recommendations by first detecting the user's profile state (NEW, LIMITED_DATA, ACTIVE, WELL_ESTABLISHED).
    * - Uses ColdStartRecommendationService for NEW and LIMITED_DATA users.
    * - Uses CandidateGenerationService + HybridRankingPipeline for ACTIVE and WELL_ESTABLISHED users.
+   * - Optionally accepts listening context (situation, mood, energy, tempo, genres) to adjust ranking weights.
    * Preserves existing response structures while returning the recommendation strategy used.
    */
   static async getHybridRecommendations(params: {
@@ -28,8 +30,10 @@ export class HybridRecommendationService {
     seedSongId?: string;
     limit?: number;
     customWeights?: Partial<HybridScoringWeights>;
+    context?: RecommendationContextAttributes | string | null;
+    contextInfluence?: number;
   }): Promise<HybridRecommendationServiceResult> {
-    const { userId, seedSongId, limit = 10, customWeights } = params;
+    const { userId, seedSongId, limit = 10, customWeights, context, contextInfluence } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
       throw new Error('Invalid user ID');
@@ -106,7 +110,13 @@ export class HybridRecommendationService {
         };
       }
 
-      const rankedResults = HybridRankingPipeline.rankCandidates(candidates, limit, weights);
+      const rankedResults = HybridRankingPipeline.rankCandidates(
+        candidates,
+        limit,
+        weights,
+        context,
+        contextInfluence
+      );
 
       return {
         strategyUsed: 'HYBRID_PERSONALIZED',
