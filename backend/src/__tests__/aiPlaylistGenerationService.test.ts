@@ -9,7 +9,6 @@ import { AIPlaylistPreference } from '../schemas/aiPlaylistPreferenceSchema.js';
 export function runAIPlaylistGenerationServiceTests() {
   console.log('[AI Playlist Generation Service Test Suite] Starting tests...');
 
-  // Test 1: Rule-Based / Local Fallback Interpreter Concept Generation
   {
     AIPlaylistGenerationService.resetInterpreter();
     AIPlaylistGenerationService.setInterpreter(new RuleBasedFallbackLLMInterpreter());
