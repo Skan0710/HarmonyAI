@@ -1,7 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import type { Song } from '../types/music';
-import { fetchContextualRecommendationsApi } from '../services/recommendationService';
+import {
+  fetchContextAwareRecommendationsApi,
+  fetchContextualRecommendationsApi,
+} from '../services/recommendationService';
 import { MediaCarousel } from './MediaCarousel';
+import {
+  ListeningContextSelector,
+  type ListeningContextId,
+} from './ListeningContextSelector';
 
 const MOOD_OPTIONS = [
   { id: 'Happy', label: 'Happy', emoji: '😊' },
@@ -12,14 +19,6 @@ const MOOD_OPTIONS = [
   { id: 'Romantic', label: 'Romantic', emoji: '💖' },
 ];
 
-const ACTIVITY_OPTIONS = [
-  { id: 'Study', label: 'Study', emoji: '📚' },
-  { id: 'Workout', label: 'Workout', emoji: '🏋️' },
-  { id: 'Travel', label: 'Travel', emoji: '🚗' },
-  { id: 'Sleep', label: 'Sleep', emoji: '🌙' },
-  { id: 'Coding', label: 'Coding', emoji: '💻' },
-];
-
 interface MoodActivityDiscoverySectionProps {
   onPlaySong: (song: Song, queueList: Song[]) => void;
 }
@@ -27,8 +26,8 @@ interface MoodActivityDiscoverySectionProps {
 export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySectionProps> = ({
   onPlaySong,
 }) => {
+  const [selectedContext, setSelectedContext] = useState<ListeningContextId>('workout');
   const [selectedMood, setSelectedMood] = useState<string>('Energetic');
-  const [selectedActivity, setSelectedActivity] = useState<string | undefined>('Workout');
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,22 +37,37 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
     setLoading(true);
     setError(null);
 
-    const { songs: resultSongs, detectedContext: context, error: apiError } =
-      await fetchContextualRecommendationsApi({
+    // 1. Attempt Context-Aware Recommendations API
+    const { data: resultItems, contextInfo, error: apiError } =
+      await fetchContextAwareRecommendationsApi({
+        context: selectedContext,
         mood: selectedMood,
-        activity: selectedActivity,
         limit: 12,
       });
 
+    if (!apiError && resultItems && resultItems.length > 0) {
+      setSongs(resultItems.map((item) => item.song));
+      setDetectedContext(contextInfo);
+      setLoading(false);
+      return;
+    }
+
+    // 2. Fallback to existing Contextual Recommendations Endpoint if needed
+    const fallbackRes = await fetchContextualRecommendationsApi({
+      mood: selectedMood,
+      activity: selectedContext,
+      limit: 12,
+    });
+
     setLoading(false);
 
-    if (apiError) {
-      setError(apiError);
+    if (fallbackRes.error && (!resultItems || resultItems.length === 0)) {
+      setError(fallbackRes.error || apiError || 'Failed to load context recommendations');
     } else {
-      setSongs(resultSongs);
-      setDetectedContext(context);
+      setSongs(fallbackRes.songs);
+      setDetectedContext(fallbackRes.detectedContext || contextInfo);
     }
-  }, [selectedMood, selectedActivity]);
+  }, [selectedContext, selectedMood]);
 
   useEffect(() => {
     loadContextualRecommendations();
@@ -63,12 +77,8 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
     setSelectedMood(moodId);
   };
 
-  const handleActivitySelect = (actId: string) => {
-    if (selectedActivity === actId) {
-      setSelectedActivity(undefined); // Toggle off optional activity
-    } else {
-      setSelectedActivity(actId);
-    }
+  const handleContextSelect = (contextId: ListeningContextId) => {
+    setSelectedContext(contextId);
   };
 
   return (
@@ -81,26 +91,34 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
             Context Discovery Engine
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Mood & Activity Finder
+            Mood & Listening Context Finder
           </h2>
           <p className="text-slate-400 text-xs sm:text-sm mt-1">
-            Pick your current vibe and activity. Our real-time context engine matches server time, acoustics, and mood score.
+            Select your primary listening situation and mood. Our real-time context engine blends your taste profile with acoustic targets.
           </p>
         </div>
 
         {/* Backend Detected Context Badge */}
         {detectedContext && (
           <div className="shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/80 border border-slate-700 text-xs font-mono text-slate-300">
-            <span className="text-indigo-400 font-semibold">Context Detected:</span>
-            <span className="text-purple-300">{detectedContext.timeOfDay || 'Day'}</span>
+            <span className="text-indigo-400 font-semibold">Active Context:</span>
+            <span className="text-purple-300 capitalize">{detectedContext.situation || selectedContext}</span>
             {selectedMood && <span>• {selectedMood}</span>}
-            {selectedActivity && <span>• {selectedActivity}</span>}
           </div>
         )}
       </div>
 
       {/* Selector Controls */}
-      <div className="space-y-4 pt-2">
+      <div className="space-y-5 pt-2">
+        {/* Reusable Listening Context Selector */}
+        <ListeningContextSelector
+          selectedContext={selectedContext}
+          onSelectContext={handleContextSelect}
+          variant="pills"
+          title="Listening Situation:"
+          description="Choose 1 primary context"
+        />
+
         {/* Mood Chips */}
         <div className="space-y-2">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -113,50 +131,15 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
                 <button
                   key={m.id}
                   onClick={() => handleMoodSelect(m.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+                  type="button"
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/40 ring-2 ring-indigo-400/50'
+                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/40 ring-2 ring-indigo-400/50 scale-[1.02]'
                       : 'bg-slate-900/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700'
                   }`}
                 >
                   <span>{m.emoji}</span>
                   <span>{m.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Activity Chips (Optional) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Select Activity (Optional):
-            </label>
-            {selectedActivity && (
-              <button
-                onClick={() => setSelectedActivity(undefined)}
-                className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
-              >
-                Clear Activity
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ACTIVITY_OPTIONS.map((a) => {
-              const isSelected = selectedActivity === a.id;
-              return (
-                <button
-                  key={a.id}
-                  onClick={() => handleActivitySelect(a.id)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-                    isSelected
-                      ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30 border border-purple-400'
-                      : 'bg-slate-900/60 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/60'
-                  }`}
-                >
-                  <span>{a.emoji}</span>
-                  <span>{a.label}</span>
                 </button>
               );
             })}
@@ -186,10 +169,10 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
       {!loading && !error && songs.length === 0 && (
         <div className="bg-slate-900/60 border border-slate-700/60 rounded-2xl p-8 text-center space-y-3">
           <p className="text-slate-300 font-semibold text-sm">
-            No tracks found for <span className="text-indigo-400">{selectedMood}</span> {selectedActivity ? `+ ${selectedActivity}` : ''}
+            No tracks found for <span className="text-indigo-400 capitalize">{selectedContext}</span> ({selectedMood})
           </p>
           <p className="text-slate-500 text-xs max-w-sm mx-auto">
-            Try choosing a different mood or clearing the activity filter to explore more tracks.
+            Try choosing a different context or mood to explore more personalized tracks.
           </p>
         </div>
       )}
@@ -198,8 +181,8 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
       {(songs.length > 0 || loading) && (
         <div className="-mx-2 sm:-mx-4">
           <MediaCarousel
-            title={`${selectedMood} ${selectedActivity ? `• ${selectedActivity}` : ''} Mix`}
-            subtitle={`AI contextual tracks tuned for ${selectedMood.toLowerCase()} ${selectedActivity ? selectedActivity.toLowerCase() : 'vibes'}`}
+            title={`${selectedContext.charAt(0).toUpperCase() + selectedContext.slice(1).replace('_', ' ')} • ${selectedMood} Mix`}
+            subtitle={`AI contextual tracks tuned for ${selectedContext.replace('_', ' ')} sessions with ${selectedMood.toLowerCase()} vibes`}
             type="song"
             items={songs}
             loading={loading}
