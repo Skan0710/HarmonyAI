@@ -10,7 +10,6 @@ export function runAIPlaylistApiEndpointTests() {
     email: 'listener@harmonyai.test',
   };
 
-  // Helper to create mock Express req/res
   function createMockReqRes(body: any, user: any = mockUser) {
     const req: any = {
       body,
@@ -42,7 +41,6 @@ export function runAIPlaylistApiEndpointTests() {
     return { req, res };
   }
 
-  // Test 1: Reject unauthenticated request (401 Unauthorized)
   {
     const { req, res } = createMockReqRes({ prompt: 'Chill evening music' }, null);
 
