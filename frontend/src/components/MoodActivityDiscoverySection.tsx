@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { Song } from '../types/music';
 import {
   fetchContextAwareRecommendationsApi,
@@ -9,6 +9,11 @@ import {
   ListeningContextSelector,
   type ListeningContextId,
 } from './ListeningContextSelector';
+import {
+  ContextCustomizationPanel,
+  type ContextCustomizationValues,
+  CONTEXT_SENSIBLE_DEFAULTS,
+} from './ContextCustomizationPanel';
 
 const MOOD_OPTIONS = [
   { id: 'Happy', label: 'Happy', emoji: '😊' },
@@ -28,50 +33,100 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
 }) => {
   const [selectedContext, setSelectedContext] = useState<ListeningContextId>('workout');
   const [selectedMood, setSelectedMood] = useState<string>('Energetic');
+  const [customValues, setCustomValues] = useState<ContextCustomizationValues>({});
+  const [isCustomPanelOpen, setIsCustomPanelOpen] = useState<boolean>(false);
+
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [detectedContext, setDetectedContext] = useState<any>(null);
 
-  const loadContextualRecommendations = useCallback(async () => {
+  // Debounce ref to prevent excessive requests while sliding controls
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFetchedSignatureRef = useRef<string>('');
+
+  const loadContextualRecommendations = useCallback(async (
+    ctx: ListeningContextId,
+    mood: string,
+    custom: ContextCustomizationValues
+  ) => {
+    // Generate signature of current request parameters
+    const signature = JSON.stringify({
+      ctx,
+      mood,
+      energy: custom.energy,
+      tempo: custom.tempo,
+      genres: custom.genres?.slice().sort(),
+      discovery: custom.discoveryLevel,
+    });
+
+    if (signature === lastFetchedSignatureRef.current && songs.length > 0) {
+      return; // Avoid unnecessary identical request
+    }
+
     setLoading(true);
     setError(null);
 
-    // 1. Attempt Context-Aware Recommendations API
-    const { data: resultItems, contextInfo, error: apiError } =
-      await fetchContextAwareRecommendationsApi({
-        context: selectedContext,
-        mood: selectedMood,
+    try {
+      // 1. Attempt Context-Aware Recommendations API
+      const { data: resultItems, contextInfo, error: apiError } =
+        await fetchContextAwareRecommendationsApi({
+          context: ctx,
+          mood: mood,
+          energy: custom.energy,
+          tempo: custom.tempo,
+          genres: custom.genres,
+          discoveryLevel: custom.discoveryLevel,
+          limit: 12,
+        });
+
+      if (!apiError && resultItems && resultItems.length > 0) {
+        lastFetchedSignatureRef.current = signature;
+        setSongs(resultItems.map((item) => item.song));
+        setDetectedContext(contextInfo);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fallback to existing Contextual Recommendations Endpoint if needed
+      const fallbackRes = await fetchContextualRecommendationsApi({
+        mood: mood,
+        activity: ctx,
+        energy: custom.energy,
         limit: 12,
       });
 
-    if (!apiError && resultItems && resultItems.length > 0) {
-      setSongs(resultItems.map((item) => item.song));
-      setDetectedContext(contextInfo);
       setLoading(false);
-      return;
+
+      if (fallbackRes.error && (!resultItems || resultItems.length === 0)) {
+        setError(fallbackRes.error || apiError || 'Failed to load context recommendations');
+      } else {
+        lastFetchedSignatureRef.current = signature;
+        setSongs(fallbackRes.songs);
+        setDetectedContext(fallbackRes.detectedContext || contextInfo);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setError(err?.message || 'Network error fetching context recommendations');
     }
+  }, [songs.length]);
 
-    // 2. Fallback to existing Contextual Recommendations Endpoint if needed
-    const fallbackRes = await fetchContextualRecommendationsApi({
-      mood: selectedMood,
-      activity: selectedContext,
-      limit: 12,
-    });
-
-    setLoading(false);
-
-    if (fallbackRes.error && (!resultItems || resultItems.length === 0)) {
-      setError(fallbackRes.error || apiError || 'Failed to load context recommendations');
-    } else {
-      setSongs(fallbackRes.songs);
-      setDetectedContext(fallbackRes.detectedContext || contextInfo);
-    }
-  }, [selectedContext, selectedMood]);
-
+  // Debounced trigger effect
   useEffect(() => {
-    loadContextualRecommendations();
-  }, [loadContextualRecommendations]);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      loadContextualRecommendations(selectedContext, selectedMood, customValues);
+    }, 300);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [selectedContext, selectedMood, customValues, loadContextualRecommendations]);
 
   const handleMoodSelect = (moodId: string) => {
     setSelectedMood(moodId);
@@ -79,6 +134,23 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
 
   const handleContextSelect = (contextId: ListeningContextId) => {
     setSelectedContext(contextId);
+    // Align sensible default mood if custom mood was not explicitly locked
+    const defaults = CONTEXT_SENSIBLE_DEFAULTS[contextId];
+    if (defaults && defaults.mood && !customValues.mood) {
+      setSelectedMood(defaults.mood);
+    }
+  };
+
+  const handleCustomValuesChange = (updated: ContextCustomizationValues) => {
+    setCustomValues(updated);
+  };
+
+  const handleResetCustomDefaults = () => {
+    setCustomValues({});
+    const defaults = CONTEXT_SENSIBLE_DEFAULTS[selectedContext];
+    if (defaults) {
+      setSelectedMood(defaults.mood);
+    }
   };
 
   return (
@@ -94,7 +166,7 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
             Mood & Listening Context Finder
           </h2>
           <p className="text-slate-400 text-xs sm:text-sm mt-1">
-            Select your primary listening situation and mood. Our real-time context engine blends your taste profile with acoustic targets.
+            Select your primary situation and customize acoustic targets. The AI dynamically balances your taste profile with real-time context.
           </p>
         </div>
 
@@ -110,7 +182,7 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
 
       {/* Selector Controls */}
       <div className="space-y-5 pt-2">
-        {/* Reusable Listening Context Selector */}
+        {/* 1. Reusable Listening Context Selector */}
         <ListeningContextSelector
           selectedContext={selectedContext}
           onSelectContext={handleContextSelect}
@@ -119,7 +191,7 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
           description="Choose 1 primary context"
         />
 
-        {/* Mood Chips */}
+        {/* 2. Mood Chips */}
         <div className="space-y-2">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
             Choose Mood:
@@ -145,6 +217,16 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
             })}
           </div>
         </div>
+
+        {/* 3. Optional Customization Controls Panel */}
+        <ContextCustomizationPanel
+          selectedContext={selectedContext}
+          values={customValues}
+          onChange={handleCustomValuesChange}
+          onReset={handleResetCustomDefaults}
+          isOpen={isCustomPanelOpen}
+          onToggleOpen={() => setIsCustomPanelOpen(!isCustomPanelOpen)}
+        />
       </div>
 
       {/* Error State */}
@@ -157,8 +239,8 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
             <p className="text-xs text-rose-300">{error}</p>
           </div>
           <button
-            onClick={() => loadContextualRecommendations()}
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-all shrink-0"
+            onClick={() => loadContextualRecommendations(selectedContext, selectedMood, customValues)}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-all shrink-0 cursor-pointer"
           >
             Retry
           </button>
@@ -172,7 +254,7 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
             No tracks found for <span className="text-indigo-400 capitalize">{selectedContext}</span> ({selectedMood})
           </p>
           <p className="text-slate-500 text-xs max-w-sm mx-auto">
-            Try choosing a different context or mood to explore more personalized tracks.
+            Try adjusting your energy/tempo sliders or clearing genre filters to explore more tracks.
           </p>
         </div>
       )}
@@ -193,3 +275,5 @@ export const MoodActivityDiscoverySection: React.FC<MoodActivityDiscoverySection
     </div>
   );
 };
+
+export default MoodActivityDiscoverySection;
