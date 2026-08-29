@@ -125,15 +125,31 @@ export class ListeningSessionService {
 
     session.lastActivityTime = now;
     session.currentSong = songObjectId;
-    session.songsPlayed.push({
+    session.currentTrack = songObjectId;
+
+    const playRecord = {
       song: songObjectId,
       playedAt: now,
       playDurationSeconds: durationSeconds,
       completed,
-    });
+    };
+
+    session.songsPlayed.push(playRecord);
+    if (!session.tracksPlayed) session.tracksPlayed = [];
+    session.tracksPlayed.push(playRecord);
+
+    if (completed) {
+      if (!session.tracksCompleted) session.tracksCompleted = [];
+      session.tracksCompleted.push({
+        song: songObjectId,
+        completedAt: now,
+        durationSeconds,
+      });
+    }
 
     if (contextSnapshot) {
       session.contextSnapshot = contextSnapshot;
+      session.sessionContext = contextSnapshot as any;
     }
 
     return await session.save();
@@ -160,7 +176,14 @@ export class ListeningSessionService {
       throw new Error('Invalid song ID');
     }
 
-    const validActions: SessionActionType[] = ['play', 'skip', 'like', 'replay', 'queue_add', 'complete'];
+    const validActions: SessionActionType[] = [
+      'play',
+      'skip',
+      'like',
+      'replay',
+      'queue_add',
+      'complete',
+    ];
     if (!validActions.includes(action)) {
       throw new Error(`Invalid session action: ${action}`);
     }
@@ -176,6 +199,7 @@ export class ListeningSessionService {
     session.lastActivityTime = now;
     if (action === 'play' || action === 'replay') {
       session.currentSong = songObjectId;
+      session.currentTrack = songObjectId;
     }
 
     session.sessionEvents.push({
@@ -184,6 +208,25 @@ export class ListeningSessionService {
       timestamp: now,
       metadata,
     });
+
+    if (action === 'skip') {
+      if (!session.tracksSkipped) session.tracksSkipped = [];
+      session.tracksSkipped.push({
+        song: songObjectId,
+        skippedAt: now,
+        playDurationBeforeSkipSeconds: metadata?.playDurationSeconds || metadata?.durationSeconds,
+        reason: metadata?.reason,
+        metadata,
+      });
+    } else if (action === 'complete') {
+      if (!session.tracksCompleted) session.tracksCompleted = [];
+      session.tracksCompleted.push({
+        song: songObjectId,
+        completedAt: now,
+        durationSeconds: metadata?.playDurationSeconds || metadata?.durationSeconds,
+        metadata,
+      });
+    }
 
     // Reuse existing recommendation interaction tracking where appropriate (non-blocking call)
     if (action === 'play' || action === 'skip' || action === 'like') {
@@ -225,6 +268,10 @@ export class ListeningSessionService {
 
     session.status = status;
     session.lastActivityTime = new Date();
+    if (status === 'ended') {
+      session.endTime = new Date();
+    }
+
     return await session.save();
   }
 
@@ -234,9 +281,10 @@ export class ListeningSessionService {
   static async endActiveSession(userId: string): Promise<boolean> {
     if (!userId || !Types.ObjectId.isValid(userId)) return false;
 
+    const now = new Date();
     const result = await ListeningSession.updateMany(
       { user: new Types.ObjectId(userId), status: { $in: ['active', 'paused'] } },
-      { $set: { status: 'ended', updatedAt: new Date() } }
+      { $set: { status: 'ended', endTime: now, updatedAt: now } }
     );
 
     return result.modifiedCount > 0;
