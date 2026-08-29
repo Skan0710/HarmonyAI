@@ -266,3 +266,40 @@ export const resetContextInfluenceConfig = (): ContextInfluenceConfig => {
   return { ...currentContextInfluenceConfig };
 };
 
+export interface SessionInfluenceConfig {
+  defaultSessionInfluence: number;       // default: 0.20 (20% session influence, keeping taste profile primary)
+  maxSessionInfluence: number;           // default: 0.35 (ensures core preferences never completely overridden)
+  minSessionInfluence: number;           // default: 0.00
+  recentCompletionBoost: number;         // default: 1.25 (boosts tracks similar to recent completions/replays)
+  repeatedSkipPenalty: number;           // default: 0.40 (penalty multiplier for tracks similar to repeatedly skipped items)
+  directSkippedSongSuppression: number;  // default: 0.10 (direct suppression for songs skipped in current session)
+}
+
+export const DEFAULT_SESSION_INFLUENCE_CONFIG: SessionInfluenceConfig = {
+  defaultSessionInfluence: 0.20,
+  maxSessionInfluence: 0.35,
+  minSessionInfluence: 0.00,
+  recentCompletionBoost: 1.25,
+  repeatedSkipPenalty: 0.40,
+  directSkippedSongSuppression: 0.10,
+};
+
+let currentSessionInfluenceConfig: SessionInfluenceConfig = { ...DEFAULT_SESSION_INFLUENCE_CONFIG };
+
+export const getSessionInfluenceConfig = (): SessionInfluenceConfig => {
+  return { ...currentSessionInfluenceConfig };
+};
+
+export const updateSessionInfluenceConfig = (
+  newConfig: Partial<SessionInfluenceConfig>
+): SessionInfluenceConfig => {
+  currentSessionInfluenceConfig = { ...currentSessionInfluenceConfig, ...newConfig };
+  return { ...currentSessionInfluenceConfig };
+};
+
+export const resetSessionInfluenceConfig = (): SessionInfluenceConfig => {
+  currentSessionInfluenceConfig = { ...DEFAULT_SESSION_INFLUENCE_CONFIG };
+  return { ...currentSessionInfluenceConfig };
+};
+
+

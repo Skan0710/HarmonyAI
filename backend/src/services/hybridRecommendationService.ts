@@ -8,6 +8,12 @@ import {
   getHybridConfigWeights,
 } from '../config/recommendationConfig.js';
 import { RecommendationContextAttributes } from '../schemas/recommendationContextSchema.js';
+import {
+  SessionTasteProfile,
+  SessionTasteProfileService,
+} from './sessionTasteProfileService.js';
+import { ListeningSessionService } from './listeningSessionService.js';
+import { IListeningSession } from '../models/ListeningSession.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
@@ -23,6 +29,7 @@ export class HybridRecommendationService {
    * - Uses ColdStartRecommendationService for NEW and LIMITED_DATA users.
    * - Uses CandidateGenerationService + HybridRankingPipeline for ACTIVE and WELL_ESTABLISHED users.
    * - Optionally accepts listening context (situation, mood, energy, tempo, genres) to adjust ranking weights.
+   * - Optionally accepts listening session taste profile (or automatically retrieves active session) to adjust weights.
    * Preserves existing response structures while returning the recommendation strategy used.
    */
   static async getHybridRecommendations(params: {
@@ -32,8 +39,22 @@ export class HybridRecommendationService {
     customWeights?: Partial<HybridScoringWeights>;
     context?: RecommendationContextAttributes | string | null;
     contextInfluence?: number;
+    sessionProfile?: SessionTasteProfile | null;
+    sessionInfluence?: number;
+    sessionId?: string | null;
+    useActiveSession?: boolean;
   }): Promise<HybridRecommendationServiceResult> {
-    const { userId, seedSongId, limit = 10, customWeights, context, contextInfluence } = params;
+    const {
+      userId,
+      seedSongId,
+      limit = 10,
+      customWeights,
+      context,
+      contextInfluence,
+      sessionProfile,
+      sessionInfluence,
+      useActiveSession,
+    } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
       throw new Error('Invalid user ID');
@@ -110,12 +131,30 @@ export class HybridRecommendationService {
         };
       }
 
+      // 4. Resolve Listening Session Profile if requested
+      let effectiveSessionProfile = sessionProfile || null;
+      let activeSessionDoc: IListeningSession | null = null;
+
+      if (!effectiveSessionProfile && useActiveSession) {
+        try {
+          activeSessionDoc = await ListeningSessionService.getActiveSession(userId);
+          if (activeSessionDoc) {
+            effectiveSessionProfile = await SessionTasteProfileService.generateSessionTasteProfile(activeSessionDoc);
+          }
+        } catch {
+          // Safe fallback if session retrieval fails
+        }
+      }
+
       const rankedResults = HybridRankingPipeline.rankCandidates(
         candidates,
         limit,
         weights,
         context,
-        contextInfluence
+        contextInfluence,
+        effectiveSessionProfile,
+        sessionInfluence,
+        activeSessionDoc
       );
 
       return {
@@ -124,7 +163,7 @@ export class HybridRecommendationService {
         recommendations: rankedResults,
       };
     } catch (error) {
-      // 4. Fail-safe Resilience Fallback: Never fail recommendation API requests
+      // 5. Fail-safe Resilience Fallback: Never fail recommendation API requests
       try {
         const coldStartRes = await ColdStartRecommendationService.getColdStartRecommendations({
           userId,
@@ -159,3 +198,5 @@ export class HybridRecommendationService {
     }
   }
 }
+
+export default HybridRecommendationService;
