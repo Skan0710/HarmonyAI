@@ -3,6 +3,7 @@ import {
   HybridScoringWeights,
   getHybridConfigWeights,
   getContextInfluenceConfig,
+  getSessionInfluenceConfig,
 } from '../config/recommendationConfig.js';
 import {
   RecommendationContextAttributes,
@@ -12,6 +13,8 @@ import {
   ContextPreferenceMappingService,
   ContextDerivedPreferences,
 } from './contextPreferenceMappingService.js';
+import { SessionTasteProfile } from './sessionTasteProfileService.js';
+import { IListeningSession } from '../models/ListeningSession.js';
 
 export interface HybridRankedResult {
   song: any;
@@ -27,6 +30,7 @@ export interface HybridRankedResult {
     noveltyScore?: number;
     userPreferenceScore?: number;
     contextScore?: number;
+    sessionScore?: number;
   };
   sources: string[];
   metadata?: Record<string, any>;
@@ -98,23 +102,138 @@ export class HybridRankingPipeline {
   }
 
   /**
+   * Helper: Calculates a candidate song's session fit score (0.0 to 1.0)
+   * based on the active temporary session profile, boosting completed/replayed track patterns
+   * and penalizing directly or repeatedly skipped tracks.
+   */
+  private static calculateSessionFitScore(
+    songDoc: any,
+    sessionProfile: SessionTasteProfile,
+    sessionDoc?: IListeningSession | null
+  ): number {
+    if (!songDoc || !sessionProfile) return 0.5;
+
+    const sessionConfig = getSessionInfluenceConfig();
+    const songId = songDoc._id ? songDoc._id.toString() : '';
+
+    // Direct suppression: If song was skipped during the current session, penalize directly
+    if (sessionDoc && sessionDoc.tracksSkipped) {
+      const isDirectlySkipped = sessionDoc.tracksSkipped.some(
+        (s) => s.song && s.song.toString() === songId
+      );
+      if (isDirectlySkipped) {
+        return Number((0.20 * sessionConfig.directSkippedSongSuppression).toFixed(4));
+      }
+    }
+
+    let accumulatedScore = 0;
+    let totalWeight = 0;
+
+    const audioFeatures = songDoc.audioFeatures || {};
+    const songEnergy = typeof audioFeatures.energy === 'number' ? audioFeatures.energy : undefined;
+    const songTempo = typeof audioFeatures.tempo === 'number' ? audioFeatures.tempo : undefined;
+    const songMood = songDoc.mood ? String(songDoc.mood).trim().toLowerCase() : undefined;
+    const songGenre = songDoc.genre
+      ? typeof songDoc.genre === 'object' && songDoc.genre.name
+        ? String(songDoc.genre.name).trim()
+        : String(songDoc.genre).trim()
+      : undefined;
+    const songArtistId = songDoc.artist
+      ? typeof songDoc.artist === 'object' && songDoc.artist._id
+        ? String(songDoc.artist._id)
+        : String(songDoc.artist)
+      : undefined;
+
+    // 1. Session Genre Alignment (Weight: 0.35)
+    if (songGenre && sessionProfile.preferredGenres.length > 0) {
+      const match = sessionProfile.preferredGenres.find(
+        (g) => g.genre.toLowerCase() === songGenre.toLowerCase()
+      );
+      const genreScore = match ? Math.min(1.0, match.score * 2.5) : 0.30;
+      accumulatedScore += genreScore * 0.35;
+      totalWeight += 0.35;
+    }
+
+    // 2. Session Artist Alignment (Weight: 0.25)
+    if (songArtistId && sessionProfile.preferredArtists.length > 0) {
+      const match = sessionProfile.preferredArtists.find(
+        (a) => a.artistId === songArtistId
+      );
+      const artistScore = match ? Math.min(1.0, match.score * 2.0) : 0.40;
+      accumulatedScore += artistScore * 0.25;
+      totalWeight += 0.25;
+    }
+
+    // 3. Acoustic Energy Fit (Weight: 0.20)
+    if (typeof songEnergy === 'number' && Number.isFinite(songEnergy)) {
+      const energyDiff = Math.abs(songEnergy - sessionProfile.averageEnergy);
+      const energyScore = Math.max(0, 1.0 - energyDiff / 0.40);
+      accumulatedScore += energyScore * 0.20;
+      totalWeight += 0.20;
+    }
+
+    // 4. Acoustic Tempo Fit (Weight: 0.10)
+    if (typeof songTempo === 'number' && songTempo > 0) {
+      const tempoDiff = Math.abs(songTempo - sessionProfile.averageTempo);
+      const tempoScore = Math.max(0, 1.0 - tempoDiff / 40);
+      accumulatedScore += tempoScore * 0.10;
+      totalWeight += 0.10;
+    }
+
+    // 5. Dominant Mood Alignment (Weight: 0.10)
+    if (songMood && sessionProfile.dominantMoods.length > 0) {
+      const match = sessionProfile.dominantMoods.find(
+        (m) => m.mood.toLowerCase() === songMood
+      );
+      const moodScore = match ? Math.min(1.0, match.score * 2.0) : 0.40;
+      accumulatedScore += moodScore * 0.10;
+      totalWeight += 0.10;
+    }
+
+    let baseSessionFit = totalWeight > 0 ? accumulatedScore / totalWeight : 0.5;
+
+    // Boost tracks similar to recent completions/replays
+    if (sessionProfile.interactionSummary.completionsCount > 0 || sessionProfile.interactionSummary.replaysCount > 0) {
+      const isTopSessionGenre = sessionProfile.preferredGenres.slice(0, 1).some(
+        (g) => songGenre && g.genre.toLowerCase() === songGenre.toLowerCase()
+      );
+      const isTopSessionArtist = songArtistId && sessionProfile.preferredArtists.slice(0, 1).some(
+        (a) => a.artistId === songArtistId
+      );
+      if (isTopSessionGenre || isTopSessionArtist) {
+        baseSessionFit *= sessionConfig.recentCompletionBoost;
+      }
+    }
+
+    // Penalize tracks similar to repeatedly skipped items
+    if (sessionProfile.interactionSummary.skipsCount >= 2) {
+      const isTopSessionGenre = sessionProfile.preferredGenres.slice(0, 1).some(
+        (g) => songGenre && g.genre.toLowerCase() === songGenre.toLowerCase()
+      );
+      if (!isTopSessionGenre) {
+        baseSessionFit *= sessionConfig.repeatedSkipPenalty;
+      }
+    }
+
+    return Number(Math.max(0, Math.min(1, baseSessionFit)).toFixed(4));
+  }
+
+  /**
    * Evaluates a candidate pool, applies Min-Max normalization across feature components,
    * calculates final weighted hybrid recommendation scores (incorporating content, collaborative,
    * user taste profile affinity, popularity, and recency signals), optionally applies context modulation,
-   * ranks candidates descending, and returns top items up to configurable limit.
-   * 
-   * @param candidates Pool of merged hybrid candidate tracks
-   * @param limit Maximum number of ranked recommendations to return (default 10)
-   * @param customWeights Optional custom weight overrides
-   * @param context Optional listening context or situation string
-   * @param customContextInfluence Optional weight override for contextual influence
+   * optionally applies listening session taste profile modulation, ranks candidates descending,
+   * and returns top items up to configurable limit.
    */
   static rankCandidates(
     candidates: HybridCandidate[],
     limit = 10,
     customWeights?: Partial<HybridScoringWeights>,
     context?: RecommendationContextAttributes | string | null,
-    customContextInfluence?: number
+    customContextInfluence?: number,
+    sessionProfile?: SessionTasteProfile | null,
+    customSessionInfluence?: number,
+    sessionDoc?: IListeningSession | null
   ): HybridRankedResult[] {
     if (!candidates || candidates.length === 0) {
       return [];
@@ -156,7 +275,7 @@ export class HybridRankingPipeline {
 
     // 2. Resolve Context Preferences & Influence if context is provided
     let derivedPreferences: ContextDerivedPreferences | null = null;
-    let effectiveInfluence = 0;
+    let effectiveContextInfluence = 0;
 
     if (context) {
       const contextInput: RecommendationContextAttributes =
@@ -172,14 +291,39 @@ export class HybridRankingPipeline {
             ? customContextInfluence
             : influenceConfig.defaultContextInfluence;
 
-        effectiveInfluence = Math.max(
+        effectiveContextInfluence = Math.max(
           influenceConfig.minContextInfluence,
           Math.min(influenceConfig.maxContextInfluence, requestedInfluence)
         );
       }
     }
 
-    // 3. Compute normalized component scores & weighted fusion per candidate
+    // 3. Resolve Session Influence if session profile is provided
+    let effectiveSessionInfluence = 0;
+    if (sessionProfile) {
+      const sessionConfig = getSessionInfluenceConfig();
+      const requestedInfluence =
+        customSessionInfluence !== undefined
+          ? customSessionInfluence
+          : sessionConfig.defaultSessionInfluence;
+
+      effectiveSessionInfluence = Math.max(
+        sessionConfig.minSessionInfluence,
+        Math.min(sessionConfig.maxSessionInfluence, requestedInfluence)
+      );
+    }
+
+    // Bound total contextual + session influence so personalized taste is always primary >= 50%
+    const totalExtraInfluence = effectiveContextInfluence + effectiveSessionInfluence;
+    if (totalExtraInfluence > 0.50) {
+      const scaleFactor = 0.50 / totalExtraInfluence;
+      effectiveContextInfluence *= scaleFactor;
+      effectiveSessionInfluence *= scaleFactor;
+    }
+
+    const baselineHybridWeight = 1 - effectiveContextInfluence - effectiveSessionInfluence;
+
+    // 4. Compute normalized component scores & weighted multi-layer fusion per candidate
     const scoredItems: HybridRankedResult[] = candidates.map((cand) => {
       const rawContent = isNaN(cand.contentScore) ? 0 : cand.contentScore || 0;
       const rawCollab = isNaN(cand.collaborativeScore) ? 0 : cand.collaborativeScore || 0;
@@ -204,14 +348,27 @@ export class HybridRankingPipeline {
       const baseHybridScore = Number(Math.max(0, Math.min(1, rawHybrid)).toFixed(4));
 
       // Calculate context adjustment if active
-      let finalScore = baseHybridScore;
       let contextFitScore: number | undefined = undefined;
-
-      if (derivedPreferences && effectiveInfluence > 0) {
+      if (derivedPreferences && effectiveContextInfluence > 0) {
         contextFitScore = this.calculateContextFitScore(cand.songDoc, derivedPreferences);
-        const blended = (1 - effectiveInfluence) * baseHybridScore + effectiveInfluence * contextFitScore;
-        finalScore = Number(Math.max(0, Math.min(1, blended)).toFixed(4));
       }
+
+      // Calculate session adjustment if active
+      let sessionFitScore: number | undefined = undefined;
+      if (sessionProfile && effectiveSessionInfluence > 0) {
+        sessionFitScore = this.calculateSessionFitScore(cand.songDoc, sessionProfile, sessionDoc);
+      }
+
+      // Blended multi-layer score
+      let blended = baselineHybridWeight * baseHybridScore;
+      if (contextFitScore !== undefined) {
+        blended += effectiveContextInfluence * contextFitScore;
+      }
+      if (sessionFitScore !== undefined) {
+        blended += effectiveSessionInfluence * sessionFitScore;
+      }
+
+      const finalScore = Number(Math.max(0, Math.min(1, blended)).toFixed(4));
 
       return {
         song: cand.songDoc,
@@ -225,22 +382,37 @@ export class HybridRankingPipeline {
           popularityScore: Number(normPop.toFixed(4)),
           recencyScore: Number(normRec.toFixed(4)),
           contextScore: contextFitScore,
+          sessionScore: sessionFitScore,
         },
         sources: cand.sources || [],
-        metadata: derivedPreferences
-          ? {
-              contextSituation: derivedPreferences.situation,
-              contextInfluence: effectiveInfluence,
-              contextFitScore,
-            }
-          : undefined,
+        metadata:
+          derivedPreferences || sessionProfile
+            ? {
+                ...(derivedPreferences
+                  ? {
+                      contextSituation: derivedPreferences.situation,
+                      contextInfluence: effectiveContextInfluence,
+                      contextFitScore,
+                    }
+                  : {}),
+                ...(sessionProfile
+                  ? {
+                      sessionId: sessionProfile.sessionId,
+                      sessionInfluence: effectiveSessionInfluence,
+                      sessionFitScore,
+                    }
+                  : {}),
+              }
+            : undefined,
       };
     });
 
-    // 4. Sort candidates descending by final hybrid score
+    // 5. Sort candidates descending by final hybrid score
     scoredItems.sort((a, b) => b.hybridScore - a.hybridScore);
 
-    // 5. Return top limit results
+    // 6. Return top limit results
     return scoredItems.slice(0, Math.max(1, limit));
   }
 }
+
+export default HybridRankingPipeline;
