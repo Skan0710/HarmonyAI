@@ -53,6 +53,7 @@ export const usePlayer = () => {
     isQueueOpen,
     isAutoplayEnabled,
     isAutoplayLoading,
+    autoplayQueue: usePlayerStore((state) => state.autoplayQueue),
 
     playSong,
     togglePlay,
@@ -67,6 +68,7 @@ export const usePlayer = () => {
     toggleRepeatMode,
     toggleAutoplay,
     setAutoplayEnabled,
+    setListeningContext: usePlayerStore((state) => state.setListeningContext),
     addToQueue,
     removeFromQueue,
     clearQueue,
@@ -75,6 +77,8 @@ export const usePlayer = () => {
     nextSong,
     previousSong,
     handleSongEnd,
+    replenishAutoplayQueue: usePlayerStore((state) => state.replenishAutoplayQueue),
+    triggerSmartAutoplay: usePlayerStore((state) => state.triggerSmartAutoplay),
     toggleQueueOpen,
     setQueueOpen,
   };
