@@ -1,88 +1,256 @@
 import assert from 'node:assert';
 import { Types } from 'mongoose';
-import { SmartAutoplayService, AutoplayCandidateResult } from '../services/smartAutoplayService.js';
+import {
+  SmartAutoplayService,
+  AutoplayCandidateResult,
+} from '../services/smartAutoplayService.js';
+import { ListeningSession } from '../models/ListeningSession.js';
+import { CandidateGenerationService } from '../services/candidateGenerationService.js';
+import { Song } from '../models/Song.js';
+import { User } from '../models/User.js';
 
-export function runSmartAutoplayServiceTests() {
+export async function runSmartAutoplayServiceTests() {
   console.log('[Smart Autoplay Service Test Suite] Starting tests...');
 
-  // Test 1: Avoidance of Skipped Songs & Manual Queue Preservation
+  // Mock songs
+  const currentSongId = new Types.ObjectId().toString();
+  const skippedSongId = new Types.ObjectId().toString();
+  const queuedSongId = new Types.ObjectId().toString();
+  const candidateSong1 = new Types.ObjectId().toString();
+  const candidateSong2 = new Types.ObjectId().toString();
+  const candidateSong3 = new Types.ObjectId().toString();
+
+  const mockCandidatePool = [
+    {
+      songId: currentSongId,
+      contentScore: 0.99,
+      collaborativeScore: 0.99,
+      userTasteAffinityScore: 0.99,
+      popularitySignal: 990,
+      recencySignal: 0.99,
+      sources: ['content'],
+      songDoc: {
+        _id: currentSongId,
+        title: 'Current Playing Track',
+        artist: { _id: 'artist-current', name: 'Current Artist' },
+        genre: 'EDM',
+        mood: 'Energetic',
+        audioFeatures: { energy: 0.90, tempo: 130 },
+      },
+    },
+    {
+      songId: skippedSongId,
+      contentScore: 0.85,
+      collaborativeScore: 0.80,
+      userTasteAffinityScore: 0.80,
+      popularitySignal: 800,
+      recencySignal: 0.80,
+      sources: ['content'],
+      songDoc: {
+        _id: skippedSongId,
+        title: 'Skipped Track',
+        artist: { _id: 'artist-skip', name: 'Skip Artist' },
+        genre: 'Rock',
+        mood: 'Aggressive',
+        audioFeatures: { energy: 0.95, tempo: 150 },
+      },
+    },
+    {
+      songId: queuedSongId,
+      contentScore: 0.88,
+      collaborativeScore: 0.85,
+      userTasteAffinityScore: 0.85,
+      popularitySignal: 850,
+      recencySignal: 0.85,
+      sources: ['collaborative'],
+      songDoc: {
+        _id: queuedSongId,
+        title: 'Manually Queued Track',
+        artist: { _id: 'artist-queue', name: 'Queue Artist' },
+        genre: 'Pop',
+        mood: 'Happy',
+        audioFeatures: { energy: 0.75, tempo: 120 },
+      },
+    },
+    {
+      songId: candidateSong1,
+      contentScore: 0.92,
+      collaborativeScore: 0.88,
+      userTasteAffinityScore: 0.90,
+      popularitySignal: 900,
+      recencySignal: 0.90,
+      sources: ['taste_profile'],
+      songDoc: {
+        _id: candidateSong1,
+        title: 'Top Autoplay Candidate 1',
+        artist: { _id: 'artist-1', name: 'Great Artist 1' },
+        genre: 'EDM',
+        mood: 'Energetic',
+        audioFeatures: { energy: 0.88, tempo: 128 },
+      },
+    },
+    {
+      songId: candidateSong2,
+      contentScore: 0.86,
+      collaborativeScore: 0.82,
+      userTasteAffinityScore: 0.85,
+      popularitySignal: 750,
+      recencySignal: 0.85,
+      sources: ['collaborative'],
+      songDoc: {
+        _id: candidateSong2,
+        title: 'Top Autoplay Candidate 2',
+        artist: { _id: 'artist-2', name: 'Great Artist 2' },
+        genre: 'Synthwave',
+        mood: 'Upbeat',
+        audioFeatures: { energy: 0.80, tempo: 124 },
+      },
+    },
+    {
+      songId: candidateSong3,
+      contentScore: 0.80,
+      collaborativeScore: 0.78,
+      userTasteAffinityScore: 0.80,
+      popularitySignal: 700,
+      recencySignal: 0.80,
+      sources: ['content'],
+      songDoc: {
+        _id: candidateSong3,
+        title: 'Top Autoplay Candidate 3',
+        artist: { _id: 'artist-1', name: 'Great Artist 1' }, // Same artist as 1
+        genre: 'EDM',
+        mood: 'Energetic',
+        audioFeatures: { energy: 0.85, tempo: 128 },
+      },
+    },
+  ];
+
+  const originalGenCandidates = CandidateGenerationService.generateHybridCandidates;
+  const originalSongFind = Song.find;
+  const originalUserFindById = User.findById;
+  const originalSessionFindOne = ListeningSession.findOne;
+
+  function mockDependencies() {
+    CandidateGenerationService.generateHybridCandidates = async () => mockCandidatePool as any;
+    (Song as any).find = () => ({
+      populate: () => ({
+        populate: () => ({
+          lean: async () => mockCandidatePool.map((c) => c.songDoc),
+        }),
+      }),
+    });
+    (User as any).findById = () => ({
+      populate: () => ({
+        lean: async () => ({ favoriteGenres: [] }),
+      }),
+    });
+    (ListeningSession as any).findOne = () => ({
+      sort: () => Promise.resolve(null),
+    });
+  }
+
+  function restoreDependencies() {
+    CandidateGenerationService.generateHybridCandidates = originalGenCandidates;
+    Song.find = originalSongFind;
+    User.findById = originalUserFindById;
+    ListeningSession.findOne = originalSessionFindOne;
+  }
+
+  // Test 1: Immediate Repeat Prevention & Skipped/Queued Song Avoidance
   {
-    const skippedId = 'song_skipped_1';
-    const queueId = 'song_in_queue_2';
-    const goodId1 = 'song_good_3';
-    const goodId2 = 'song_good_4';
+    mockDependencies();
 
-    const mockCandidates = [
-      { song: { _id: skippedId, title: 'Skipped Track', artist: { _id: 'a1', name: 'Artist 1' } }, sessionRelevanceScore: 0.95 },
-      { song: { _id: queueId, title: 'Queued Track', artist: { _id: 'a2', name: 'Artist 2' } }, sessionRelevanceScore: 0.90 },
-      { song: { _id: goodId1, title: 'Good Track 1', artist: { _id: 'a3', name: 'Artist 3' } }, sessionRelevanceScore: 0.88 },
-      { song: { _id: goodId2, title: 'Good Track 2', artist: { _id: 'a4', name: 'Artist 4' } }, sessionRelevanceScore: 0.85 },
-    ];
+    const userId = new Types.ObjectId().toString();
+    const mockSession = new ListeningSession({
+      _id: new Types.ObjectId(),
+      user: new Types.ObjectId(userId),
+      currentTrack: new Types.ObjectId(currentSongId),
+      tracksPlayed: [{ song: new Types.ObjectId(currentSongId), playedAt: new Date(), completed: false }],
+      tracksSkipped: [{ song: new Types.ObjectId(skippedSongId), skippedAt: new Date() }],
+      status: 'active',
+    });
 
-    const skippedSet = new Set([skippedId]);
-    const queueSet = new Set([queueId]);
+    const res = await SmartAutoplayService.generateAutoplayCandidates({
+      userId,
+      currentTrackId: currentSongId,
+      sessionDoc: mockSession,
+      currentQueueSongIds: [queuedSongId],
+      limit: 3,
+    });
 
-    const filtered = mockCandidates.filter(
-      (c) => !skippedSet.has(c.song._id) && !queueSet.has(c.song._id)
+    assert.ok(res.tracks.length > 0);
+    const trackIds = res.tracks.map((t) => t.song._id.toString());
+
+    assert.ok(!trackIds.includes(currentSongId), 'Current song must not immediately repeat');
+    assert.ok(!trackIds.includes(skippedSongId), 'Skipped song must be excluded');
+    assert.ok(!trackIds.includes(queuedSongId), 'Queued song must be excluded to avoid overriding manual queue');
+    assert.ok(trackIds.includes(candidateSong1), 'Top candidate must be selected');
+
+    console.log('✓ Test 1 Passed: Immediate repeat, skip, and manual queue avoidance verified.');
+    restoreDependencies();
+  }
+
+  // Test 2: Diversity Filtering (Prevents Consecutive Same Artist)
+  {
+    mockDependencies();
+
+    const userId = new Types.ObjectId().toString();
+    const res = await SmartAutoplayService.generateAutoplayCandidates({
+      userId,
+      limit: 3,
+      lastPlayedArtistId: 'artist-1',
+    });
+
+    assert.ok(res.tracks.length >= 2);
+    const firstArtistId = res.tracks[0].song.artist._id;
+    assert.notStrictEqual(
+      firstArtistId,
+      'artist-1',
+      'First autoplay track must not repeat the last played artist'
     );
 
-    assert.strictEqual(filtered.length, 2);
-    assert.strictEqual(filtered[0].song._id, goodId1);
-    assert.strictEqual(filtered[1].song._id, goodId2);
-
-    console.log('✓ Test 1 Passed: Skipped song avoidance & manual queue preservation verified.');
+    console.log('✓ Test 2 Passed: Diversity filtering prevents consecutive songs from the same artist.');
+    restoreDependencies();
   }
 
-  // Test 2: Diversity Filtering Preventing Consecutive Songs from Same Artist
+  // Test 3: Configurable Output Limits
   {
-    const lastPlayedArtistId = 'artist_repeat';
-    const mockPool = [
-      { song: { _id: 's1', artist: { _id: 'artist_repeat' } }, autoplayScore: 0.95, sessionRelevanceScore: 0.95 },
-      { song: { _id: 's2', artist: { _id: 'artist_diverse_1' } }, autoplayScore: 0.90, sessionRelevanceScore: 0.90 },
-      { song: { _id: 's3', artist: { _id: 'artist_repeat' } }, autoplayScore: 0.88, sessionRelevanceScore: 0.88 },
-      { song: { _id: 's4', artist: { _id: 'artist_diverse_2' } }, autoplayScore: 0.85, sessionRelevanceScore: 0.85 },
-    ];
+    mockDependencies();
 
-    const selected: any[] = [];
-    let prevArtist = lastPlayedArtistId;
+    const userId = new Types.ObjectId().toString();
+    const [res1, res2, res3] = await Promise.all([
+      SmartAutoplayService.generateAutoplayCandidates({ userId, limit: 1 }),
+      SmartAutoplayService.generateAutoplayCandidates({ userId, limit: 2 }),
+      SmartAutoplayService.generateAutoplayCandidates({ userId, limit: 3 }),
+    ]);
 
-    for (const item of mockPool) {
-      const artId = item.song.artist._id;
-      if (artId !== prevArtist) {
-        selected.push(item);
-        prevArtist = artId;
-      }
-    }
+    assert.strictEqual(res1.tracks.length, 1);
+    assert.strictEqual(res2.tracks.length, 2);
+    assert.strictEqual(res3.tracks.length, 3);
 
-    assert.ok(selected.length >= 2);
-    assert.notStrictEqual(selected[0].song.artist._id, lastPlayedArtistId, 'First autoplay does not repeat last played artist');
-
-    console.log('✓ Test 2 Passed: Diversity filtering (no consecutive same artist) verified.');
+    console.log('✓ Test 3 Passed: Output track count is fully configurable.');
+    restoreDependencies();
   }
 
-  // Test 3: Repetition Avoidance via Played Song Score Penalization
+  // Test 4: Ranked List with Clear Autoplay Reasons
   {
-    const unplayedCandidateScore = 0.85;
-    const playedCandidateScore = 0.85;
+    mockDependencies();
 
-    const penalizedPlayedScore = Number((playedCandidateScore * 0.6).toFixed(4));
+    const userId = new Types.ObjectId().toString();
+    const res = await SmartAutoplayService.generateAutoplayCandidates({
+      userId,
+      context: 'workout',
+      limit: 2,
+    });
 
-    assert.ok(unplayedCandidateScore > penalizedPlayedScore, 'Unplayed songs rank higher than previously played songs');
+    assert.strictEqual(res.tracks.length, 2);
+    assert.ok(res.tracks[0].autoplayScore > 0);
+    assert.ok(typeof res.tracks[0].reason === 'string');
+    assert.ok(res.tracks[0].reason.length > 0);
 
-    console.log('✓ Test 3 Passed: Repetition avoidance via played score penalization verified.');
+    console.log('✓ Test 4 Passed: Autoplay generates ranked list with descriptive reasons.');
+    restoreDependencies();
   }
 
-  // Test 4: Configurable Output Limit
-  {
-    const items = [1, 2, 3, 4, 5, 6, 7, 8];
-    const limit3 = items.slice(0, 3);
-    const limit5 = items.slice(0, 5);
-
-    assert.strictEqual(limit3.length, 3);
-    assert.strictEqual(limit5.length, 5);
-
-    console.log('✓ Test 4 Passed: Configurable output limit verified.');
-  }
-
-  console.log('🎉 All smart autoplay service tests completed successfully.');
+  console.log('🎉 All 4 Smart Autoplay Service tests completed successfully.');
 }
