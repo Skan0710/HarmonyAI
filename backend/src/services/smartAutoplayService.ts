@@ -5,6 +5,8 @@ import { ListeningSessionService } from './listeningSessionService.js';
 import {
   SessionTasteProfile,
   SessionTasteProfileService,
+  SessionDriftMetrics,
+  SessionDriftThresholds,
 } from './sessionTasteProfileService.js';
 import { RecommendationContextAttributes } from '../schemas/recommendationContextSchema.js';
 import {
@@ -111,6 +113,30 @@ export interface GenerateAutoplayParams {
 export interface GenerateAdaptiveQueueParams extends GenerateAutoplayParams {
   targetFamiliarityRatio?: number; // default: 0.60
   targetDiscoveryRatio?: number;   // default: 0.40
+}
+
+export interface AdaptAutoplayParams {
+  userId: string;
+  currentTrackId?: string;
+  previousSessionProfile?: SessionTasteProfile | null;
+  existingAutoplayQueue?: any[];
+  currentQueueSongIds?: string[];
+  context?: RecommendationContextAttributes | string | null;
+  queueSize?: number;
+  thresholds?: SessionDriftThresholds;
+  forceRegenerate?: boolean;
+  isDebugMode?: boolean;
+}
+
+export interface AdaptiveAutoplayEvaluationResult {
+  regenerated: boolean;
+  queue: AdaptiveQueueTrackItem[];
+  tracks: SmartAutoplayTrackItem[];
+  candidates: AutoplayCandidateResult[];
+  sessionProfile: SessionTasteProfile | null;
+  driftMetrics: SessionDriftMetrics;
+  reason: string;
+  diagnostics?: AutoplayDiagnostics;
 }
 
 export class SmartAutoplayService {
@@ -551,6 +577,9 @@ export class SmartAutoplayService {
   /**
    * Generates smart autoplay candidates (aliases generateAdaptiveQueue for unified logic).
    */
+  /**
+   * Generates smart autoplay candidates (aliases generateAdaptiveQueue for unified logic).
+   */
   static async generateAutoplayCandidates(
     params: GenerateAutoplayParams
   ): Promise<SmartAutoplayResult> {
@@ -563,6 +592,96 @@ export class SmartAutoplayService {
       sessionActive: adaptiveResult.sessionActive,
       contextApplied: adaptiveResult.contextPreserved,
       diagnostics: adaptiveResult.diagnostics,
+    };
+  }
+
+  /**
+   * Dynamically adapts Smart Autoplay to the user's active listening session:
+   * - Evaluates session events (recent completions/replays increase signals, skips decrease signals).
+   * - Computes multi-factor drift across genre, artist, energy, tempo, mood, and consecutive skips.
+   * - Regenerates future autoplay recommendations only when session taste changes significantly or queue is empty.
+   * - Avoids unnecessary regeneration churn on every single micro-event.
+   * - Strictly preserves the user's permanent profile without permanent mutation.
+   */
+  static async evaluateAndAdaptAutoplayQueue(
+    params: AdaptAutoplayParams
+  ): Promise<AdaptiveAutoplayEvaluationResult> {
+    const {
+      userId,
+      currentTrackId,
+      previousSessionProfile,
+      existingAutoplayQueue = [],
+      currentQueueSongIds = [],
+      context,
+      queueSize = 5,
+      thresholds,
+      forceRegenerate = false,
+      isDebugMode = false,
+    } = params;
+
+    // 1. Fetch active session and compute live temporary session profile
+    const activeSession = await ListeningSessionService.getActiveSession(userId);
+    const currentProfile = activeSession
+      ? await SessionTasteProfileService.generateSessionTasteProfile(activeSession)
+      : null;
+
+    // 2. Calculate multidimensional drift
+    const driftMetrics = SessionTasteProfileService.calculateSessionDrift(
+      previousSessionProfile || null,
+      currentProfile,
+      activeSession,
+      thresholds
+    );
+
+    const isQueueEmpty = !existingAutoplayQueue || existingAutoplayQueue.length === 0;
+    const shouldRegenerate = forceRegenerate || isQueueEmpty || driftMetrics.isSignificant;
+
+    if (shouldRegenerate) {
+      const adaptiveResult = await this.generateAdaptiveQueue({
+        userId,
+        currentTrackId,
+        context,
+        sessionDoc: activeSession,
+        sessionProfile: currentProfile,
+        currentQueueSongIds,
+        queueSize,
+        isDebugMode,
+      });
+
+      return {
+        regenerated: true,
+        queue: adaptiveResult.queue,
+        tracks: adaptiveResult.tracks,
+        candidates: adaptiveResult.candidates,
+        sessionProfile: currentProfile,
+        driftMetrics,
+        reason: driftMetrics.reason || 'Regenerated due to significant session taste adaptation',
+        diagnostics: adaptiveResult.diagnostics,
+      };
+    }
+
+    // 3. Stable state: retain existing autoplay queue without recalculation overhead
+    return {
+      regenerated: false,
+      queue: (existingAutoplayQueue as AdaptiveQueueTrackItem[]) || [],
+      tracks: existingAutoplayQueue.map((item: any) => ({
+        song: item.song || item,
+        autoplayScore: item.queueScore || item.autoplayScore || 0.8,
+        hybridScore: item.hybridScore || 0.8,
+        reason: item.reason || 'Retained from active session queue',
+        sources: item.sources || ['session_retained'],
+      })),
+      candidates: existingAutoplayQueue.map((item: any) => ({
+        song: item.song || item,
+        autoplayScore: item.queueScore || item.autoplayScore || 0.8,
+        sessionRelevanceScore: item.sessionScore || 0.8,
+        artistId: item.song?.artist?._id || item.artistId || '',
+        genre: item.song?.genre?.name || item.genre || '',
+        reason: item.reason || 'Retained from active session queue',
+      })),
+      sessionProfile: currentProfile || previousSessionProfile || null,
+      driftMetrics,
+      reason: 'Session taste within stability threshold; retained existing autoplay queue',
     };
   }
 }

@@ -297,9 +297,46 @@ export const updateSessionInfluenceConfig = (
   return { ...currentSessionInfluenceConfig };
 };
 
-export const resetSessionInfluenceConfig = (): SessionInfluenceConfig => {
-  currentSessionInfluenceConfig = { ...DEFAULT_SESSION_INFLUENCE_CONFIG };
-  return { ...currentSessionInfluenceConfig };
+export interface SessionAdaptationConfig {
+  driftThreshold: number;              // default: 0.30 (overall drift score threshold to trigger regeneration)
+  genreDriftThreshold: number;         // default: 0.35 (genre distribution divergence threshold)
+  artistDriftThreshold: number;        // default: 0.35 (artist distribution divergence threshold)
+  energyDriftThreshold: number;        // default: 0.20 (delta in average energy)
+  tempoDriftThreshold: number;         // default: 15.0 (delta in BPM)
+  moodDriftThreshold: number;          // default: 0.30 (mood divergence threshold)
+  minInteractionsBeforeRegen: number;  // default: 2 (cooldown / min events before checking regeneration)
+  maxConsecutiveSkipsBeforeRegen: number; // default: 2 (triggers immediate regeneration when 2+ consecutive skips happen)
+}
+
+export const DEFAULT_SESSION_ADAPTATION_CONFIG: SessionAdaptationConfig = {
+  driftThreshold: 0.30,
+  genreDriftThreshold: 0.35,
+  artistDriftThreshold: 0.35,
+  energyDriftThreshold: 0.20,
+  tempoDriftThreshold: 15.0,
+  moodDriftThreshold: 0.30,
+  minInteractionsBeforeRegen: 2,
+  maxConsecutiveSkipsBeforeRegen: 2,
+};
+
+let currentSessionAdaptationConfig: SessionAdaptationConfig = {
+  ...DEFAULT_SESSION_ADAPTATION_CONFIG,
+};
+
+export const getSessionAdaptationConfig = (): SessionAdaptationConfig => {
+  return { ...currentSessionAdaptationConfig };
+};
+
+export const updateSessionAdaptationConfig = (
+  newConfig: Partial<SessionAdaptationConfig>
+): SessionAdaptationConfig => {
+  currentSessionAdaptationConfig = { ...currentSessionAdaptationConfig, ...newConfig };
+  return { ...currentSessionAdaptationConfig };
+};
+
+export const resetSessionAdaptationConfig = (): SessionAdaptationConfig => {
+  currentSessionAdaptationConfig = { ...DEFAULT_SESSION_ADAPTATION_CONFIG };
+  return { ...currentSessionAdaptationConfig };
 };
 
 

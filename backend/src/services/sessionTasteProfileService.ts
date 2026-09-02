@@ -4,6 +4,11 @@ import { ListeningSessionService } from './listeningSessionService.js';
 import { Song } from '../models/Song.js';
 import { User } from '../models/User.js';
 
+import {
+  getSessionAdaptationConfig,
+  SessionAdaptationConfig,
+} from '../config/recommendationConfig.js';
+
 export interface GenrePreferenceSignal {
   genre: string;
   score: number; // Normalized 0.0 to 1.0
@@ -20,6 +25,29 @@ export interface ArtistPreferenceSignal {
 export interface MoodPreferenceSignal {
   mood: string;
   score: number; // Normalized 0.0 to 1.0
+}
+
+export interface SessionDriftMetrics {
+  genreDrift: number; // 0.0 to 1.0 (1 - genre cosine similarity)
+  artistDrift: number; // 0.0 to 1.0 (1 - artist cosine similarity)
+  energyDelta: number; // Absolute energy change (0.0 to 1.0)
+  tempoDeltaBpm: number; // Absolute BPM difference
+  moodDrift: number; // 0.0 to 1.0 (1 - mood cosine similarity)
+  overallDriftScore: number; // Composite weighted drift score (0.0 to 1.0)
+  consecutiveSkips: number;
+  isSignificant: boolean;
+  reason?: string;
+}
+
+export interface SessionDriftThresholds {
+  driftThreshold?: number;
+  genreDriftThreshold?: number;
+  artistDriftThreshold?: number;
+  energyDriftThreshold?: number;
+  tempoDriftThreshold?: number;
+  moodDriftThreshold?: number;
+  minInteractionsBeforeRegen?: number;
+  maxConsecutiveSkipsBeforeRegen?: number;
 }
 
 export interface SessionTasteProfile {
@@ -344,6 +372,206 @@ export class SessionTasteProfileService {
   }
 
   /**
+   * Computes cosine similarity between two key-value weight maps (0.0 to 1.0).
+   */
+  private static calculateVectorCosineSimilarity(
+    mapA: Map<string, number>,
+    mapB: Map<string, number>
+  ): number {
+    if (mapA.size === 0 && mapB.size === 0) return 1.0;
+    if (mapA.size === 0 || mapB.size === 0) return 0.0;
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (const [key, valA] of mapA.entries()) {
+      normA += valA * valA;
+      const valB = mapB.get(key) || 0;
+      dotProduct += valA * valB;
+    }
+
+    for (const valB of mapB.values()) {
+      normB += valB * valB;
+    }
+
+    if (normA === 0 || normB === 0) return 0.0;
+    return Math.max(0, Math.min(1, dotProduct / (Math.sqrt(normA) * Math.sqrt(normB))));
+  }
+
+  /**
+   * Calculates multidimensional drift between previous and current session taste profiles:
+   * - genre divergence
+   * - artist divergence
+   * - energy shift
+   * - tempo (BPM) shift
+   * - mood divergence
+   * - consecutive skips count
+   */
+  static calculateSessionDrift(
+    previousProfile: SessionTasteProfile | null,
+    currentProfile: SessionTasteProfile | null,
+    sessionDoc?: IListeningSession | null,
+    thresholds?: SessionDriftThresholds
+  ): SessionDriftMetrics {
+    const config = getSessionAdaptationConfig();
+    const activeThresholds = {
+      driftThreshold: thresholds?.driftThreshold ?? config.driftThreshold,
+      genreDriftThreshold: thresholds?.genreDriftThreshold ?? config.genreDriftThreshold,
+      artistDriftThreshold: thresholds?.artistDriftThreshold ?? config.artistDriftThreshold,
+      energyDriftThreshold: thresholds?.energyDriftThreshold ?? config.energyDriftThreshold,
+      tempoDriftThreshold: thresholds?.tempoDriftThreshold ?? config.tempoDriftThreshold,
+      moodDriftThreshold: thresholds?.moodDriftThreshold ?? config.moodDriftThreshold,
+      minInteractionsBeforeRegen: thresholds?.minInteractionsBeforeRegen ?? config.minInteractionsBeforeRegen,
+      maxConsecutiveSkipsBeforeRegen:
+        thresholds?.maxConsecutiveSkipsBeforeRegen ?? config.maxConsecutiveSkipsBeforeRegen,
+    };
+
+    // Calculate consecutive skips from session tail
+    let consecutiveSkips = 0;
+    if (sessionDoc?.sessionEvents && sessionDoc.sessionEvents.length > 0) {
+      for (let i = sessionDoc.sessionEvents.length - 1; i >= 0; i--) {
+        if (sessionDoc.sessionEvents[i].action === 'skip') {
+          consecutiveSkips++;
+        } else {
+          break;
+        }
+      }
+    } else if (sessionDoc?.tracksSkipped && sessionDoc.tracksSkipped.length > 0) {
+      consecutiveSkips = Math.min(sessionDoc.tracksSkipped.length, 3);
+    }
+
+    // Baseline scenarios
+    if (!previousProfile && !currentProfile) {
+      return {
+        genreDrift: 0,
+        artistDrift: 0,
+        energyDelta: 0,
+        tempoDeltaBpm: 0,
+        moodDrift: 0,
+        overallDriftScore: 0,
+        consecutiveSkips: 0,
+        isSignificant: false,
+        reason: 'No session profiles present',
+      };
+    }
+
+    if (!previousProfile && currentProfile) {
+      const isInitialSignificant = currentProfile.totalInteractions >= 1;
+      return {
+        genreDrift: 1.0,
+        artistDrift: 1.0,
+        energyDelta: 0,
+        tempoDeltaBpm: 0,
+        moodDrift: 1.0,
+        overallDriftScore: 1.0,
+        consecutiveSkips,
+        isSignificant: isInitialSignificant,
+        reason: 'Initial session profile created',
+      };
+    }
+
+    if (previousProfile && !currentProfile) {
+      return {
+        genreDrift: 1.0,
+        artistDrift: 1.0,
+        energyDelta: 0,
+        tempoDeltaBpm: 0,
+        moodDrift: 1.0,
+        overallDriftScore: 1.0,
+        consecutiveSkips,
+        isSignificant: true,
+        reason: 'Session profile cleared',
+      };
+    }
+
+    const prev = previousProfile!;
+    const curr = currentProfile!;
+
+    // 1. Genre divergence
+    const genreMapPrev = new Map<string, number>(prev.preferredGenres.map((g) => [g.genre.toLowerCase(), g.score]));
+    const genreMapCurr = new Map<string, number>(curr.preferredGenres.map((g) => [g.genre.toLowerCase(), g.score]));
+    const genreSimilarity = this.calculateVectorCosineSimilarity(genreMapPrev, genreMapCurr);
+    const genreDrift = Number((1.0 - genreSimilarity).toFixed(4));
+
+    // 2. Artist divergence
+    const artistMapPrev = new Map<string, number>(prev.preferredArtists.map((a) => [a.artistId, a.score]));
+    const artistMapCurr = new Map<string, number>(curr.preferredArtists.map((a) => [a.artistId, a.score]));
+    const artistSimilarity = this.calculateVectorCosineSimilarity(artistMapPrev, artistMapCurr);
+    const artistDrift = Number((1.0 - artistSimilarity).toFixed(4));
+
+    // 3. Energy Delta
+    const energyDelta = Number(Math.abs(prev.averageEnergy - curr.averageEnergy).toFixed(4));
+
+    // 4. Tempo Delta (BPM)
+    const tempoDeltaBpm = Math.abs(prev.averageTempo - curr.averageTempo);
+
+    // 5. Mood divergence
+    const moodMapPrev = new Map<string, number>(prev.dominantMoods.map((m) => [m.mood.toLowerCase(), m.score]));
+    const moodMapCurr = new Map<string, number>(curr.dominantMoods.map((m) => [m.mood.toLowerCase(), m.score]));
+    const moodSimilarity = this.calculateVectorCosineSimilarity(moodMapPrev, moodMapCurr);
+    const moodDrift = Number((1.0 - moodSimilarity).toFixed(4));
+
+    // Composite overall drift
+    const normalizedTempoDrift = Math.min(1.0, tempoDeltaBpm / 50.0);
+    const overallDriftScore = Number(
+      (
+        0.30 * genreDrift +
+        0.20 * artistDrift +
+        0.25 * energyDelta +
+        0.15 * normalizedTempoDrift +
+        0.10 * moodDrift
+      ).toFixed(4)
+    );
+
+    // Check significance triggers
+    const reasons: string[] = [];
+    if (consecutiveSkips >= activeThresholds.maxConsecutiveSkipsBeforeRegen) {
+      reasons.push(`${consecutiveSkips} consecutive skips detected`);
+    }
+    if (overallDriftScore >= activeThresholds.driftThreshold) {
+      reasons.push(`Overall drift (${overallDriftScore}) exceeds threshold (${activeThresholds.driftThreshold})`);
+    }
+    if (genreDrift >= activeThresholds.genreDriftThreshold) {
+      reasons.push(`Genre shift (${genreDrift}) exceeds threshold (${activeThresholds.genreDriftThreshold})`);
+    }
+    if (energyDelta >= activeThresholds.energyDriftThreshold) {
+      reasons.push(`Energy shift (${energyDelta}) exceeds threshold (${activeThresholds.energyDriftThreshold})`);
+    }
+    if (tempoDeltaBpm >= activeThresholds.tempoDriftThreshold) {
+      reasons.push(`Tempo shift (${tempoDeltaBpm} BPM) exceeds threshold (${activeThresholds.tempoDriftThreshold} BPM)`);
+    }
+
+    const hasMeaningfulInteractionCount =
+      curr.totalInteractions - prev.totalInteractions >= activeThresholds.minInteractionsBeforeRegen ||
+      consecutiveSkips >= activeThresholds.maxConsecutiveSkipsBeforeRegen;
+
+    const isSignificant = reasons.length > 0 && hasMeaningfulInteractionCount;
+
+    return {
+      genreDrift,
+      artistDrift,
+      energyDelta,
+      tempoDeltaBpm,
+      moodDrift,
+      overallDriftScore,
+      consecutiveSkips,
+      isSignificant,
+      reason: reasons.length > 0 ? reasons.join('; ') : 'No significant session taste drift',
+    };
+  }
+
+  /**
+   * Helper to check if a drift metric is considered a significant change.
+   */
+  static isSignificantSessionChange(
+    drift: SessionDriftMetrics,
+    thresholds?: SessionDriftThresholds
+  ): boolean {
+    return drift.isSignificant;
+  }
+
+  /**
    * Retrieves the user's active listening session and calculates their temporary session taste profile.
    */
   static async getActiveSessionTasteProfile(userId: string): Promise<SessionTasteProfile | null> {
@@ -361,3 +589,4 @@ export class SessionTasteProfileService {
 }
 
 export default SessionTasteProfileService;
+
