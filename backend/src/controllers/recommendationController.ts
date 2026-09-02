@@ -10,6 +10,7 @@ import { HybridRecommendationService } from '../services/hybridRecommendationSer
 import { ContextAwareRecommendationService } from '../services/contextAwareRecommendationService.js';
 import { ContextualAssistantService } from '../services/contextualAssistantService.js';
 import { SessionRecommendationService } from '../services/sessionRecommendationService.js';
+import { ListeningSessionService } from '../services/listeningSessionService.js';
 import { SmartAutoplayService } from '../services/smartAutoplayService.js';
 import { ContentSimilarityService } from '../services/similarityService.js';
 import { SongFeatureExtractionService } from '../services/songFeatureExtractionService.js';
@@ -272,38 +273,146 @@ export const getSmartAutoplayCandidates = controllerWrapper(async (req: Request,
   const user = ensureAuth(req, res);
   if (!user) return;
 
-  const q = extractQueryParams(req, { limit: 'int' });
-  const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 5 : Math.min(25, q.limit);
+  // 1. Current Track Resolution & Validation
+  const rawTrackId =
+    req.query.currentTrack ||
+    req.query.currentTrackId ||
+    req.query.songId ||
+    req.body?.currentTrack ||
+    req.body?.currentTrackId ||
+    req.body?.songId;
 
-  const lastPlayedArtistId = req.query.lastPlayedArtistId ? String(req.query.lastPlayedArtistId) : undefined;
-  const excludeQueueParam = req.query.excludeQueue ? String(req.query.excludeQueue).split(',') : [];
+  let currentTrackId: string | undefined = undefined;
+  if (rawTrackId) {
+    const trackStr = String(rawTrackId).trim();
+    if (!Types.ObjectId.isValid(trackStr)) {
+      throw new ControllerError(400, 'Invalid currentTrack ID format');
+    }
+    currentTrackId = trackStr;
+  }
+
+  // 2. Queue Size / Limit Validation
+  const rawLimit =
+    req.query.queueSize ||
+    req.query.limit ||
+    req.body?.queueSize ||
+    req.body?.limit;
+  const parsedLimit = rawLimit ? parseInt(String(rawLimit), 10) : 5;
+  const queueSize = isNaN(parsedLimit) || parsedLimit < 1 ? 5 : Math.min(30, parsedLimit);
+
+  // 3. Context Sanitization & Validation
+  const rawContext = req.query.context || req.body?.context;
+  let sanitizedContext: any = undefined;
+  if (rawContext) {
+    const contextInput = typeof rawContext === 'string' ? { situation: rawContext } : rawContext;
+    const val = validateAndSanitizeRecommendationContext(contextInput);
+    if (val.isValid) {
+      sanitizedContext = val.sanitized;
+    }
+  }
+
+  const lastPlayedArtistId = req.query.lastPlayedArtistId
+    ? String(req.query.lastPlayedArtistId)
+    : req.body?.lastPlayedArtistId
+    ? String(req.body.lastPlayedArtistId)
+    : undefined;
+
+  const rawExcludeQueue =
+    req.query.excludeQueue ||
+    req.body?.excludeQueue ||
+    req.body?.currentQueueSongIds;
+
+  const excludeQueueParam: string[] = Array.isArray(rawExcludeQueue)
+    ? rawExcludeQueue.map(String)
+    : typeof rawExcludeQueue === 'string'
+    ? rawExcludeQueue.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
 
   const isDebugMode =
     req.query.debug === 'true' && process.env.NODE_ENV !== 'production';
 
   try {
-    const result = await SmartAutoplayService.generateAutoplayCandidates({
+    // 4. Retrieve Active Listening Session Gracefully
+    let activeSession = null;
+    try {
+      activeSession = await ListeningSessionService.getActiveSession(user._id.toString());
+    } catch {
+      // Graceful fallback if session retrieval fails or db temporarily unavailable
+      activeSession = null;
+    }
+
+    // 5. Generate Next Tracks using Smart Autoplay Service
+    const result = await SmartAutoplayService.generateAdaptiveQueue({
       userId: user._id.toString(),
-      limit: parsedLimit,
+      currentTrackId,
+      sessionDoc: activeSession,
+      queueSize,
+      context: sanitizedContext,
       lastPlayedArtistId,
       currentQueueSongIds: excludeQueueParam,
       isDebugMode,
     });
 
+    // 6. Look up Current Track Info
+    const targetTrackId = currentTrackId || result.currentTrackId;
+    let currentTrackInfo: any = null;
+    if (targetTrackId && Types.ObjectId.isValid(targetTrackId)) {
+      try {
+        currentTrackInfo = await Song.findById(targetTrackId)
+          .populate('artist', 'name')
+          .populate('genre', 'name')
+          .lean();
+      } catch {
+        currentTrackInfo = null;
+      }
+    }
+
+    // 7. Format Explanation Metadata & Scores
+    const primaryReason =
+      result.queue[0]?.reason ||
+      (result.contextPreserved
+        ? `Tuned for your ${result.contextPreserved} session`
+        : 'Recommended next for your listening session');
+
     res.status(200).json({
       success: true,
       strategyUsed: 'SMART_AUTOPLAY',
-      count: result.candidates.length,
-      data: result.candidates,
+      currentTrack: currentTrackInfo,
+      currentTrackId: targetTrackId,
+      sessionActive: result.sessionActive,
+      context: result.contextPreserved,
+      count: result.queue.length,
+      queueSize: result.queueSize,
+      data: result.tracks,
+      queue: result.queue,
+      candidates: result.candidates,
+      balanceDistribution: result.balanceDistribution,
+      explanationMetadata: {
+        primaryReason,
+        contextApplied: result.contextPreserved,
+        dominantGenres: result.balanceDistribution?.dominantGenres || [],
+        uniqueArtistsCount: result.balanceDistribution?.uniqueArtistsCount || 0,
+      },
       ...(isDebugMode && result.diagnostics ? { diagnostics: result.diagnostics } : {}),
     });
   } catch (error: any) {
-    // Fallback → return empty array (not an error)
+    if (error instanceof ControllerError) {
+      throw error;
+    }
+
+    // Fallback → return safe empty / graceful recovery response
     res.status(200).json({
       success: true,
       strategyUsed: 'SMART_AUTOPLAY_FALLBACK',
+      currentTrack: null,
+      currentTrackId,
+      sessionActive: false,
+      context: sanitizedContext?.situation || undefined,
       count: 0,
+      queueSize,
       data: [],
+      queue: [],
+      candidates: [],
       message: error.message || 'Smart autoplay generated fallback response',
     });
   }
