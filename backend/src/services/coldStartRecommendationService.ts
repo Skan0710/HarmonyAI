@@ -74,18 +74,32 @@ export class ColdStartRecommendationService {
     // Channel A: Explicit Favorite Genre & Artist Matches
     let favoriteCandidates: ISong[] = [];
     if (favoriteGenreIds.size > 0 || favoriteArtistIds.size > 0) {
-      favoriteCandidates = await Song.find({
-        isPublished: true,
-        $or: [
-          { genre: { $in: Array.from(favoriteGenreIds).map((id) => new Types.ObjectId(id)) } },
-          { artist: { $in: Array.from(favoriteArtistIds).map((id) => new Types.ObjectId(id)) } },
-        ],
-      })
-        .populate('artist', 'name avatar')
-        .populate('genre', 'name slug')
-        .sort({ playCount: -1 })
-        .limit(30)
-        .lean();
+      const validGenreObjectIds = Array.from(favoriteGenreIds)
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+      const validArtistObjectIds = Array.from(favoriteArtistIds)
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+
+      const orConditions: any[] = [];
+      if (validGenreObjectIds.length > 0) {
+        orConditions.push({ genre: { $in: validGenreObjectIds } });
+      }
+      if (validArtistObjectIds.length > 0) {
+        orConditions.push({ artist: { $in: validArtistObjectIds } });
+      }
+
+      if (orConditions.length > 0) {
+        favoriteCandidates = await Song.find({
+          isPublished: true,
+          $or: orConditions,
+        })
+          .populate('artist', 'name avatar')
+          .populate('genre', 'name slug')
+          .sort({ playCount: -1 })
+          .limit(30)
+          .lean();
+      }
     }
 
     // Channel B: Popular / Trending Tracks
