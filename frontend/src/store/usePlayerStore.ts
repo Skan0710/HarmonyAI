@@ -55,6 +55,7 @@ interface PlayerState {
   autoplayQueue: Song[]; // Adaptive upcoming Smart Autoplay buffer
   recentPlayedSongIds: string[]; // History buffer to prevent repeat selections
   currentListeningContext: string | null;
+  autoplayError: string | null;
 
   // Actions / Functions
   playSong: (song: Song, queue?: Song[]) => void;
@@ -73,6 +74,8 @@ interface PlayerState {
   setListeningContext: (context: string | null) => void;
   addToQueue: (song: Song) => void;
   removeFromQueue: (index: number) => void;
+  removeAutoplayTrack: (index: number) => void;
+  skipToAutoplayTrack: (index?: number) => void;
   clearQueue: () => void;
   setQueue: (queue: Song[], startIndex?: number) => void;
   playQueueIndex: (index: number) => void;
@@ -103,6 +106,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   autoplayQueue: [],
   recentPlayedSongIds: [],
   currentListeningContext: null,
+  autoplayError: null,
 
   playSong: (song, queue) => {
     const currentQueue = queue && queue.length > 0 ? queue : get().queue.length > 0 ? get().queue : [song];
@@ -269,6 +273,53 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     });
   },
 
+  removeAutoplayTrack: (index: number) => {
+    const { autoplayQueue, isAutoplayEnabled } = get();
+    if (index < 0 || index >= autoplayQueue.length) return;
+
+    const updated = autoplayQueue.filter((_, i) => i !== index);
+    set({ autoplayQueue: updated });
+
+    // If queue is now near exhaustion, trigger automatic replenishment
+    if (updated.length <= 2 && isAutoplayEnabled) {
+      get().replenishAutoplayQueue().catch(() => {});
+    }
+  },
+
+  skipToAutoplayTrack: (index = 0) => {
+    const { autoplayQueue, queue, queueIndex } = get();
+    if (autoplayQueue.length === 0) {
+      get().triggerSmartAutoplay();
+      return;
+    }
+
+    const targetIdx = Math.max(0, Math.min(index, autoplayQueue.length - 1));
+    const targetSong = autoplayQueue[targetIdx];
+    const remainingBuffer = autoplayQueue.filter((_, idx) => idx !== targetIdx);
+
+    const updatedQueue = [...queue, targetSong];
+    const nextIdx = queueIndex + 1;
+
+    const prevRecent = get().recentPlayedSongIds.filter((id) => id !== targetSong._id);
+    const updatedRecent = [targetSong._id, ...prevRecent].slice(0, 20);
+
+    set({
+      queue: updatedQueue,
+      queueIndex: nextIdx,
+      currentSong: targetSong,
+      autoplayQueue: remainingBuffer,
+      recentPlayedSongIds: updatedRecent,
+      isPlaying: true,
+      currentTime: 0,
+    });
+
+    notifyTrackPlay(targetSong._id);
+
+    if (remainingBuffer.length <= 2) {
+      get().replenishAutoplayQueue().catch(() => {});
+    }
+  },
+
   clearQueue: () => {
     set({
       queue: [],
@@ -386,12 +437,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           set({
             autoplayQueue: mergedBuffer,
             isAutoplayLoading: false,
+            autoplayError: null,
           });
           return true;
         }
       }
-    } catch {
-      // Graceful error handling: keep existing queue intact
+    } catch (err: any) {
+      set({ autoplayError: err?.message || 'Autoplay recommendation service unavailable' });
     }
 
     set({ isAutoplayLoading: false });

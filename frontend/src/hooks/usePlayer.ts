@@ -54,6 +54,7 @@ export const usePlayer = () => {
     isAutoplayEnabled,
     isAutoplayLoading,
     autoplayQueue: usePlayerStore((state) => state.autoplayQueue),
+    autoplayError: usePlayerStore((state) => state.autoplayError),
 
     playSong,
     togglePlay,
@@ -71,6 +72,8 @@ export const usePlayer = () => {
     setListeningContext: usePlayerStore((state) => state.setListeningContext),
     addToQueue,
     removeFromQueue,
+    removeAutoplayTrack: usePlayerStore((state) => state.removeAutoplayTrack),
+    skipToAutoplayTrack: usePlayerStore((state) => state.skipToAutoplayTrack),
     clearQueue,
     setQueue,
     playQueueIndex,

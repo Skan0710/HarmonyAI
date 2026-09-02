@@ -25,6 +25,7 @@ export const MiniPlayer: React.FC = () => {
     isQueueOpen,
     isAutoplayEnabled,
     isAutoplayLoading,
+    autoplayQueue,
     togglePlay,
     pause,
     stop,
@@ -286,15 +287,15 @@ export const MiniPlayer: React.FC = () => {
             {/* Smart Autoplay Control Toggle */}
             <button
               onClick={toggleAutoplay}
-              className={`p-1.5 rounded-lg transition-all relative flex items-center gap-1 group ${
+              className={`p-1.5 rounded-lg transition-all relative flex items-center gap-1 group cursor-pointer ${
                 isAutoplayEnabled
-                  ? 'text-purple-300 bg-purple-500/20 border border-purple-500/40 shadow-sm shadow-purple-900/40'
+                  ? 'text-purple-300 bg-purple-500/20 border border-purple-500/40 shadow-sm shadow-purple-900/40 ring-1 ring-purple-500/30'
                   : 'text-slate-500 hover:text-slate-300 bg-slate-800/40 border border-slate-700/40'
               }`}
               title={
                 isAutoplayEnabled
-                  ? 'Smart Autoplay: Enabled (Plays matching songs when queue ends)'
-                  : 'Smart Autoplay: Disabled (Playback stops when queue ends)'
+                  ? `Smart Autoplay: ON (${autoplayQueue.length} tracks buffered)`
+                  : 'Smart Autoplay: OFF (Click to enable)'
               }
               aria-label="Toggle Smart Autoplay"
             >
@@ -304,6 +305,11 @@ export const MiniPlayer: React.FC = () => {
               <span className="hidden md:inline text-[10px] font-bold uppercase tracking-wider">
                 {isAutoplayEnabled ? 'Autoplay' : 'Autoplay Off'}
               </span>
+              {isAutoplayEnabled && autoplayQueue.length > 0 && (
+                <span className="hidden lg:inline text-[9px] font-mono px-1 py-0.2 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/40 font-bold">
+                  {autoplayQueue.length}
+                </span>
+              )}
             </button>
           </div>
 
