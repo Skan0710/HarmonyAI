@@ -30,8 +30,11 @@ router.get('/explain/:songId', protect, getRecommendationExplanation);
 router.get('/explanation/:songId', protect, getRecommendationExplanation);
 router.get('/:songId/explanation', protect, getRecommendationExplanation);
 
-// GET /api/recommendations/autoplay?limit=5&lastPlayedArtistId=...&excludeQueue=id1,id2 (Protected JWT)
+// GET & POST /api/recommendations/autoplay (Protected JWT - Smart Autoplay & Adaptive Queue)
 router.get('/autoplay', protect, getSmartAutoplayCandidates);
+router.post('/autoplay', protect, getSmartAutoplayCandidates);
+router.get('/smart-autoplay', protect, getSmartAutoplayCandidates);
+router.post('/smart-autoplay', protect, getSmartAutoplayCandidates);
 
 // GET /api/recommendations/session?limit=10 (Protected JWT)
 router.get('/session', protect, getSessionRecommendations);
