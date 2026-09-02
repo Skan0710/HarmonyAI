@@ -91,11 +91,37 @@ export interface AutoplayCandidateResponse {
   reason: string;
 }
 
+export interface AutoplayTrackResponse {
+  song: Song;
+  queuePosition?: number;
+  queueScore?: number;
+  autoplayScore?: number;
+  hybridScore?: number;
+  sessionScore?: number;
+  contextScore?: number;
+  tier?: string;
+  reason?: string;
+  sources?: string[];
+}
+
 export interface AutoplayApiResponse {
   success: boolean;
   strategyUsed?: string;
+  currentTrack?: Song | null;
+  currentTrackId?: string;
+  sessionActive?: boolean;
+  context?: string;
   count?: number;
-  data?: AutoplayCandidateResponse[];
+  queueSize?: number;
+  data?: AutoplayCandidateResponse[] | AutoplayTrackResponse[];
+  queue?: AutoplayTrackResponse[];
+  candidates?: AutoplayCandidateResponse[];
+  explanationMetadata?: {
+    primaryReason?: string;
+    contextApplied?: string;
+    dominantGenres?: string[];
+    uniqueArtistsCount?: number;
+  };
   message?: string;
 }
 
@@ -194,16 +220,30 @@ export const fetchSessionRecommendationsApi = async (
 };
 
 export const fetchSmartAutoplayApi = async (params: {
+  currentTrackId?: string;
+  context?: string | any;
+  queueSize?: number;
   limit?: number;
   lastPlayedArtistId?: string;
   excludeQueue?: string[];
 }): Promise<{
   songs: Song[];
+  queue: AutoplayTrackResponse[];
   rawCandidates: AutoplayCandidateResponse[];
+  explanationMetadata?: any;
   error: string | null;
 }> => {
   const queryParams = new URLSearchParams();
-  if (params.limit) queryParams.append('limit', String(params.limit));
+  const effectiveLimit = params.queueSize || params.limit || 5;
+  queryParams.append('limit', String(effectiveLimit));
+  queryParams.append('queueSize', String(effectiveLimit));
+  if (params.currentTrackId) queryParams.append('currentTrack', params.currentTrackId);
+  if (params.context) {
+    queryParams.append(
+      'context',
+      typeof params.context === 'string' ? params.context : JSON.stringify(params.context)
+    );
+  }
   if (params.lastPlayedArtistId) queryParams.append('lastPlayedArtistId', params.lastPlayedArtistId);
   if (params.excludeQueue && params.excludeQueue.length > 0) {
     queryParams.append('excludeQueue', params.excludeQueue.join(','));
@@ -215,10 +255,24 @@ export const fetchSmartAutoplayApi = async (params: {
   );
 
   const result = extractEnvelopeData(response, 'Failed to fetch autoplay candidates');
-  const rawCandidates = result.data || [];
-  const songs = rawCandidates.filter((item) => Boolean(item.song)).map((item) => item.song);
+  const payload = response.data;
+  const rawQueue: AutoplayTrackResponse[] = payload?.queue || [];
+  const rawCandidates: AutoplayCandidateResponse[] =
+    payload?.candidates ||
+    (Array.isArray(result.data) ? (result.data as AutoplayCandidateResponse[]) : []);
 
-  return { songs, rawCandidates, error: result.error };
+  // Extract valid songs from queue or fallback candidates
+  const songsFromQueue = rawQueue.map((item) => item.song).filter(Boolean);
+  const songsFromCandidates = rawCandidates.map((item) => item.song).filter(Boolean);
+  const songs = songsFromQueue.length > 0 ? songsFromQueue : songsFromCandidates;
+
+  return {
+    songs,
+    queue: rawQueue,
+    rawCandidates,
+    explanationMetadata: payload?.explanationMetadata,
+    error: result.error,
+  };
 };
 
 export interface RecommendationExplanationResponse {
