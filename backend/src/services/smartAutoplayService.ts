@@ -220,21 +220,28 @@ export class SmartAutoplayService {
     if (session) {
       if (session.sessionEvents) {
         sessionEventsCount = session.sessionEvents.length;
-        session.sessionEvents.forEach((ev) => {
-          if (ev.action === 'skip' && ev.song) {
-            skippedSongIdsSet.add(ev.song.toString());
+        session.sessionEvents.forEach((ev: any) => {
+          const sId = ev && typeof ev === 'object' && ev.song ? ev.song.toString() : ev ? ev.toString() : '';
+          if (sId) {
+            if (ev.action === 'skip') {
+              skippedSongIdsSet.add(sId);
+            } else if (ev.action === 'play' || ev.action === 'complete' || ev.action === 'replay') {
+              playedSongIdsSet.add(sId);
+              recentPlaysList.push(sId);
+            }
           }
         });
       }
       if (session.tracksSkipped) {
-        session.tracksSkipped.forEach((sk) => {
-          if (sk.song) skippedSongIdsSet.add(sk.song.toString());
+        session.tracksSkipped.forEach((sk: any) => {
+          const sId = sk && typeof sk === 'object' && sk.song ? sk.song.toString() : sk ? sk.toString() : '';
+          if (sId) skippedSongIdsSet.add(sId);
         });
       }
       const plays = session.tracksPlayed || session.songsPlayed || [];
-      plays.forEach((sp) => {
-        if (sp.song) {
-          const sId = sp.song.toString();
+      plays.forEach((sp: any) => {
+        const sId = sp && typeof sp === 'object' && sp.song ? sp.song.toString() : sp ? sp.toString() : '';
+        if (sId) {
           playedSongIdsSet.add(sId);
           recentPlaysList.push(sId);
         }
