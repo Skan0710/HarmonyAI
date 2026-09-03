@@ -4,6 +4,8 @@ import {
   getHybridConfigWeights,
   getContextInfluenceConfig,
   getSessionInfluenceConfig,
+  getTemporalTasteInfluenceConfig,
+  TemporalTasteInfluenceConfig,
 } from '../config/recommendationConfig.js';
 import {
   RecommendationContextAttributes,
@@ -15,6 +17,10 @@ import {
 } from './contextPreferenceMappingService.js';
 import { SessionTasteProfile } from './sessionTasteProfileService.js';
 import { IListeningSession } from '../models/ListeningSession.js';
+import {
+  UnifiedLayeredTasteProfile,
+  TemporalTasteLayer,
+} from './layeredTemporalTasteProfileService.js';
 
 export interface HybridRankedResult {
   song: any;
@@ -31,6 +37,10 @@ export interface HybridRankedResult {
     userPreferenceScore?: number;
     contextScore?: number;
     sessionScore?: number;
+    shortTermScore?: number;
+    mediumTermScore?: number;
+    longTermScore?: number;
+    temporalTasteScore?: number;
   };
   sources: string[];
   metadata?: Record<string, any>;
@@ -219,10 +229,104 @@ export class HybridRankingPipeline {
   }
 
   /**
+   * Helper: Calculates alignment between a candidate song and a single temporal taste layer
+   * (short-term, medium-term, or long-term) based on genre, artist, mood, and acoustic profiles.
+   */
+  private static calculateLayerFitScore(
+    songDoc: any,
+    layer: TemporalTasteLayer,
+    config: TemporalTasteInfluenceConfig
+  ): number {
+    if (!songDoc || !layer) return 0.5;
+
+    let accumulatedScore = 0;
+    let totalWeight = 0;
+
+    const songGenre = songDoc.genre
+      ? typeof songDoc.genre === 'object' && songDoc.genre.name
+        ? String(songDoc.genre.name).trim().toLowerCase()
+        : String(songDoc.genre).trim().toLowerCase()
+      : undefined;
+
+    const songArtist = songDoc.artist
+      ? typeof songDoc.artist === 'object' && songDoc.artist.name
+        ? String(songDoc.artist.name).trim().toLowerCase()
+        : String(songDoc.artist).trim().toLowerCase()
+      : undefined;
+
+    const songMood = songDoc.mood ? String(songDoc.mood).trim().toLowerCase() : undefined;
+    const audioFeatures = songDoc.audioFeatures || {};
+
+    // 1. Genre Fit (Weight from config, default 0.40)
+    if (layer.genres && layer.genres.length > 0) {
+      totalWeight += config.genreMatchWeight;
+      if (songGenre) {
+        const matched = layer.genres.find(
+          (g) => g.name.toLowerCase() === songGenre || (g.id && String(g.id) === String(songDoc.genre?._id || songDoc.genre))
+        );
+        if (matched) {
+          accumulatedScore += config.genreMatchWeight * Math.max(0.2, matched.score);
+        }
+      }
+    }
+
+    // 2. Artist Fit (Weight from config, default 0.30)
+    if (layer.artists && layer.artists.length > 0) {
+      totalWeight += config.artistMatchWeight;
+      if (songArtist) {
+        const matched = layer.artists.find(
+          (a) => a.name.toLowerCase() === songArtist || (a.id && String(a.id) === String(songDoc.artist?._id || songDoc.artist))
+        );
+        if (matched) {
+          accumulatedScore += config.artistMatchWeight * Math.max(0.2, matched.score);
+        }
+      }
+    }
+
+    // 3. Mood Fit (Weight from config, default 0.15)
+    if (layer.moods && layer.moods.length > 0) {
+      totalWeight += config.moodMatchWeight;
+      if (songMood) {
+        const matched = layer.moods.find((m) => m.name.toLowerCase() === songMood);
+        if (matched) {
+          accumulatedScore += config.moodMatchWeight * Math.max(0.2, matched.score);
+        }
+      }
+    }
+
+    // 4. Acoustic Target Fit (Weight from config, default 0.15)
+    if (layer.acousticTargets && audioFeatures) {
+      totalWeight += config.acousticMatchWeight;
+      let acousticScore = 0.5;
+      let acousticCount = 0;
+      let acousticSum = 0;
+
+      if (typeof audioFeatures.energy === 'number' && typeof layer.acousticTargets.energy === 'number') {
+        const diff = Math.abs(audioFeatures.energy - layer.acousticTargets.energy);
+        acousticSum += Math.max(0, 1.0 - diff / 0.40);
+        acousticCount++;
+      }
+      if (typeof audioFeatures.tempo === 'number' && typeof layer.acousticTargets.tempo === 'number') {
+        const diff = Math.abs(audioFeatures.tempo - layer.acousticTargets.tempo);
+        acousticSum += Math.max(0, 1.0 - diff / 40);
+        acousticCount++;
+      }
+      if (acousticCount > 0) {
+        acousticScore = acousticSum / acousticCount;
+      }
+      accumulatedScore += config.acousticMatchWeight * acousticScore;
+    }
+
+    if (totalWeight === 0) return 0.5;
+    return Number(Math.max(0, Math.min(1, accumulatedScore / totalWeight)).toFixed(4));
+  }
+
+  /**
    * Evaluates a candidate pool, applies Min-Max normalization across feature components,
    * calculates final weighted hybrid recommendation scores (incorporating content, collaborative,
    * user taste profile affinity, popularity, and recency signals), optionally applies context modulation,
-   * optionally applies listening session taste profile modulation, ranks candidates descending,
+   * optionally applies listening session taste profile modulation, optionally applies multi-layer
+   * temporal taste profile modulation (short, medium, long term signals), ranks candidates descending,
    * and returns top items up to configurable limit.
    */
   static rankCandidates(
@@ -233,7 +337,9 @@ export class HybridRankingPipeline {
     customContextInfluence?: number,
     sessionProfile?: SessionTasteProfile | null,
     customSessionInfluence?: number,
-    sessionDoc?: IListeningSession | null
+    sessionDoc?: IListeningSession | null,
+    temporalProfile?: UnifiedLayeredTasteProfile | null,
+    customTemporalInfluence?: number
   ): HybridRankedResult[] {
     if (!candidates || candidates.length === 0) {
       return [];
@@ -313,17 +419,35 @@ export class HybridRankingPipeline {
       );
     }
 
-    // Bound total contextual + session influence so personalized taste is always primary >= 50%
-    const totalExtraInfluence = effectiveContextInfluence + effectiveSessionInfluence;
+    // 4. Resolve Temporal Taste Influence if temporal profile is provided
+    let effectiveTemporalInfluence = 0;
+    const temporalConfig = getTemporalTasteInfluenceConfig();
+    if (temporalProfile) {
+      const requestedInfluence =
+        customTemporalInfluence !== undefined
+          ? customTemporalInfluence
+          : temporalConfig.defaultTemporalInfluence;
+
+      effectiveTemporalInfluence = Math.max(
+        temporalConfig.minTemporalInfluence,
+        Math.min(temporalConfig.maxTemporalInfluence, requestedInfluence)
+      );
+    }
+
+    // Bound total contextual + session + temporal influence so personalized baseline is preserved >= 50%
+    const totalExtraInfluence =
+      effectiveContextInfluence + effectiveSessionInfluence + effectiveTemporalInfluence;
     if (totalExtraInfluence > 0.50) {
       const scaleFactor = 0.50 / totalExtraInfluence;
       effectiveContextInfluence *= scaleFactor;
       effectiveSessionInfluence *= scaleFactor;
+      effectiveTemporalInfluence *= scaleFactor;
     }
 
-    const baselineHybridWeight = 1 - effectiveContextInfluence - effectiveSessionInfluence;
+    const baselineHybridWeight =
+      1 - effectiveContextInfluence - effectiveSessionInfluence - effectiveTemporalInfluence;
 
-    // 4. Compute normalized component scores & weighted multi-layer fusion per candidate
+    // 5. Compute normalized component scores & weighted multi-layer fusion per candidate
     const scoredItems: HybridRankedResult[] = candidates.map((cand) => {
       const rawContent = isNaN(cand.contentScore) ? 0 : cand.contentScore || 0;
       const rawCollab = isNaN(cand.collaborativeScore) ? 0 : cand.collaborativeScore || 0;
@@ -359,6 +483,31 @@ export class HybridRankingPipeline {
         sessionFitScore = this.calculateSessionFitScore(cand.songDoc, sessionProfile, sessionDoc);
       }
 
+      // Calculate separate temporal layer signals if active
+      let shortTermScore: number | undefined = undefined;
+      let mediumTermScore: number | undefined = undefined;
+      let longTermScore: number | undefined = undefined;
+      let temporalTasteScore: number | undefined = undefined;
+
+      if (temporalProfile && effectiveTemporalInfluence > 0) {
+        shortTermScore = this.calculateLayerFitScore(cand.songDoc, temporalProfile.shortTerm, temporalConfig);
+        mediumTermScore = this.calculateLayerFitScore(cand.songDoc, temporalProfile.mediumTerm, temporalConfig);
+        longTermScore = this.calculateLayerFitScore(cand.songDoc, temporalProfile.longTerm, temporalConfig);
+
+        const sumSignalWeights =
+          temporalConfig.shortTermSignalWeight +
+          temporalConfig.mediumTermSignalWeight +
+          temporalConfig.longTermSignalWeight;
+
+        const weightedTemporal =
+          (shortTermScore * temporalConfig.shortTermSignalWeight +
+            mediumTermScore * temporalConfig.mediumTermSignalWeight +
+            longTermScore * temporalConfig.longTermSignalWeight) /
+          Math.max(0.01, sumSignalWeights);
+
+        temporalTasteScore = Number(Math.max(0, Math.min(1, weightedTemporal)).toFixed(4));
+      }
+
       // Blended multi-layer score
       let blended = baselineHybridWeight * baseHybridScore;
       if (contextFitScore !== undefined) {
@@ -366,6 +515,9 @@ export class HybridRankingPipeline {
       }
       if (sessionFitScore !== undefined) {
         blended += effectiveSessionInfluence * sessionFitScore;
+      }
+      if (temporalTasteScore !== undefined) {
+        blended += effectiveTemporalInfluence * temporalTasteScore;
       }
 
       const finalScore = Number(Math.max(0, Math.min(1, blended)).toFixed(4));
@@ -383,10 +535,14 @@ export class HybridRankingPipeline {
           recencyScore: Number(normRec.toFixed(4)),
           contextScore: contextFitScore,
           sessionScore: sessionFitScore,
+          shortTermScore,
+          mediumTermScore,
+          longTermScore,
+          temporalTasteScore,
         },
         sources: cand.sources || [],
         metadata:
-          derivedPreferences || sessionProfile
+          derivedPreferences || sessionProfile || temporalProfile
             ? {
                 ...(derivedPreferences
                   ? {
@@ -402,15 +558,25 @@ export class HybridRankingPipeline {
                       sessionFitScore,
                     }
                   : {}),
+                ...(temporalProfile
+                  ? {
+                      temporalInfluence: effectiveTemporalInfluence,
+                      shortTermFitScore: shortTermScore,
+                      mediumTermFitScore: mediumTermScore,
+                      longTermFitScore: longTermScore,
+                      temporalTasteScore,
+                      tasteStabilityScore: temporalProfile.tasteStabilityScore,
+                    }
+                  : {}),
               }
             : undefined,
       };
     });
 
-    // 5. Sort candidates descending by final hybrid score
+    // 6. Sort candidates descending by final hybrid score
     scoredItems.sort((a, b) => b.hybridScore - a.hybridScore);
 
-    // 6. Return top limit results
+    // 7. Return top limit results
     return scoredItems.slice(0, Math.max(1, limit));
   }
 }

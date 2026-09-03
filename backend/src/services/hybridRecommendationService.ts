@@ -14,6 +14,10 @@ import {
 } from './sessionTasteProfileService.js';
 import { ListeningSessionService } from './listeningSessionService.js';
 import { IListeningSession } from '../models/ListeningSession.js';
+import {
+  LayeredTemporalTasteProfileService,
+  UnifiedLayeredTasteProfile,
+} from './layeredTemporalTasteProfileService.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
@@ -30,6 +34,7 @@ export class HybridRecommendationService {
    * - Uses CandidateGenerationService + HybridRankingPipeline for ACTIVE and WELL_ESTABLISHED users.
    * - Optionally accepts listening context (situation, mood, energy, tempo, genres) to adjust ranking weights.
    * - Optionally accepts listening session taste profile (or automatically retrieves active session) to adjust weights.
+   * - Optionally accepts temporal taste profile (or automatically retrieves layered profile) to adjust weights.
    * Preserves existing response structures while returning the recommendation strategy used.
    */
   static async getHybridRecommendations(params: {
@@ -43,6 +48,9 @@ export class HybridRecommendationService {
     sessionInfluence?: number;
     sessionId?: string | null;
     useActiveSession?: boolean;
+    temporalProfile?: UnifiedLayeredTasteProfile | null;
+    temporalInfluence?: number;
+    useTemporalProfile?: boolean;
   }): Promise<HybridRecommendationServiceResult> {
     const {
       userId,
@@ -54,6 +62,9 @@ export class HybridRecommendationService {
       sessionProfile,
       sessionInfluence,
       useActiveSession,
+      temporalProfile,
+      temporalInfluence,
+      useTemporalProfile,
     } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
@@ -146,6 +157,16 @@ export class HybridRecommendationService {
         }
       }
 
+      // 5. Resolve Temporal Taste Profile if requested
+      let effectiveTemporalProfile = temporalProfile || null;
+      if (!effectiveTemporalProfile && useTemporalProfile) {
+        try {
+          effectiveTemporalProfile = await LayeredTemporalTasteProfileService.generateLayeredTasteProfile(userId);
+        } catch {
+          // Safe fallback if temporal taste profile retrieval fails
+        }
+      }
+
       const rankedResults = HybridRankingPipeline.rankCandidates(
         candidates,
         limit,
@@ -154,7 +175,9 @@ export class HybridRecommendationService {
         contextInfluence,
         effectiveSessionProfile,
         sessionInfluence,
-        activeSessionDoc
+        activeSessionDoc,
+        effectiveTemporalProfile,
+        temporalInfluence
       );
 
       return {

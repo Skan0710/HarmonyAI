@@ -413,5 +413,52 @@ export const resetTemporalAggregationConfig = (): TemporalPreferenceAggregationC
   return { ...currentTemporalAggregationConfig };
 };
 
+export interface TemporalTasteInfluenceConfig {
+  defaultTemporalInfluence: number;   // default: 0.25
+  maxTemporalInfluence: number;       // default: 0.40
+  minTemporalInfluence: number;       // default: 0.00
+  shortTermSignalWeight: number;      // default: 0.50 (recent momentum influences more strongly)
+  mediumTermSignalWeight: number;     // default: 0.30
+  longTermSignalWeight: number;       // default: 0.20 (preserving foundational long-term taste)
+  genreMatchWeight: number;           // default: 0.40
+  artistMatchWeight: number;          // default: 0.30
+  moodMatchWeight: number;            // default: 0.15
+  acousticMatchWeight: number;        // default: 0.15
+}
+
+export const DEFAULT_TEMPORAL_INFLUENCE_CONFIG: TemporalTasteInfluenceConfig = {
+  defaultTemporalInfluence: 0.25,
+  maxTemporalInfluence: 0.40,
+  minTemporalInfluence: 0.00,
+  shortTermSignalWeight: 0.50,
+  mediumTermSignalWeight: 0.30,
+  longTermSignalWeight: 0.20,
+  genreMatchWeight: 0.40,
+  artistMatchWeight: 0.30,
+  moodMatchWeight: 0.15,
+  acousticMatchWeight: 0.15,
+};
+
+let currentTemporalInfluenceConfig: TemporalTasteInfluenceConfig = {
+  ...DEFAULT_TEMPORAL_INFLUENCE_CONFIG,
+};
+
+export const getTemporalTasteInfluenceConfig = (): TemporalTasteInfluenceConfig => {
+  return { ...currentTemporalInfluenceConfig };
+};
+
+export const updateTemporalTasteInfluenceConfig = (
+  newConfig: Partial<TemporalTasteInfluenceConfig>
+): TemporalTasteInfluenceConfig => {
+  currentTemporalInfluenceConfig = { ...currentTemporalInfluenceConfig, ...newConfig };
+  return { ...currentTemporalInfluenceConfig };
+};
+
+export const resetTemporalTasteInfluenceConfig = (): TemporalTasteInfluenceConfig => {
+  currentTemporalInfluenceConfig = { ...DEFAULT_TEMPORAL_INFLUENCE_CONFIG };
+  return { ...currentTemporalInfluenceConfig };
+};
+
+
 
 
