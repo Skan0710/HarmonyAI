@@ -49,6 +49,25 @@ export interface LayeredTasteProfileWeights {
   longTermWeight: number;   // default: 0.20
 }
 
+export interface PreferenceChangeSignal {
+  name: string;
+  category: 'genre' | 'artist' | 'mood';
+  shortTermScore: number;
+  longTermScore: number;
+  changeDelta: number; // shortTermScore - longTermScore
+  changePercentage: number;
+  direction: 'rising' | 'declining' | 'emerging' | 'stable';
+  explanation: string;
+}
+
+export interface StrongestChangingPreferences {
+  topRising: PreferenceChangeSignal[];
+  topDeclining: PreferenceChangeSignal[];
+  topEmerging: PreferenceChangeSignal[];
+  overallChanges: PreferenceChangeSignal[];
+  tasteShiftSummary: string;
+}
+
 export interface UnifiedLayeredTasteProfile {
   userId: string;
   // Individual layers preserved strictly
@@ -60,6 +79,8 @@ export interface UnifiedLayeredTasteProfile {
   unifiedArtists: TasteAffinityItem[];
   unifiedMoods: TasteAffinityItem[];
   unifiedAcousticTargets?: AcousticProfileTarget;
+  // Strongest changing preferences across horizons
+  strongestChangingPreferences?: StrongestChangingPreferences;
   // Metadata & diagnostics
   layerWeights: LayeredTasteProfileWeights;
   tasteStabilityScore: number; // [0.0, 1.0] (1.0 = highly stable taste, < 0.5 = active pivot)
@@ -403,6 +424,12 @@ export class LayeredTemporalTasteProfileService {
       longTerm.genres
     );
 
+    // 4. Identify strongest changing preferences between short-term momentum and long-term baseline
+    const strongestChangingPreferences = this.calculateStrongestChangingPreferences(
+      shortTerm,
+      longTerm
+    );
+
     const totalInteractions =
       shortTerm.totalInteractions +
       mediumTerm.totalInteractions +
@@ -417,12 +444,119 @@ export class LayeredTemporalTasteProfileService {
       unifiedArtists,
       unifiedMoods,
       unifiedAcousticTargets,
+      strongestChangingPreferences,
       layerWeights: weights,
       tasteStabilityScore,
       dominantTasteCategory: unifiedGenres.length > 0 ? unifiedGenres[0].name : undefined,
       totalInteractionsAnalyzed: totalInteractions,
       createdAt: now,
       updatedAt: now,
+    };
+  }
+
+  /**
+   * Compares the user's short-term taste against foundational long-term taste to identify
+   * the strongest changing preferences (emerging, rising/surging, and declining/cooling).
+   */
+  static calculateStrongestChangingPreferences(
+    shortTerm: TemporalTasteLayer,
+    longTerm: TemporalTasteLayer,
+    limit = 10
+  ): StrongestChangingPreferences {
+    const changes: PreferenceChangeSignal[] = [];
+
+    const analyzeCategory = (
+      shortList: TasteAffinityItem[],
+      longList: TasteAffinityItem[],
+      category: 'genre' | 'artist' | 'mood'
+    ) => {
+      const shortMap = new Map<string, TasteAffinityItem>();
+      const longMap = new Map<string, TasteAffinityItem>();
+      const allNames = new Set<string>();
+
+      shortList.forEach((item) => {
+        const key = item.name.toLowerCase();
+        shortMap.set(key, item);
+        allNames.add(item.name);
+      });
+
+      longList.forEach((item) => {
+        const key = item.name.toLowerCase();
+        longMap.set(key, item);
+        allNames.add(item.name);
+      });
+
+      for (const name of allNames) {
+        const key = name.toLowerCase();
+        const shortItem = shortMap.get(key);
+        const longItem = longMap.get(key);
+
+        const shortScore = shortItem ? shortItem.score : 0;
+        const longScore = longItem ? longItem.score : 0;
+        const delta = Number((shortScore - longScore).toFixed(4));
+
+        if (shortScore === 0 && longScore === 0) continue;
+
+        let direction: 'rising' | 'declining' | 'emerging' | 'stable' = 'stable';
+        let explanation = '';
+        const pct = longScore > 0
+          ? Number(((delta / longScore) * 100).toFixed(1))
+          : 100;
+
+        if (shortScore > 0 && longScore === 0) {
+          direction = 'emerging';
+          explanation = `New discovery: ${name} recently entered listening rotations with a ${shortScore.toFixed(2)} score.`;
+        } else if (delta >= 0.15) {
+          direction = 'rising';
+          explanation = `Surging: ${name} grew by ${(delta * 100).toFixed(1)}% above long-term affinity.`;
+        } else if (delta <= -0.15) {
+          direction = 'declining';
+          explanation = `Cooling down: ${name} decreased by ${(Math.abs(delta) * 100).toFixed(1)}% compared to historical listening.`;
+        } else {
+          direction = 'stable';
+          explanation = `${name} remains consistent with baseline listening habits.`;
+        }
+
+        changes.push({
+          name,
+          category,
+          shortTermScore: shortScore,
+          longTermScore: longScore,
+          changeDelta: delta,
+          changePercentage: pct,
+          direction,
+          explanation,
+        });
+      }
+    };
+
+    analyzeCategory(shortTerm.genres, longTerm.genres, 'genre');
+    analyzeCategory(shortTerm.artists, longTerm.artists, 'artist');
+    analyzeCategory(shortTerm.moods, longTerm.moods, 'mood');
+
+    // Sort by absolute delta descending
+    changes.sort((a, b) => Math.abs(b.changeDelta) - Math.abs(a.changeDelta));
+
+    const topRising = changes.filter((c) => c.direction === 'rising').slice(0, limit);
+    const topDeclining = changes.filter((c) => c.direction === 'declining').slice(0, limit);
+    const topEmerging = changes.filter((c) => c.direction === 'emerging').slice(0, limit);
+    const overallChanges = changes.slice(0, limit);
+
+    let tasteShiftSummary = 'Your listening profile shows stable continuity across time horizons.';
+    if (topEmerging.length > 0 && topRising.length > 0) {
+      tasteShiftSummary = `Active taste evolution: ${topEmerging[0].name} recently emerged, while ${topRising[0].name} is experiencing a strong listening spike.`;
+    } else if (topRising.length > 0) {
+      tasteShiftSummary = `Surging interest in ${topRising.map((r) => r.name).slice(0, 2).join(' and ')} compared to foundational taste.`;
+    } else if (topDeclining.length > 0) {
+      tasteShiftSummary = `Rotation cooling down for ${topDeclining[0].name} while baseline favorites remain intact.`;
+    }
+
+    return {
+      topRising,
+      topDeclining,
+      topEmerging,
+      overallChanges,
+      tasteShiftSummary,
     };
   }
 

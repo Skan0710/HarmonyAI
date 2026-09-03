@@ -13,6 +13,7 @@ import {
   getListeningProfile,
 } from '../controllers/userController.js';
 import { getPersonalizedFeed } from '../controllers/personalizedFeedController.js';
+import { getTemporalTasteProfile } from '../controllers/temporalTasteProfileController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
 const router = Router();
@@ -20,6 +21,10 @@ const router = Router();
 // Protected user profile routes
 router.get('/me', protect, getCurrentUser);
 router.put('/me', protect, updateCurrentUser);
+
+// Temporal Taste Profile routes
+router.get('/me/temporal-taste-profile', protect, getTemporalTasteProfile);
+router.get('/temporal-taste-profile', protect, getTemporalTasteProfile);
 
 // Listening Profile & Stats analytics (accessible via /me/listening-profile and /listening-profile)
 router.get('/me/listening-profile', protect, getListeningProfile);

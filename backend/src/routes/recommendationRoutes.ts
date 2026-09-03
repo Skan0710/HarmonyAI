@@ -16,9 +16,14 @@ import {
   submitFeedback,
   getUserFeedback,
 } from '../controllers/recommendationInteractionController.js';
+import { getTemporalTasteProfile } from '../controllers/temporalTasteProfileController.js';
 import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// GET /api/recommendations/temporal-taste-profile (Protected JWT - Multi-Horizon Temporal Taste Profile)
+router.get('/temporal-taste-profile', protect, getTemporalTasteProfile);
+router.get('/temporal-profile', protect, getTemporalTasteProfile);
 
 // GET & POST /api/recommendations/context (Protected JWT - Context-Aware Recommendations)
 router.get('/context', protect, getContextAwareRecommendations);
