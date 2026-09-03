@@ -64,22 +64,14 @@ export class MusicSearchTool implements AssistantTool<MusicSearchInput, MusicSea
       },
     };
   }
-
-  /**
-   * Standalone music search execution method reusable outside the assistant framework.
-   */
   static async searchMusic(input: MusicSearchInput): Promise<MusicSearchResultData> {
     const { query, limit = 10 } = input;
     const safeLimit = Math.max(1, Math.min(50, limit));
-
-    // Perform full catalog search across songs, artists, and albums
     const catalogResults = await searchCatalog(query, safeLimit);
 
-    // If search returned songs, ensure full population from database
     let songs: ISong[] = catalogResults.songs || [];
 
     if (songs.length === 0) {
-      // Fallback partial text query on Song collection directly
       const searchRegex = new RegExp(query.trim(), 'i');
       songs = await Song.find({
         isPublished: true,
