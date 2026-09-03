@@ -503,9 +503,10 @@ export class LayeredTemporalTasteProfileService {
           ? Number(((delta / longScore) * 100).toFixed(1))
           : 100;
 
-        const isEmerging =
-          (shortScore > 0 && longScore === 0) ||
-          (shortItem && longItem && shortItem.interactionCount >= longItem.interactionCount && delta > 0);
+        // "Emerging" strictly means the item has no long-term history at all
+        // but has appeared in the short-term window for the first time.
+        // Items that exist in both layers are "rising" or "declining" based on delta.
+        const isEmerging = shortScore > 0 && longScore === 0;
 
         if (isEmerging) {
           direction = 'emerging';
