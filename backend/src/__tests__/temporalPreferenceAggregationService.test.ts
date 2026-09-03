@@ -294,7 +294,111 @@ export async function runTemporalPreferenceAggregationServiceTests() {
       console.log('✓ Test 7 Passed: End-to-end user aggregation with MongoDB models & persistence verified.');
     }
 
-    console.log('🎉 ALL 7 Temporal Preference Aggregation Service tests completed successfully.');
+    // Test 8: Configurable Decay Functions (Exponential, Linear, and Step Models)
+    {
+      const eventRecent = new Date(now.getTime() - 2 * 86400000);   // 2 days old
+      const eventMid = new Date(now.getTime() - 20 * 86400000);     // 20 days old
+      const eventOld = new Date(now.getTime() - 80 * 86400000);     // 80 days old
+      const eventAncient = new Date(now.getTime() - 200 * 86400000); // 200 days old
+
+      // 1. Exponential Decay
+      const expConfig = { ...getTemporalAggregationConfig(), decayModel: 'exponential' as const };
+      const expRecent = TemporalPreferenceAggregationService.calculateTimeDecay(eventRecent, 10, expConfig, now);
+      const expMid = TemporalPreferenceAggregationService.calculateTimeDecay(eventMid, 10, expConfig, now);
+      const expOld = TemporalPreferenceAggregationService.calculateTimeDecay(eventOld, 10, expConfig, now);
+      assert.ok(expRecent > expMid && expMid > expOld, 'Exponential decay: older events have strictly less influence');
+
+      // 2. Linear Decay
+      const linearConfig = {
+        ...getTemporalAggregationConfig(),
+        decayModel: 'linear' as const,
+        linearDecayMaxDays: 100,
+        minWeightFloor: 0.10,
+      };
+      const linRecent = TemporalPreferenceAggregationService.calculateTimeDecay(eventRecent, 10, linearConfig, now);
+      const linMid = TemporalPreferenceAggregationService.calculateTimeDecay(eventMid, 10, linearConfig, now);
+      const linAncient = TemporalPreferenceAggregationService.calculateTimeDecay(eventAncient, 10, linearConfig, now);
+      assert.ok(linRecent > linMid, 'Linear decay: older events have strictly less influence');
+      assert.strictEqual(linAncient, 0.10, 'Linear decay: events beyond maxDays clamped to minWeightFloor');
+
+      // 3. Step Decay
+      const stepConfig = {
+        ...getTemporalAggregationConfig(),
+        decayModel: 'step' as const,
+        stepDecayBrackets: [
+          { maxDays: 7, multiplier: 1.0 },
+          { maxDays: 30, multiplier: 0.65 },
+          { maxDays: 90, multiplier: 0.35 },
+          { maxDays: 180, multiplier: 0.10 },
+        ],
+        minWeightFloor: 0.05,
+      };
+      const stepRecent = TemporalPreferenceAggregationService.calculateTimeDecay(eventRecent, 10, stepConfig, now);
+      const stepMid = TemporalPreferenceAggregationService.calculateTimeDecay(eventMid, 10, stepConfig, now);
+      const stepOld = TemporalPreferenceAggregationService.calculateTimeDecay(eventOld, 10, stepConfig, now);
+      const stepAncient = TemporalPreferenceAggregationService.calculateTimeDecay(eventAncient, 10, stepConfig, now);
+
+      assert.strictEqual(stepRecent, 1.0, 'Step decay: <= 7 days receives 1.0');
+      assert.strictEqual(stepMid, 0.65, 'Step decay: 8-30 days receives 0.65');
+      assert.strictEqual(stepOld, 0.35, 'Step decay: 31-90 days receives 0.35');
+      assert.strictEqual(stepAncient, 0.05, 'Step decay: beyond brackets receives minWeightFloor');
+
+      console.log('✓ Test 8 Passed: Configurable decay models (exponential, linear, step) verified.');
+    }
+
+    // Test 9: Simple and Explainable Decay Breakdown (explainDecay)
+    {
+      const threeDaysAgo = new Date(now.getTime() - 3 * 86400000);
+      const explanation = TemporalPreferenceAggregationService.explainDecay(
+        threeDaysAgo,
+        'complete',
+        7,
+        getTemporalAggregationConfig(),
+        now
+      );
+
+      assert.strictEqual(explanation.decayModel, 'exponential');
+      assert.strictEqual(explanation.eventAgeDays, 3);
+      assert.strictEqual(explanation.baseWeight, 1.5);
+      assert.ok(explanation.decayFactor > 0.70 && explanation.decayFactor < 0.80);
+      assert.strictEqual(explanation.effectiveWeight, Number((1.5 * explanation.decayFactor).toFixed(4)));
+      assert.ok(explanation.summary.includes('days ago'), 'Summary must mention age');
+      assert.ok(explanation.summary.includes('retains'), 'Summary must mention retained percentage');
+
+      console.log('✓ Test 9 Passed: Simple and explainable decay breakdown verified.');
+    }
+
+    // Test 10: Aggregation with Linear and Step Decay Overrides
+    {
+      const events: RawTemporalInteractionEvent[] = [
+        {
+          genreName: 'Classical',
+          action: 'play',
+          timestamp: new Date(now.getTime() - 2 * 86400000),
+        },
+        {
+          genreName: 'Classical',
+          action: 'play',
+          timestamp: new Date(now.getTime() - 40 * 86400000),
+        },
+      ];
+
+      const linearResult = TemporalPreferenceAggregationService.aggregateFromEvents(userId, events, {
+        configOverride: { decayModel: 'linear', linearDecayMaxDays: 60 },
+        referenceDate: now,
+      });
+      assert.strictEqual(linearResult.shortTerm.genres[0].name, 'Classical');
+
+      const stepResult = TemporalPreferenceAggregationService.aggregateFromEvents(userId, events, {
+        configOverride: { decayModel: 'step' },
+        referenceDate: now,
+      });
+      assert.strictEqual(stepResult.shortTerm.genres[0].name, 'Classical');
+
+      console.log('✓ Test 10 Passed: Aggregation successfully executes across multiple decay models.');
+    }
+
+    console.log('🎉 ALL 10 Temporal Preference Aggregation Service tests completed successfully.');
   } finally {
     (ListeningHistory as any).find = originalHistoryFind;
     (User as any).findById = originalUserFindById;

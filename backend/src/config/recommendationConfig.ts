@@ -339,7 +339,17 @@ export const resetSessionAdaptationConfig = (): SessionAdaptationConfig => {
   return { ...currentSessionAdaptationConfig };
 };
 
+export type PreferenceDecayModel = 'exponential' | 'linear' | 'step';
+
+export interface StepDecayBracket {
+  maxDays: number;
+  multiplier: number;
+}
+
 export interface TemporalPreferenceAggregationConfig {
+  decayModel: PreferenceDecayModel; // default: 'exponential' ('exponential' | 'linear' | 'step')
+  linearDecayMaxDays: number;       // default: 180 (days until minWeightFloor is reached in linear mode)
+  stepDecayBrackets: StepDecayBracket[]; // custom tiered brackets for step decay
   shortTermDays: number;            // default: 14 (short-term window in days)
   mediumTermDays: number;           // default: 60 (medium-term window in days)
   longTermDays: number;             // default: 180 (long-term window in days)
@@ -358,6 +368,14 @@ export interface TemporalPreferenceAggregationConfig {
 }
 
 export const DEFAULT_TEMPORAL_AGGREGATION_CONFIG: TemporalPreferenceAggregationConfig = {
+  decayModel: 'exponential',
+  linearDecayMaxDays: 180,
+  stepDecayBrackets: [
+    { maxDays: 7, multiplier: 1.0 },
+    { maxDays: 30, multiplier: 0.70 },
+    { maxDays: 90, multiplier: 0.40 },
+    { maxDays: 180, multiplier: 0.15 },
+  ],
   shortTermDays: 14,
   mediumTermDays: 60,
   longTermDays: 180,
