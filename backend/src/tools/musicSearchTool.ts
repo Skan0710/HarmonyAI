@@ -65,28 +65,76 @@ export class MusicSearchTool implements AssistantTool<MusicSearchInput, MusicSea
     };
   }
   static async searchMusic(input: MusicSearchInput): Promise<MusicSearchResultData> {
-    const { query, limit = 10 } = input;
+    const { query, genre, artist, limit = 10 } = input;
     const safeLimit = Math.max(1, Math.min(50, limit));
-    const catalogResults = await searchCatalog(query, safeLimit);
+    const catalogResults = await searchCatalog(query, safeLimit * 3);
 
     let songs: ISong[] = catalogResults.songs || [];
 
+    // Apply genre / artist post-filters on the catalog result set
+    if (genre) {
+      const genreLower = genre.trim().toLowerCase();
+      songs = songs.filter((s: any) => {
+        const genreName =
+          s.genre && typeof s.genre === 'object' && s.genre.name
+            ? s.genre.name
+            : String(s.genre || '');
+        return genreName.toLowerCase().includes(genreLower);
+      });
+    }
+    if (artist) {
+      const artistLower = artist.trim().toLowerCase();
+      songs = songs.filter((s: any) => {
+        const artistName =
+          s.artist && typeof s.artist === 'object' && s.artist.name
+            ? s.artist.name
+            : String(s.artist || '');
+        return artistName.toLowerCase().includes(artistLower);
+      });
+    }
+    songs = songs.slice(0, safeLimit);
+
+    // Fallback: direct Song collection query when catalog search yields no results
     if (songs.length === 0) {
       const searchRegex = new RegExp(query.trim(), 'i');
-      songs = await Song.find({
+      const fallbackQuery: Record<string, any> = {
         isPublished: true,
         $or: [
           { title: searchRegex },
           { tags: searchRegex },
           { language: searchRegex },
-          { mood: searchRegex },
         ],
-      })
+      };
+
+      songs = await Song.find(fallbackQuery)
         .populate('artist', 'name profileImage avatar verified')
         .populate('album', 'title coverImage releaseYear')
         .populate('genre', 'name slug')
-        .limit(safeLimit)
+        .limit(safeLimit * 3)
         .lean() as any;
+
+      // Apply the same genre / artist filters on the fallback results
+      if (genre) {
+        const genreLower = genre.trim().toLowerCase();
+        songs = songs.filter((s: any) => {
+          const genreName =
+            s.genre && typeof s.genre === 'object' && s.genre.name
+              ? s.genre.name
+              : String(s.genre || '');
+          return genreName.toLowerCase().includes(genreLower);
+        });
+      }
+      if (artist) {
+        const artistLower = artist.trim().toLowerCase();
+        songs = songs.filter((s: any) => {
+          const artistName =
+            s.artist && typeof s.artist === 'object' && s.artist.name
+              ? s.artist.name
+              : String(s.artist || '');
+          return artistName.toLowerCase().includes(artistLower);
+        });
+      }
+      songs = songs.slice(0, safeLimit);
     }
 
     return {
