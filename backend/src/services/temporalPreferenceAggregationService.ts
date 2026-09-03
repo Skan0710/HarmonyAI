@@ -538,11 +538,13 @@ export class TemporalPreferenceAggregationService {
       for (const item of scores) {
         const filter: any = {
           userId: userObjId,
+          type,
           timeWindow,
         };
 
         const updateData: any = {
           userId: userObjId,
+          type,
           preferenceScore: item.preferenceScore,
           interactionCount: item.interactionCount,
           lastInteractionAt: item.lastInteractionAt,
