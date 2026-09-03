@@ -339,4 +339,61 @@ export const resetSessionAdaptationConfig = (): SessionAdaptationConfig => {
   return { ...currentSessionAdaptationConfig };
 };
 
+export interface TemporalPreferenceAggregationConfig {
+  shortTermDays: number;            // default: 14 (short-term window in days)
+  mediumTermDays: number;           // default: 60 (medium-term window in days)
+  longTermDays: number;             // default: 180 (long-term window in days)
+  shortTermHalfLifeDays: number;    // default: 5 (aggressive recency decay for immediate taste)
+  mediumTermHalfLifeDays: number;   // default: 21 (balanced recency decay)
+  longTermHalfLifeDays: number;     // default: 90 (gentle decay preserving long-term favorites)
+  shortTermBlendWeight: number;     // default: 0.50 (weight of short-term in blended score)
+  mediumTermBlendWeight: number;    // default: 0.30 (weight of medium-term in blended score)
+  longTermBlendWeight: number;      // default: 0.20 (weight of long-term in blended score)
+  playWeight: number;               // default: 1.0 (base weight for play)
+  completeWeight: number;           // default: 1.5 (weight for full completion)
+  replayWeight: number;             // default: 2.0 (weight for repeated play/replay)
+  likeWeight: number;               // default: 2.0 (weight for explicit favorite/like)
+  skipPenaltyWeight: number;        // default: -0.8 (penalty for skipped track)
+  minWeightFloor: number;           // default: 0.05 (decay floor to preserve historical signal)
+}
+
+export const DEFAULT_TEMPORAL_AGGREGATION_CONFIG: TemporalPreferenceAggregationConfig = {
+  shortTermDays: 14,
+  mediumTermDays: 60,
+  longTermDays: 180,
+  shortTermHalfLifeDays: 5,
+  mediumTermHalfLifeDays: 21,
+  longTermHalfLifeDays: 90,
+  shortTermBlendWeight: 0.50,
+  mediumTermBlendWeight: 0.30,
+  longTermBlendWeight: 0.20,
+  playWeight: 1.0,
+  completeWeight: 1.5,
+  replayWeight: 2.0,
+  likeWeight: 2.0,
+  skipPenaltyWeight: -0.8,
+  minWeightFloor: 0.05,
+};
+
+let currentTemporalAggregationConfig: TemporalPreferenceAggregationConfig = {
+  ...DEFAULT_TEMPORAL_AGGREGATION_CONFIG,
+};
+
+export const getTemporalAggregationConfig = (): TemporalPreferenceAggregationConfig => {
+  return { ...currentTemporalAggregationConfig };
+};
+
+export const updateTemporalAggregationConfig = (
+  newConfig: Partial<TemporalPreferenceAggregationConfig>
+): TemporalPreferenceAggregationConfig => {
+  currentTemporalAggregationConfig = { ...currentTemporalAggregationConfig, ...newConfig };
+  return { ...currentTemporalAggregationConfig };
+};
+
+export const resetTemporalAggregationConfig = (): TemporalPreferenceAggregationConfig => {
+  currentTemporalAggregationConfig = { ...DEFAULT_TEMPORAL_AGGREGATION_CONFIG };
+  return { ...currentTemporalAggregationConfig };
+};
+
+
 
