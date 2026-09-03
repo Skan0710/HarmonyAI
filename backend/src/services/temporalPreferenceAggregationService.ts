@@ -11,7 +11,22 @@ import { Song } from '../models/Song.js';
 import {
   TemporalPreferenceAggregationConfig,
   getTemporalAggregationConfig,
+  PreferenceDecayModel,
 } from '../config/recommendationConfig.js';
+
+export interface DecayExplanation {
+  decayModel: PreferenceDecayModel;
+  eventDate: Date;
+  referenceDate: Date;
+  eventAgeDays: number;
+  decayFactor: number;
+  baseWeight: number;
+  effectiveWeight: number;
+  minWeightFloor: number;
+  halfLifeDays?: number;
+  linearMaxDays?: number;
+  summary: string;
+}
 
 export interface RawTemporalInteractionEvent {
   songId?: string;
@@ -33,6 +48,7 @@ export interface TemporalPreferenceScore {
   lastInteractionAt: Date;
   timeWindow: TemporalTimeWindow;
   rawWeight: number;
+  decayExplanation?: string;
 }
 
 export interface WindowPreferences {
@@ -64,8 +80,57 @@ export interface AggregateTemporalOptions {
 
 export class TemporalPreferenceAggregationService {
   /**
-   * Calculates exponential recency decay weight based on age and half-life:
-   * W(t) = max(minFloor, 0.5 ^ (ageInDays / halfLifeDays))
+   * Calculates time-based preference decay factor using the configured decay function.
+   * Simple, modular, and explainable.
+   * Supports 'exponential', 'linear', and 'step' decay models.
+   *
+   * - 'exponential': Decays smoothly based on half-life (W = 0.5 ^ (age / halfLife)).
+   * - 'linear': Decays linearly across maxDays towards minFloor.
+   * - 'step': Applies step brackets based on discrete time age tiers.
+   */
+  static calculateTimeDecay(
+    eventDate: Date,
+    halfLifeDays: number,
+    config: TemporalPreferenceAggregationConfig = getTemporalAggregationConfig(),
+    referenceDate: Date = new Date()
+  ): number {
+    const ageMs = Math.max(0, referenceDate.getTime() - new Date(eventDate).getTime());
+    const ageInDays = ageMs / (1000 * 60 * 60 * 24);
+    const minFloor = config.minWeightFloor ?? 0.05;
+
+    switch (config.decayModel) {
+      case 'linear': {
+        const maxDays = Math.max(1, config.linearDecayMaxDays || 180);
+        if (ageInDays >= maxDays) return minFloor;
+        const slope = (1.0 - minFloor) / maxDays;
+        const linearFactor = 1.0 - slope * ageInDays;
+        return Number(Math.max(minFloor, Math.min(1.0, linearFactor)).toFixed(4));
+      }
+
+      case 'step': {
+        const brackets = config.stepDecayBrackets || [
+          { maxDays: 7, multiplier: 1.0 },
+          { maxDays: 30, multiplier: 0.70 },
+          { maxDays: 90, multiplier: 0.40 },
+          { maxDays: 180, multiplier: 0.15 },
+        ];
+        const matched = brackets.find((b) => ageInDays <= b.maxDays);
+        if (matched) {
+          return Number(Math.max(minFloor, Math.min(1.0, matched.multiplier)).toFixed(4));
+        }
+        return minFloor;
+      }
+
+      case 'exponential':
+      default: {
+        const decayed = Math.pow(0.5, ageInDays / Math.max(0.5, halfLifeDays));
+        return Number(Math.max(minFloor, Math.min(1.0, decayed)).toFixed(4));
+      }
+    }
+  }
+
+  /**
+   * Backwards-compatible alias for calculateTimeDecay in exponential mode.
    */
   static calculateRecencyDecay(
     eventDate: Date,
@@ -73,10 +138,57 @@ export class TemporalPreferenceAggregationService {
     minFloor: number = 0.05,
     referenceDate: Date = new Date()
   ): number {
+    const config = {
+      ...getTemporalAggregationConfig(),
+      decayModel: 'exponential' as const,
+      minWeightFloor: minFloor,
+    };
+    return this.calculateTimeDecay(eventDate, halfLifeDays, config, referenceDate);
+  }
+
+  /**
+   * Provides a clear, transparent, and human-readable explanation of how a specific interaction
+   * or preference event was decayed over time.
+   */
+  static explainDecay(
+    eventDate: Date,
+    action: string = 'play',
+    halfLifeDays: number = 5,
+    config: TemporalPreferenceAggregationConfig = getTemporalAggregationConfig(),
+    referenceDate: Date = new Date()
+  ): DecayExplanation {
     const ageMs = Math.max(0, referenceDate.getTime() - new Date(eventDate).getTime());
-    const ageInDays = ageMs / (1000 * 60 * 60 * 24);
-    const decayed = Math.pow(0.5, ageInDays / Math.max(0.5, halfLifeDays));
-    return Math.max(minFloor, Math.min(1.0, decayed));
+    const eventAgeDays = Number((ageMs / (1000 * 60 * 60 * 24)).toFixed(2));
+    const baseWeight = this.getInteractionWeight(action, config);
+    const decayFactor = this.calculateTimeDecay(eventDate, halfLifeDays, config, referenceDate);
+    const effectiveWeight = Number((baseWeight * decayFactor).toFixed(4));
+    const minWeightFloor = config.minWeightFloor ?? 0.05;
+
+    let summary = '';
+    if (config.decayModel === 'exponential') {
+      summary = `Interaction occurred ${eventAgeDays} days ago. With a ${halfLifeDays}-day half-life exponential decay, ` +
+        `it retains ${(decayFactor * 100).toFixed(1)}% of original strength (${baseWeight} -> ${effectiveWeight}).`;
+    } else if (config.decayModel === 'linear') {
+      summary = `Interaction occurred ${eventAgeDays} days ago. With linear decay across ${config.linearDecayMaxDays} days, ` +
+        `it retains ${(decayFactor * 100).toFixed(1)}% of original strength (${baseWeight} -> ${effectiveWeight}).`;
+    } else {
+      summary = `Interaction occurred ${eventAgeDays} days ago. With step bracket decay, ` +
+        `it retains ${(decayFactor * 100).toFixed(1)}% of original strength (${baseWeight} -> ${effectiveWeight}).`;
+    }
+
+    return {
+      decayModel: config.decayModel,
+      eventDate,
+      referenceDate,
+      eventAgeDays,
+      decayFactor,
+      baseWeight,
+      effectiveWeight,
+      minWeightFloor,
+      halfLifeDays: config.decayModel === 'exponential' ? halfLifeDays : undefined,
+      linearMaxDays: config.decayModel === 'linear' ? config.linearDecayMaxDays : undefined,
+      summary,
+    };
   }
 
   /**
@@ -156,10 +268,10 @@ export class TemporalPreferenceAggregationService {
 
     for (const ev of windowEvents) {
       const baseWeight = this.getInteractionWeight(ev.action, config);
-      const recencyDecay = this.calculateRecencyDecay(
+      const recencyDecay = this.calculateTimeDecay(
         ev.timestamp,
         halfLifeDays,
-        config.minWeightFloor,
+        config,
         referenceDate
       );
       const effectiveWeight = baseWeight * recencyDecay;
