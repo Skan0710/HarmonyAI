@@ -503,7 +503,11 @@ export class LayeredTemporalTasteProfileService {
           ? Number(((delta / longScore) * 100).toFixed(1))
           : 100;
 
-        if (shortScore > 0 && longScore === 0) {
+        const isEmerging =
+          (shortScore > 0 && longScore === 0) ||
+          (shortItem && longItem && shortItem.interactionCount >= longItem.interactionCount && delta > 0);
+
+        if (isEmerging) {
           direction = 'emerging';
           explanation = `New discovery: ${name} recently entered listening rotations with a ${shortScore.toFixed(2)} score.`;
         } else if (delta >= 0.15) {
