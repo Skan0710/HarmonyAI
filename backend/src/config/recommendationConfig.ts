@@ -459,6 +459,88 @@ export const resetTemporalTasteInfluenceConfig = (): TemporalTasteInfluenceConfi
   return { ...currentTemporalInfluenceConfig };
 };
 
+// ==========================================
+// Recommendation Quality Metrics & Evaluation Config
+// ==========================================
 
+export interface RecommendationQualityConfig {
+  playRateWeight: number;        // default: 0.30
+  likeRateWeight: number;        // default: 0.25
+  saveRateWeight: number;        // default: 0.20
+  completionRateWeight: number;  // default: 0.15
+  skipPenaltyWeight: number;     // default: 0.20
+  minSamplesForSignificance: number; // default: 3
+}
 
+export const DEFAULT_QUALITY_CONFIG: RecommendationQualityConfig = {
+  playRateWeight: 0.30,
+  likeRateWeight: 0.25,
+  saveRateWeight: 0.20,
+  completionRateWeight: 0.15,
+  skipPenaltyWeight: 0.20,
+  minSamplesForSignificance: 3,
+};
 
+let currentQualityConfig: RecommendationQualityConfig = { ...DEFAULT_QUALITY_CONFIG };
+
+export const getRecommendationQualityConfig = (): RecommendationQualityConfig => {
+  return { ...currentQualityConfig };
+};
+
+export const updateRecommendationQualityConfig = (
+  newConfig: Partial<RecommendationQualityConfig>
+): RecommendationQualityConfig => {
+  currentQualityConfig = { ...currentQualityConfig, ...newConfig };
+  return { ...currentQualityConfig };
+};
+
+export const resetRecommendationQualityConfig = (): RecommendationQualityConfig => {
+  currentQualityConfig = { ...DEFAULT_QUALITY_CONFIG };
+  return { ...currentQualityConfig };
+};
+
+// ==========================================
+// Recommendation Score Calibration Config
+// ==========================================
+
+export interface RecommendationCalibrationConfig {
+  enabled: boolean;                 // default: true
+  likedBoostFactor: number;          // default: 1.15
+  savedBoostFactor: number;          // default: 1.20
+  skipPenaltyFactor: number;         // default: 0.85
+  repeatedSkipPenaltyFactor: number; // default: 0.70
+  highCompletionBoostFactor: number; // default: 1.10
+  minCalibrationMultiplier: number;  // default: 0.50
+  maxCalibrationMultiplier: number;  // default: 1.50
+  sourceWeightAdjustment: number;   // default: 0.15 (influence of signal-source historical performance)
+}
+
+export const DEFAULT_CALIBRATION_CONFIG: RecommendationCalibrationConfig = {
+  enabled: true,
+  likedBoostFactor: 1.15,
+  savedBoostFactor: 1.20,
+  skipPenaltyFactor: 0.85,
+  repeatedSkipPenaltyFactor: 0.70,
+  highCompletionBoostFactor: 1.10,
+  minCalibrationMultiplier: 0.50,
+  maxCalibrationMultiplier: 1.50,
+  sourceWeightAdjustment: 0.15,
+};
+
+let currentCalibrationConfig: RecommendationCalibrationConfig = { ...DEFAULT_CALIBRATION_CONFIG };
+
+export const getRecommendationCalibrationConfig = (): RecommendationCalibrationConfig => {
+  return { ...currentCalibrationConfig };
+};
+
+export const updateRecommendationCalibrationConfig = (
+  newConfig: Partial<RecommendationCalibrationConfig>
+): RecommendationCalibrationConfig => {
+  currentCalibrationConfig = { ...currentCalibrationConfig, ...newConfig };
+  return { ...currentCalibrationConfig };
+};
+
+export const resetRecommendationCalibrationConfig = (): RecommendationCalibrationConfig => {
+  currentCalibrationConfig = { ...DEFAULT_CALIBRATION_CONFIG };
+  return { ...currentCalibrationConfig };
+};
