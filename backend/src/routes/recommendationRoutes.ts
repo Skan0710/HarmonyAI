@@ -15,6 +15,7 @@ import {
   trackBulkImpressions,
   submitFeedback,
   getUserFeedback,
+  processFeedbackLoop,
 } from '../controllers/recommendationInteractionController.js';
 import { getTemporalTasteProfile } from '../controllers/temporalTasteProfileController.js';
 import {
@@ -75,6 +76,8 @@ router.get('/feedback', protect, getUserFeedback);
 // POST /api/recommendations/feedback (Protected JWT - feedback on recommendations/explanations)
 router.post('/feedback', protect, submitFeedback);
 router.post('/explanation/feedback', protect, submitFeedback);
+router.post('/feedback/loop', protect, processFeedbackLoop);
+router.post('/evaluate', protect, processFeedbackLoop);
 
 // POST /api/recommendations/interactions (Protected JWT)
 router.post('/interactions', protect, trackInteraction);
