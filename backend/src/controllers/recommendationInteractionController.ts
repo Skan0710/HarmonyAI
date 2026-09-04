@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { RecommendationInteractionTrackingService } from '../services/recommendationInteractionTrackingService.js';
+import { RecommendationFeedbackLearningService } from '../services/recommendationFeedbackLearningService.js';
 import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
 import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
 
@@ -7,7 +8,7 @@ export const trackInteraction = controllerWrapper(async (req: Request, res: Resp
   const user = ensureAuth(req, res);
   if (!user) return;
 
-  const { songId, action, recommendationSource = 'hybrid', metadata } = req.body;
+  const { songId, action, recommendationSource = 'hybrid', metadata, listeningDurationSeconds, completionRate } = req.body;
 
   if (!songId || !action) {
     throw new ControllerError(400, 'songId and action are required');
@@ -23,6 +24,19 @@ export const trackInteraction = controllerWrapper(async (req: Request, res: Resp
     action,
     recommendationSource,
     metadata,
+  });
+
+  // Trigger recommendation feedback learning loop
+  RecommendationFeedbackLearningService.processFeedbackEvent({
+    userId: user._id.toString(),
+    songId,
+    action,
+    recommendationSource,
+    listeningDurationSeconds,
+    completionRate,
+    metadata,
+  }).catch(() => {
+    // Non-blocking safe catch
   });
 
   res.status(201).json({ success: true, data: record });
@@ -67,6 +81,17 @@ export const submitFeedback = controllerWrapper(async (req: Request, res: Respon
     explanationContext,
   });
 
+  // Trigger feedback learning loop
+  RecommendationFeedbackLearningService.processFeedbackEvent({
+    userId: user._id.toString(),
+    songId,
+    action: feedback === 'thumbs_up' || feedback === 'helpful' ? 'like' : feedback === 'thumbs_down' ? 'skip' : feedback,
+    recommendationSource,
+    metadata: explanationContext,
+  }).catch(() => {
+    // Non-blocking safe catch
+  });
+
   res.status(200).json({
     success: true,
     message: 'Feedback recorded successfully',
@@ -75,6 +100,43 @@ export const submitFeedback = controllerWrapper(async (req: Request, res: Respon
 });
 
 export const submitExplanationFeedback = submitFeedback;
+
+export const processFeedbackLoop = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
+
+  const {
+    songId,
+    action,
+    recommendationSource = 'hybrid',
+    listeningDurationSeconds,
+    completionRate,
+    metadata,
+  } = req.body;
+
+  if (!songId || !action) {
+    throw new ControllerError(400, 'songId and action are required');
+  }
+
+  if (!isValidObjectId(songId)) {
+    throw new ControllerError(400, 'Invalid songId format');
+  }
+
+  const result = await RecommendationFeedbackLearningService.processFeedbackEvent({
+    userId: user._id.toString(),
+    songId,
+    action,
+    recommendationSource,
+    listeningDurationSeconds,
+    completionRate,
+    metadata,
+  });
+
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+});
 
 export const getUserFeedback = controllerWrapper(async (req: Request, res: Response) => {
   const user = ensureAuth(req, res);
