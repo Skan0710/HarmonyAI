@@ -9,6 +9,7 @@ import {
   getSmartAutoplayCandidates,
   getRecommendationExplanation,
   getContextAwareRecommendations,
+  getRecommendationAnalytics,
 } from '../controllers/recommendationController.js';
 import {
   trackInteraction,
@@ -26,6 +27,9 @@ import {
 import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// GET /api/recommendations/analytics (Protected JWT - Developer Diagnostic Analytics)
+router.get('/analytics', protect, getRecommendationAnalytics);
 
 // GET /api/recommendations/performance (Protected JWT - Quality & Performance Tracking)
 router.get('/performance', protect, getRecommendationPerformance);
