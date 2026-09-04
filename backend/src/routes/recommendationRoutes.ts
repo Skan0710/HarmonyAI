@@ -17,9 +17,19 @@ import {
   getUserFeedback,
 } from '../controllers/recommendationInteractionController.js';
 import { getTemporalTasteProfile } from '../controllers/temporalTasteProfileController.js';
+import {
+  getRecommendationPerformance,
+  getSignalPerformance,
+  getEngagementMetrics,
+} from '../controllers/recommendationPerformanceController.js';
 import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// GET /api/recommendations/performance (Protected JWT - Quality & Performance Tracking)
+router.get('/performance', protect, getRecommendationPerformance);
+router.get('/performance/signals', protect, getSignalPerformance);
+router.get('/performance/engagement', protect, getEngagementMetrics);
 
 // GET /api/recommendations/temporal-taste-profile (Protected JWT - Multi-Horizon Temporal Taste Profile)
 router.get('/temporal-taste-profile', protect, getTemporalTasteProfile);
