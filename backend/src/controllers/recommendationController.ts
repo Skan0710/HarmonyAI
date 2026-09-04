@@ -16,6 +16,7 @@ import { ContentSimilarityService } from '../services/similarityService.js';
 import { SongFeatureExtractionService } from '../services/songFeatureExtractionService.js';
 import { UserTasteProfileService } from '../services/userTasteProfileService.js';
 import { RecommendationExplanationService } from '../services/recommendationExplanationService.js';
+import { RecommendationAnalyticsService } from '../services/recommendationAnalyticsService.js';
 import { validateAndSanitizeRecommendationContext } from '../schemas/recommendationContextSchema.js';
 import { ContextPreferenceMappingService } from '../services/contextPreferenceMappingService.js';
 import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
@@ -132,11 +133,20 @@ export const getHybridRecommendations = controllerWrapper(async (req: Request, r
       contextInfluence,
     });
 
+    const isDebugRequested = req.query.debug === 'true' || req.query.analytics === 'true';
+    const analytics = isDebugRequested
+      ? RecommendationAnalyticsService.generateAnalytics(
+          user._id.toString(),
+          result.recommendations || []
+        )
+      : undefined;
+
     res.status(200).json({
       success: true,
       strategyUsed: result.strategyUsed,
       userClassification: result.userClassification,
       count: result.recommendations.length,
+      ...(analytics ? { analytics } : {}),
       data: result.recommendations || [],
     });
   } catch (error: any) {
@@ -150,6 +160,35 @@ export const getHybridRecommendations = controllerWrapper(async (req: Request, r
       message: error.message || 'Failed to fetch hybrid recommendations safely',
     });
   }
+});
+
+export const getRecommendationAnalytics = controllerWrapper(async (req: Request, res: Response) => {
+  const user = ensureAuth(req, res);
+  if (!user) return;
+
+  const q = extractQueryParams(req, { limit: 'int' });
+  const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 10 : q.limit;
+
+  const result = await HybridRecommendationService.getHybridRecommendations({
+    userId: user._id.toString(),
+    limit: parsedLimit,
+  });
+
+  const analytics = RecommendationAnalyticsService.generateAnalytics(
+    user._id.toString(),
+    result.recommendations || []
+  );
+
+  res.status(200).json({
+    success: true,
+    data: {
+      strategyUsed: result.strategyUsed,
+      userClassification: result.userClassification,
+      count: result.recommendations.length,
+      analytics,
+      recommendations: result.recommendations || [],
+    },
+  });
 });
 
 export const getContextualRecommendations = controllerWrapper(async (req: Request, res: Response) => {
