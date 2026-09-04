@@ -41,6 +41,9 @@ export interface HybridRankedResult {
     mediumTermScore?: number;
     longTermScore?: number;
     temporalTasteScore?: number;
+    calibrationMultiplier?: number;
+    calibrationScore?: number;
+    feedbackContribution?: number;
   };
   sources: string[];
   metadata?: Record<string, any>;

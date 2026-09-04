@@ -18,6 +18,7 @@ import {
   LayeredTemporalTasteProfileService,
   UnifiedLayeredTasteProfile,
 } from './layeredTemporalTasteProfileService.js';
+import { RecommendationScoreCalibrationService } from './recommendationScoreCalibrationService.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
@@ -51,6 +52,7 @@ export class HybridRecommendationService {
     temporalProfile?: UnifiedLayeredTasteProfile | null;
     temporalInfluence?: number;
     useTemporalProfile?: boolean;
+    useScoreCalibration?: boolean;
   }): Promise<HybridRecommendationServiceResult> {
     const {
       userId,
@@ -65,6 +67,7 @@ export class HybridRecommendationService {
       temporalProfile,
       temporalInfluence,
       useTemporalProfile,
+      useScoreCalibration,
     } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
@@ -167,7 +170,7 @@ export class HybridRecommendationService {
         }
       }
 
-      const rankedResults = HybridRankingPipeline.rankCandidates(
+      let rankedResults = HybridRankingPipeline.rankCandidates(
         candidates,
         limit,
         weights,
@@ -179,6 +182,19 @@ export class HybridRecommendationService {
         effectiveTemporalProfile,
         temporalInfluence
       );
+
+      // Score Calibration Layer based on historical feedback
+      if (useScoreCalibration !== false) {
+        try {
+          const feedbackProfile = await RecommendationScoreCalibrationService.buildUserFeedbackProfile(userId);
+          rankedResults = RecommendationScoreCalibrationService.calibrateRankedResults(
+            rankedResults,
+            feedbackProfile
+          );
+        } catch {
+          // Safe fallback: proceed with uncalibrated results
+        }
+      }
 
       return {
         strategyUsed: 'HYBRID_PERSONALIZED',
