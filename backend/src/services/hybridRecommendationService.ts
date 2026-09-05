@@ -21,6 +21,7 @@ import {
 import { RecommendationScoreCalibrationService } from './recommendationScoreCalibrationService.js';
 import { UserSpecificSignalWeightingService } from './userSpecificSignalWeightingService.js';
 import { AdaptiveExplorationService } from './adaptiveExplorationService.js';
+import { DiversityAwareRankingService } from './diversityAwareRankingService.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
@@ -57,6 +58,7 @@ export class HybridRecommendationService {
     useScoreCalibration?: boolean;
     useUserSpecificWeights?: boolean;
     useAdaptiveExploration?: boolean;
+    useDiversityRanking?: boolean;
   }): Promise<HybridRecommendationServiceResult> {
     const {
       userId,
@@ -74,6 +76,7 @@ export class HybridRecommendationService {
       useScoreCalibration,
       useUserSpecificWeights,
       useAdaptiveExploration,
+      useDiversityRanking,
     } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
@@ -243,6 +246,19 @@ export class HybridRecommendationService {
             }
           );
           rankedResults = explorationRes.results;
+        } catch {
+          // Safe fallback: proceed with current ranked results
+        }
+      }
+
+      // Diversity-Aware Ranking Layer
+      if (useDiversityRanking) {
+        try {
+          const diversityRes = DiversityAwareRankingService.applyDiversityAwareRanking(
+            rankedResults,
+            { targetLimit: limit }
+          );
+          rankedResults = diversityRes.results;
         } catch {
           // Safe fallback: proceed with current ranked results
         }

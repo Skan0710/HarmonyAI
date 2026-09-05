@@ -45,6 +45,7 @@ export interface HybridRankedResult {
     calibrationMultiplier?: number;
     calibrationScore?: number;
     feedbackContribution?: number;
+    diversityAdjustment?: number;
   };
   sources: string[];
   metadata?: Record<string, any>;
