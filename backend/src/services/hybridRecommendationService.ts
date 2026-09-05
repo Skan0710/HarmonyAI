@@ -20,6 +20,7 @@ import {
 } from './layeredTemporalTasteProfileService.js';
 import { RecommendationScoreCalibrationService } from './recommendationScoreCalibrationService.js';
 import { UserSpecificSignalWeightingService } from './userSpecificSignalWeightingService.js';
+import { AdaptiveExplorationService } from './adaptiveExplorationService.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
@@ -55,6 +56,7 @@ export class HybridRecommendationService {
     useTemporalProfile?: boolean;
     useScoreCalibration?: boolean;
     useUserSpecificWeights?: boolean;
+    useAdaptiveExploration?: boolean;
   }): Promise<HybridRecommendationServiceResult> {
     const {
       userId,
@@ -71,6 +73,7 @@ export class HybridRecommendationService {
       useTemporalProfile,
       useScoreCalibration,
       useUserSpecificWeights,
+      useAdaptiveExploration,
     } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
@@ -221,6 +224,27 @@ export class HybridRecommendationService {
           );
         } catch {
           // Safe fallback: proceed with uncalibrated results
+        }
+      }
+
+      // Adaptive Exploration vs Exploitation Layer
+      if (useAdaptiveExploration) {
+        try {
+          const feedbackProfile = await RecommendationScoreCalibrationService.buildUserFeedbackProfile(userId);
+          const explorationRes = AdaptiveExplorationService.applyExplorationReranking(
+            rankedResults,
+            {
+              userId,
+              userClassification,
+              temporalProfile: effectiveTemporalProfile,
+              feedbackProfile,
+              activeSession: activeSessionDoc,
+              userEncounteredSongIds: feedbackProfile?.likedSongIds,
+            }
+          );
+          rankedResults = explorationRes.results;
+        } catch {
+          // Safe fallback: proceed with current ranked results
         }
       }
 
