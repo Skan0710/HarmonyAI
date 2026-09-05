@@ -6,6 +6,7 @@ import {
   getSessionInfluenceConfig,
   getTemporalTasteInfluenceConfig,
   TemporalTasteInfluenceConfig,
+  getRecommendationSignalConfig,
 } from '../config/recommendationConfig.js';
 import {
   RecommendationContextAttributes,
@@ -73,41 +74,43 @@ export class HybridRankingPipeline {
         : String(songDoc.genre).trim()
       : undefined;
 
-    // 1. Energy Fit (Weight: 0.35)
+    const contextConfig = getRecommendationSignalConfig().contextSignals;
+
+    // 1. Energy Fit
     if (typeof songEnergy === 'number' && Number.isFinite(songEnergy)) {
       const energyDiff = Math.abs(songEnergy - preferences.targetEnergy);
-      const energyScore = 1.0 - Math.min(1.0, energyDiff / 0.40);
-      accumulatedScore += Math.max(0, energyScore) * 0.35;
-      totalWeight += 0.35;
+      const energyScore = 1.0 - Math.min(1.0, energyDiff / contextConfig.energyTolerance);
+      accumulatedScore += Math.max(0, energyScore) * contextConfig.energyMatchWeight;
+      totalWeight += contextConfig.energyMatchWeight;
     }
 
-    // 2. Tempo Fit (Weight: 0.25)
+    // 2. Tempo Fit
     if (typeof songTempo === 'number' && songTempo > 0) {
       const tempoDiff = Math.abs(songTempo - preferences.targetTempo);
-      const tempoScore = 1.0 - Math.min(1.0, tempoDiff / 35);
-      accumulatedScore += Math.max(0, tempoScore) * 0.25;
-      totalWeight += 0.25;
+      const tempoScore = 1.0 - Math.min(1.0, tempoDiff / contextConfig.tempoTolerance);
+      accumulatedScore += Math.max(0, tempoScore) * contextConfig.tempoMatchWeight;
+      totalWeight += contextConfig.tempoMatchWeight;
     }
 
-    // 3. Mood Fit (Weight: 0.20)
+    // 3. Mood Fit
     if (songMood && preferences.targetMood) {
       const targetMoodLower = preferences.targetMood.toLowerCase();
       let moodScore = 0.5;
       if (songMood === targetMoodLower) {
         moodScore = 1.0;
       }
-      accumulatedScore += moodScore * 0.20;
-      totalWeight += 0.20;
+      accumulatedScore += moodScore * contextConfig.moodMatchWeight;
+      totalWeight += contextConfig.moodMatchWeight;
     }
 
-    // 4. Genre Fit (Weight: 0.20)
+    // 4. Genre Fit
     if (songGenre && preferences.preferredGenres && preferences.preferredGenres.length > 0) {
       const isPreferred = preferences.preferredGenres.some(
         (g) => g.toLowerCase() === songGenre.toLowerCase()
       );
       const genreScore = isPreferred ? 1.0 : 0.40;
-      accumulatedScore += genreScore * 0.20;
-      totalWeight += 0.20;
+      accumulatedScore += genreScore * contextConfig.genreMatchWeight;
+      totalWeight += contextConfig.genreMatchWeight;
     }
 
     if (totalWeight === 0) return 0.5;
@@ -437,11 +440,14 @@ export class HybridRankingPipeline {
       );
     }
 
-    // Bound total contextual + session + temporal influence so personalized baseline is preserved >= 50%
+    // Bound total contextual + session + temporal influence so personalized baseline is preserved >= minBaselineWeightFloor
+    const signalConfig = getRecommendationSignalConfig();
+    const maxModulation = signalConfig.modulationLayers.maxCombinedModulationInfluence;
+
     const totalExtraInfluence =
       effectiveContextInfluence + effectiveSessionInfluence + effectiveTemporalInfluence;
-    if (totalExtraInfluence > 0.50) {
-      const scaleFactor = 0.50 / totalExtraInfluence;
+    if (totalExtraInfluence > maxModulation) {
+      const scaleFactor = maxModulation / totalExtraInfluence;
       effectiveContextInfluence *= scaleFactor;
       effectiveSessionInfluence *= scaleFactor;
       effectiveTemporalInfluence *= scaleFactor;
