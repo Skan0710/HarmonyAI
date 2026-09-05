@@ -106,6 +106,39 @@ export interface FeedbackSignalWeights {
 }
 
 /**
+ * Adaptive exploration vs exploitation configuration.
+ * Governs the balance between known user preferences (exploitation)
+ * and relevant but less familiar discoveries (exploration).
+ */
+export interface ExplorationExploitationConfig {
+  defaultExplorationRate: number;        // default: 0.20
+  minExplorationRate: number;            // default: 0.05
+  maxExplorationRate: number;            // default: 0.50
+  newUserExplorationRate: number;        // default: 0.40
+  limitedHistoryExplorationRate: number; // default: 0.30
+  activePivotExplorationBoost: number;   // default: 0.10
+  highStabilityExplorationDampen: number;// default: 0.08
+  negativeFeedbackDampenFactor: number;  // default: 0.15 (throttles exploration on high skips)
+  positiveFeedbackBoostFactor: number;   // default: 0.05
+  minRelevanceThreshold: number;         // default: 0.25 (prevents unrelated items from receiving novelty boost)
+  enabled: boolean;                      // default: true
+}
+
+export const DEFAULT_EXPLORATION_EXPLOITATION_CONFIG: ExplorationExploitationConfig = {
+  defaultExplorationRate: 0.20,
+  minExplorationRate: 0.05,
+  maxExplorationRate: 0.50,
+  newUserExplorationRate: 0.40,
+  limitedHistoryExplorationRate: 0.30,
+  activePivotExplorationBoost: 0.10,
+  highStabilityExplorationDampen: 0.08,
+  negativeFeedbackDampenFactor: 0.15,
+  positiveFeedbackBoostFactor: 0.05,
+  minRelevanceThreshold: 0.25,
+  enabled: true,
+};
+
+/**
  * Master recommendation signal configuration.
  */
 export interface RecommendationSignalConfig {
@@ -115,6 +148,7 @@ export interface RecommendationSignalConfig {
   sessionBehavior: SessionBehaviorSignalWeights;
   contextSignals: ContextSignalWeights;
   feedbackSignals: FeedbackSignalWeights;
+  explorationExploitation: ExplorationExploitationConfig;
 }
 
 /**
@@ -174,6 +208,7 @@ export const DEFAULT_RECOMMENDATION_SIGNAL_CONFIG: RecommendationSignalConfig = 
     maxCalibrationMultiplier: 1.50,
     sourceWeightAdjustment: 0.15,
   },
+  explorationExploitation: { ...DEFAULT_EXPLORATION_EXPLOITATION_CONFIG },
 };
 
 let currentSignalConfig: RecommendationSignalConfig = {
@@ -183,6 +218,7 @@ let currentSignalConfig: RecommendationSignalConfig = {
   sessionBehavior: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.sessionBehavior },
   contextSignals: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.contextSignals },
   feedbackSignals: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.feedbackSignals },
+  explorationExploitation: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.explorationExploitation },
 };
 
 /**
@@ -196,6 +232,7 @@ export const getRecommendationSignalConfig = (): RecommendationSignalConfig => {
     sessionBehavior: { ...currentSignalConfig.sessionBehavior },
     contextSignals: { ...currentSignalConfig.contextSignals },
     feedbackSignals: { ...currentSignalConfig.feedbackSignals },
+    explorationExploitation: { ...currentSignalConfig.explorationExploitation },
   };
 };
 
@@ -210,6 +247,7 @@ export const updateRecommendationSignalConfig = (
     sessionBehavior: Partial<SessionBehaviorSignalWeights>;
     contextSignals: Partial<ContextSignalWeights>;
     feedbackSignals: Partial<FeedbackSignalWeights>;
+    explorationExploitation: Partial<ExplorationExploitationConfig>;
   }>
 ): RecommendationSignalConfig => {
   if (newConfig.baselineSignals) {
@@ -248,6 +286,12 @@ export const updateRecommendationSignalConfig = (
       ...newConfig.feedbackSignals,
     };
   }
+  if (newConfig.explorationExploitation) {
+    currentSignalConfig.explorationExploitation = {
+      ...currentSignalConfig.explorationExploitation,
+      ...newConfig.explorationExploitation,
+    };
+  }
 
   notifyChangeListeners();
   return getRecommendationSignalConfig();
@@ -264,10 +308,29 @@ export const resetRecommendationSignalConfig = (): RecommendationSignalConfig =>
     sessionBehavior: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.sessionBehavior },
     contextSignals: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.contextSignals },
     feedbackSignals: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.feedbackSignals },
+    explorationExploitation: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.explorationExploitation },
   };
 
   notifyChangeListeners();
   return getRecommendationSignalConfig();
+};
+
+export const getExplorationExploitationConfig = (): ExplorationExploitationConfig => {
+  return { ...currentSignalConfig.explorationExploitation };
+};
+
+export const updateExplorationExploitationConfig = (
+  newConfig: Partial<ExplorationExploitationConfig>
+): ExplorationExploitationConfig => {
+  updateRecommendationSignalConfig({ explorationExploitation: newConfig });
+  return getExplorationExploitationConfig();
+};
+
+export const resetExplorationExploitationConfig = (): ExplorationExploitationConfig => {
+  updateRecommendationSignalConfig({
+    explorationExploitation: { ...DEFAULT_EXPLORATION_EXPLOITATION_CONFIG },
+  });
+  return getExplorationExploitationConfig();
 };
 
 export type SignalConfigChangeListener = (config: RecommendationSignalConfig) => void;
