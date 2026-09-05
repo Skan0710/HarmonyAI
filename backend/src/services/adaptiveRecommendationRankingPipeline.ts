@@ -40,6 +40,9 @@ export interface AdaptivePipelineOptions {
   sessionProfile?: SessionTasteProfile | null;
   sessionInfluence?: number;
   sessionId?: string | null;
+  activeSession?: IListeningSession | null;
+  sessionDoc?: IListeningSession | null;
+  session?: IListeningSession | null;
   useActiveSession?: boolean;
   temporalProfile?: UnifiedLayeredTasteProfile | null;
   temporalInfluence?: number;
@@ -647,9 +650,17 @@ export class AdaptiveRecommendationRankingPipeline {
 
     // Resolve context & profiles
     const isDbConnected = mongoose.connection?.readyState === 1;
+    let activeSessionDoc: IListeningSession | null =
+      options.activeSession || options.sessionDoc || options.session || null;
     let effectiveSessionProfile = sessionProfile || null;
-    let activeSessionDoc: IListeningSession | null = null;
-    if (!effectiveSessionProfile && useActiveSession && userId && Types.ObjectId.isValid(userId) && isDbConnected) {
+
+    if (!effectiveSessionProfile && activeSessionDoc) {
+      try {
+        effectiveSessionProfile = await SessionTasteProfileService.generateSessionTasteProfile(activeSessionDoc);
+      } catch {
+        // Safe fallback
+      }
+    } else if (!effectiveSessionProfile && useActiveSession && userId && Types.ObjectId.isValid(userId) && isDbConnected) {
       try {
         activeSessionDoc = await ListeningSessionService.getActiveSession(userId);
         if (activeSessionDoc) {
