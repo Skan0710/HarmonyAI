@@ -393,7 +393,7 @@ export const fetchContextAwareRecommendationsApi = async (params: {
     const result = extractEnvelopeData(response, 'Failed to fetch context-aware recommendations');
     return {
       data: result.data || [],
-      contextInfo: (response as any)?.context || null,
+      contextInfo: response.data?.context || null,
       error: result.error,
     };
   } catch (err: any) {
