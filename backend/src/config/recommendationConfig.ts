@@ -202,11 +202,17 @@ export const updateNoveltyConfigWeights = (
   newWeights: Partial<NoveltyScoringWeights>
 ): NoveltyScoringWeights => {
   currentNoveltyWeights = { ...currentNoveltyWeights, ...newWeights };
+  if (!isSyncingFromMaster) {
+    updateRecommendationSignalConfig({ noveltyScoring: newWeights });
+  }
   return { ...currentNoveltyWeights };
 };
 
 export const resetNoveltyConfigWeights = (): NoveltyScoringWeights => {
   currentNoveltyWeights = { ...DEFAULT_NOVELTY_WEIGHTS };
+  if (!isSyncingFromMaster) {
+    updateRecommendationSignalConfig({ noveltyScoring: DEFAULT_NOVELTY_WEIGHTS });
+  }
   return { ...currentNoveltyWeights };
 };
 
@@ -597,6 +603,10 @@ registerSignalConfigChangeListener((cfg) => {
     currentCalibrationConfig = {
       ...currentCalibrationConfig,
       ...cfg.feedbackSignals,
+    };
+    currentNoveltyWeights = {
+      ...currentNoveltyWeights,
+      ...cfg.noveltyScoring,
     };
   } finally {
     isSyncingFromMaster = false;

@@ -24,7 +24,8 @@ export type RecommendationSignalIdentifier =
   | 'context'
   | 'feedback_calibration'
   | 'popularity'
-  | 'recency';
+  | 'recency'
+  | 'novelty';
 
 /**
  * Foundational baseline hybrid scoring weights.
@@ -165,6 +166,26 @@ export const DEFAULT_DIVERSITY_AWARE_RANKING_CONFIG: DiversityAwareRankingConfig
 };
 
 /**
+ * Recommendation novelty scoring configuration.
+ * Controls how unfamiliar songs are rewarded while strictly gated by relevance.
+ */
+export interface NoveltyScoringConfig {
+  noveltyWeight: number;             // default: 0.15 (15% weight)
+  minRelevanceThreshold: number;     // default: 0.35 (below 0.35 base relevance, novelty boost is gated to 0)
+  maxCatalogPlayCount: number;       // default: 1000
+  userExposureDecayFactor: number;   // default: 0.20
+  enabled: boolean;                  // default: true
+}
+
+export const DEFAULT_NOVELTY_SCORING_CONFIG: NoveltyScoringConfig = {
+  noveltyWeight: 0.15,
+  minRelevanceThreshold: 0.35,
+  maxCatalogPlayCount: 1000,
+  userExposureDecayFactor: 0.20,
+  enabled: true,
+};
+
+/**
  * Master recommendation signal configuration.
  */
 export interface RecommendationSignalConfig {
@@ -176,6 +197,7 @@ export interface RecommendationSignalConfig {
   feedbackSignals: FeedbackSignalWeights;
   explorationExploitation: ExplorationExploitationConfig;
   diversityAwareRanking: DiversityAwareRankingConfig;
+  noveltyScoring: NoveltyScoringConfig;
 }
 
 /**
@@ -237,6 +259,7 @@ export const DEFAULT_RECOMMENDATION_SIGNAL_CONFIG: RecommendationSignalConfig = 
   },
   explorationExploitation: { ...DEFAULT_EXPLORATION_EXPLOITATION_CONFIG },
   diversityAwareRanking: { ...DEFAULT_DIVERSITY_AWARE_RANKING_CONFIG },
+  noveltyScoring: { ...DEFAULT_NOVELTY_SCORING_CONFIG },
 };
 
 let currentSignalConfig: RecommendationSignalConfig = {
@@ -248,6 +271,7 @@ let currentSignalConfig: RecommendationSignalConfig = {
   feedbackSignals: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.feedbackSignals },
   explorationExploitation: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.explorationExploitation },
   diversityAwareRanking: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.diversityAwareRanking },
+  noveltyScoring: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.noveltyScoring },
 };
 
 /**
@@ -263,6 +287,7 @@ export const getRecommendationSignalConfig = (): RecommendationSignalConfig => {
     feedbackSignals: { ...currentSignalConfig.feedbackSignals },
     explorationExploitation: { ...currentSignalConfig.explorationExploitation },
     diversityAwareRanking: { ...currentSignalConfig.diversityAwareRanking },
+    noveltyScoring: { ...currentSignalConfig.noveltyScoring },
   };
 };
 
@@ -279,6 +304,7 @@ export const updateRecommendationSignalConfig = (
     feedbackSignals: Partial<FeedbackSignalWeights>;
     explorationExploitation: Partial<ExplorationExploitationConfig>;
     diversityAwareRanking: Partial<DiversityAwareRankingConfig>;
+    noveltyScoring: Partial<NoveltyScoringConfig>;
   }>
 ): RecommendationSignalConfig => {
   if (newConfig.baselineSignals) {
@@ -329,6 +355,12 @@ export const updateRecommendationSignalConfig = (
       ...newConfig.diversityAwareRanking,
     };
   }
+  if (newConfig.noveltyScoring) {
+    currentSignalConfig.noveltyScoring = {
+      ...currentSignalConfig.noveltyScoring,
+      ...newConfig.noveltyScoring,
+    };
+  }
 
   notifyChangeListeners();
   return getRecommendationSignalConfig();
@@ -347,6 +379,7 @@ export const resetRecommendationSignalConfig = (): RecommendationSignalConfig =>
     feedbackSignals: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.feedbackSignals },
     explorationExploitation: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.explorationExploitation },
     diversityAwareRanking: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.diversityAwareRanking },
+    noveltyScoring: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.noveltyScoring },
   };
 
   notifyChangeListeners();
@@ -387,6 +420,24 @@ export const resetDiversityAwareRankingConfig = (): DiversityAwareRankingConfig 
     diversityAwareRanking: { ...DEFAULT_DIVERSITY_AWARE_RANKING_CONFIG },
   });
   return getDiversityAwareRankingConfig();
+};
+
+export const getNoveltyScoringConfig = (): NoveltyScoringConfig => {
+  return { ...currentSignalConfig.noveltyScoring };
+};
+
+export const updateNoveltyScoringConfig = (
+  newConfig: Partial<NoveltyScoringConfig>
+): NoveltyScoringConfig => {
+  updateRecommendationSignalConfig({ noveltyScoring: newConfig });
+  return getNoveltyScoringConfig();
+};
+
+export const resetNoveltyScoringConfig = (): NoveltyScoringConfig => {
+  updateRecommendationSignalConfig({
+    noveltyScoring: { ...DEFAULT_NOVELTY_SCORING_CONFIG },
+  });
+  return getNoveltyScoringConfig();
 };
 
 export type SignalConfigChangeListener = (config: RecommendationSignalConfig) => void;
@@ -508,6 +559,11 @@ export const getEffectiveSignalDistribution = (activeLayers?: {
       weight: Number(recEff.toFixed(4)),
       percentage: Number((recEff * 100).toFixed(2)),
       active: true,
+    },
+    novelty: {
+      weight: config.noveltyScoring.noveltyWeight,
+      percentage: Number((config.noveltyScoring.noveltyWeight * 100).toFixed(2)),
+      active: config.noveltyScoring.enabled,
     },
   };
 
