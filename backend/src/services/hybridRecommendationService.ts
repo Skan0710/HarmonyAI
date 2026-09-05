@@ -6,6 +6,7 @@ import { ColdStartRecommendationService } from './coldStartRecommendationService
 import {
   HybridScoringWeights,
   getHybridConfigWeights,
+  NoveltyScoringWeights,
 } from '../config/recommendationConfig.js';
 import { RecommendationContextAttributes } from '../schemas/recommendationContextSchema.js';
 import {
@@ -22,6 +23,7 @@ import { RecommendationScoreCalibrationService } from './recommendationScoreCali
 import { UserSpecificSignalWeightingService } from './userSpecificSignalWeightingService.js';
 import { AdaptiveExplorationService } from './adaptiveExplorationService.js';
 import { DiversityAwareRankingService } from './diversityAwareRankingService.js';
+import { NoveltyScoringService } from './noveltyScoringService.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
@@ -59,6 +61,8 @@ export class HybridRecommendationService {
     useUserSpecificWeights?: boolean;
     useAdaptiveExploration?: boolean;
     useDiversityRanking?: boolean;
+    useNoveltyScoring?: boolean;
+    noveltyWeights?: Partial<NoveltyScoringWeights>;
   }): Promise<HybridRecommendationServiceResult> {
     const {
       userId,
@@ -77,6 +81,8 @@ export class HybridRecommendationService {
       useUserSpecificWeights,
       useAdaptiveExploration,
       useDiversityRanking,
+      useNoveltyScoring,
+      noveltyWeights,
     } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
@@ -246,6 +252,21 @@ export class HybridRecommendationService {
             }
           );
           rankedResults = explorationRes.results;
+        } catch {
+          // Safe fallback: proceed with current ranked results
+        }
+      }
+
+      // Recommendation Novelty Scoring Layer
+      if (useNoveltyScoring) {
+        try {
+          const familiarityProfile = await NoveltyScoringService.buildUserFamiliarityProfile(userId);
+          const noveltyRes = NoveltyScoringService.applyNoveltyScoringToRankedResults(
+            rankedResults,
+            familiarityProfile,
+            noveltyWeights
+          );
+          rankedResults = noveltyRes.results;
         } catch {
           // Safe fallback: proceed with current ranked results
         }
