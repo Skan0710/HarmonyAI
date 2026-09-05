@@ -1,29 +1,17 @@
 import { Types } from 'mongoose';
-import { CandidateGenerationService } from './candidateGenerationService.js';
-import { HybridRankingPipeline, HybridRankedResult } from './hybridRankingPipeline.js';
-import { ColdStartDetectionService } from './coldStartDetectionService.js';
+import { HybridRankedResult } from './hybridRankingPipeline.js';
 import { ColdStartRecommendationService } from './coldStartRecommendationService.js';
 import {
   HybridScoringWeights,
-  getHybridConfigWeights,
   NoveltyScoringWeights,
 } from '../config/recommendationConfig.js';
 import { RecommendationContextAttributes } from '../schemas/recommendationContextSchema.js';
+import { SessionTasteProfile } from './sessionTasteProfileService.js';
+import { UnifiedLayeredTasteProfile } from './layeredTemporalTasteProfileService.js';
 import {
-  SessionTasteProfile,
-  SessionTasteProfileService,
-} from './sessionTasteProfileService.js';
-import { ListeningSessionService } from './listeningSessionService.js';
-import { IListeningSession } from '../models/ListeningSession.js';
-import {
-  LayeredTemporalTasteProfileService,
-  UnifiedLayeredTasteProfile,
-} from './layeredTemporalTasteProfileService.js';
-import { RecommendationScoreCalibrationService } from './recommendationScoreCalibrationService.js';
-import { UserSpecificSignalWeightingService } from './userSpecificSignalWeightingService.js';
-import { AdaptiveExplorationService } from './adaptiveExplorationService.js';
-import { DiversityAwareRankingService } from './diversityAwareRankingService.js';
-import { NoveltyScoringService } from './noveltyScoringService.js';
+  AdaptiveRecommendationRankingPipeline,
+  AdaptivePipelineStageDiagnostics,
+} from './adaptiveRecommendationRankingPipeline.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
@@ -31,6 +19,7 @@ export interface HybridRecommendationServiceResult {
   strategyUsed: 'COLD_START' | 'HYBRID_PERSONALIZED';
   userClassification: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
   recommendations: HybridRankedResult[];
+  pipelineDiagnostics?: AdaptivePipelineStageDiagnostics;
 }
 
 export class HybridRecommendationService {
@@ -73,6 +62,7 @@ export class HybridRecommendationService {
       contextInfluence,
       sessionProfile,
       sessionInfluence,
+      sessionId,
       useActiveSession,
       temporalProfile,
       temporalInfluence,
@@ -90,205 +80,33 @@ export class HybridRecommendationService {
     }
 
     try {
-      // 1. Detect User Profile State (NEW, LIMITED_DATA, ACTIVE, WELL_ESTABLISHED)
-      const coldStartInfo = await ColdStartDetectionService.detectUserColdStartStatus(userId);
-      const userClassification = coldStartInfo.classification;
-      const isColdStart = coldStartInfo.isColdStart;
-
-      // 2. Cold-Start Strategy Execution for NEW or LIMITED_DATA Users
-      if (isColdStart) {
-        const coldStartRes = await ColdStartRecommendationService.getColdStartRecommendations({
-          userId,
-          limit,
-        });
-
-        const formattedResults: HybridRankedResult[] = coldStartRes.songs.map((songDoc, idx) => ({
-          song: songDoc,
-          hybridScore: Number((1.0 - idx * 0.05).toFixed(4)), // Bounded score for display
-          componentScores: {
-            contentScore: 0,
-            collaborativeScore: 0,
-            userTasteAffinityScore: 0.5,
-            popularityScore: Number((songDoc.playCount ? Math.min(1, songDoc.playCount / 1000) : 0.5).toFixed(4)),
-            recencyScore: 0.8,
-          },
-          sources: coldStartRes.candidateSources || ['cold_start'],
-        }));
-
-        return {
-          strategyUsed: 'COLD_START',
-          userClassification,
-          recommendations: formattedResults,
-        };
-      }
-
-      // 3. Personalized Hybrid Engine Execution for ACTIVE and WELL_ESTABLISHED Users
-      const weights: HybridScoringWeights = {
-        ...getHybridConfigWeights(),
-        ...customWeights,
-      };
-
-      const candidates = await CandidateGenerationService.generateHybridCandidates({
+      const pipelineRes = await AdaptiveRecommendationRankingPipeline.executePipeline({
         userId,
         seedSongId,
-        candidateLimit: 50,
-      });
-
-      if (candidates.length === 0) {
-        // Fallback to cold start if candidates map is empty
-        const fallbackRes = await ColdStartRecommendationService.getColdStartRecommendations({
-          userId,
-          limit,
-        });
-        const fallbackFormatted: HybridRankedResult[] = fallbackRes.songs.map((songDoc, idx) => ({
-          song: songDoc,
-          hybridScore: Number((0.8 - idx * 0.05).toFixed(4)),
-          componentScores: {
-            contentScore: 0,
-            collaborativeScore: 0,
-            userTasteAffinityScore: 0.3,
-            popularityScore: 0.5,
-            recencyScore: 0.5,
-          },
-          sources: ['catalog_fallback'],
-        }));
-
-        return {
-          strategyUsed: 'COLD_START',
-          userClassification,
-          recommendations: fallbackFormatted,
-        };
-      }
-
-      // 4. Resolve Listening Session Profile if requested
-      let effectiveSessionProfile = sessionProfile || null;
-      let activeSessionDoc: IListeningSession | null = null;
-
-      if (!effectiveSessionProfile && useActiveSession) {
-        try {
-          activeSessionDoc = await ListeningSessionService.getActiveSession(userId);
-          if (activeSessionDoc) {
-            effectiveSessionProfile = await SessionTasteProfileService.generateSessionTasteProfile(activeSessionDoc);
-          }
-        } catch {
-          // Safe fallback if session retrieval fails
-        }
-      }
-
-      // 5. Resolve Temporal Taste Profile if requested
-      let effectiveTemporalProfile = temporalProfile || null;
-      if (!effectiveTemporalProfile && useTemporalProfile) {
-        try {
-          effectiveTemporalProfile = await LayeredTemporalTasteProfileService.generateLayeredTasteProfile(userId);
-        } catch {
-          // Safe fallback if temporal taste profile retrieval fails
-        }
-      }
-
-      let effectiveWeights = weights;
-      let effectiveTemporalInf = temporalInfluence;
-      let effectiveSessionInf = sessionInfluence;
-
-      if (useUserSpecificWeights && !customWeights) {
-        try {
-          const userWeights = UserSpecificSignalWeightingService.calculateUserSpecificWeights({
-            userId,
-            userClassification,
-            temporalProfile: effectiveTemporalProfile,
-            activeSession: activeSessionDoc,
-            sessionProfile: effectiveSessionProfile,
-          });
-          effectiveWeights = userWeights.baselineWeights;
-          if (temporalInfluence === undefined) {
-            effectiveTemporalInf = userWeights.modulationLayers.temporalInfluence;
-          }
-          if (sessionInfluence === undefined) {
-            effectiveSessionInf = userWeights.modulationLayers.sessionInfluence;
-          }
-        } catch {
-          // Safe fallback to default weights
-        }
-      }
-
-      let rankedResults = HybridRankingPipeline.rankCandidates(
-        candidates,
         limit,
-        effectiveWeights,
+        customWeights,
         context,
         contextInfluence,
-        effectiveSessionProfile,
-        effectiveSessionInf,
-        activeSessionDoc,
-        effectiveTemporalProfile,
-        effectiveTemporalInf
-      );
-
-      // Score Calibration Layer based on historical feedback
-      if (useScoreCalibration !== false) {
-        try {
-          const feedbackProfile = await RecommendationScoreCalibrationService.buildUserFeedbackProfile(userId);
-          rankedResults = RecommendationScoreCalibrationService.calibrateRankedResults(
-            rankedResults,
-            feedbackProfile
-          );
-        } catch {
-          // Safe fallback: proceed with uncalibrated results
-        }
-      }
-
-      // Adaptive Exploration vs Exploitation Layer
-      if (useAdaptiveExploration) {
-        try {
-          const feedbackProfile = await RecommendationScoreCalibrationService.buildUserFeedbackProfile(userId);
-          const explorationRes = AdaptiveExplorationService.applyExplorationReranking(
-            rankedResults,
-            {
-              userId,
-              userClassification,
-              temporalProfile: effectiveTemporalProfile,
-              feedbackProfile,
-              activeSession: activeSessionDoc,
-              userEncounteredSongIds: feedbackProfile?.likedSongIds,
-            }
-          );
-          rankedResults = explorationRes.results;
-        } catch {
-          // Safe fallback: proceed with current ranked results
-        }
-      }
-
-      // Recommendation Novelty Scoring Layer
-      if (useNoveltyScoring) {
-        try {
-          const familiarityProfile = await NoveltyScoringService.buildUserFamiliarityProfile(userId);
-          const noveltyRes = NoveltyScoringService.applyNoveltyScoringToRankedResults(
-            rankedResults,
-            familiarityProfile,
-            noveltyWeights
-          );
-          rankedResults = noveltyRes.results;
-        } catch {
-          // Safe fallback: proceed with current ranked results
-        }
-      }
-
-      // Diversity-Aware Ranking Layer
-      if (useDiversityRanking) {
-        try {
-          const diversityRes = DiversityAwareRankingService.applyDiversityAwareRanking(
-            rankedResults,
-            { targetLimit: limit }
-          );
-          rankedResults = diversityRes.results;
-        } catch {
-          // Safe fallback: proceed with current ranked results
-        }
-      }
+        sessionProfile,
+        sessionInfluence,
+        sessionId,
+        useActiveSession,
+        temporalProfile,
+        temporalInfluence,
+        useTemporalProfile,
+        useScoreCalibration,
+        useUserSpecificWeights,
+        useAdaptiveExploration,
+        useDiversityRanking,
+        useNoveltyScoring,
+        noveltyWeights,
+      });
 
       return {
-        strategyUsed: 'HYBRID_PERSONALIZED',
-        userClassification,
-        recommendations: rankedResults,
+        strategyUsed: pipelineRes.strategyUsed,
+        userClassification: pipelineRes.userClassification,
+        recommendations: pipelineRes.recommendations,
+        pipelineDiagnostics: pipelineRes.diagnostics,
       };
     } catch (error) {
       // 5. Fail-safe Resilience Fallback: Never fail recommendation API requests
