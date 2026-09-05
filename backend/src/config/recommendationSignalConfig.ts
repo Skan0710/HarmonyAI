@@ -139,6 +139,32 @@ export const DEFAULT_EXPLORATION_EXPLOITATION_CONFIG: ExplorationExploitationCon
 };
 
 /**
+ * Diversity-aware recommendation ranking configuration.
+ * Controls progressive repetition penalties across artists, genres, and pairwise similarity.
+ */
+export interface DiversityAwareRankingConfig {
+  diversityStrength: number;             // default: 0.30 (lambda in marginal utility)
+  artistRepetitionPenalty: number;       // default: 0.15
+  genreRepetitionPenalty: number;        // default: 0.10
+  similarSongPenalty: number;            // default: 0.15
+  similarityThreshold: number;           // default: 0.70
+  maxConsecutiveSameArtist: number;      // default: 1 (allows 1 consecutive before penalty)
+  maxConsecutiveSameGenre: number;       // default: 2 (allows 2 consecutive before penalty)
+  enabled: boolean;                      // default: true
+}
+
+export const DEFAULT_DIVERSITY_AWARE_RANKING_CONFIG: DiversityAwareRankingConfig = {
+  diversityStrength: 0.30,
+  artistRepetitionPenalty: 0.15,
+  genreRepetitionPenalty: 0.10,
+  similarSongPenalty: 0.15,
+  similarityThreshold: 0.70,
+  maxConsecutiveSameArtist: 1,
+  maxConsecutiveSameGenre: 2,
+  enabled: true,
+};
+
+/**
  * Master recommendation signal configuration.
  */
 export interface RecommendationSignalConfig {
@@ -149,6 +175,7 @@ export interface RecommendationSignalConfig {
   contextSignals: ContextSignalWeights;
   feedbackSignals: FeedbackSignalWeights;
   explorationExploitation: ExplorationExploitationConfig;
+  diversityAwareRanking: DiversityAwareRankingConfig;
 }
 
 /**
@@ -209,6 +236,7 @@ export const DEFAULT_RECOMMENDATION_SIGNAL_CONFIG: RecommendationSignalConfig = 
     sourceWeightAdjustment: 0.15,
   },
   explorationExploitation: { ...DEFAULT_EXPLORATION_EXPLOITATION_CONFIG },
+  diversityAwareRanking: { ...DEFAULT_DIVERSITY_AWARE_RANKING_CONFIG },
 };
 
 let currentSignalConfig: RecommendationSignalConfig = {
@@ -219,6 +247,7 @@ let currentSignalConfig: RecommendationSignalConfig = {
   contextSignals: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.contextSignals },
   feedbackSignals: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.feedbackSignals },
   explorationExploitation: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.explorationExploitation },
+  diversityAwareRanking: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.diversityAwareRanking },
 };
 
 /**
@@ -233,6 +262,7 @@ export const getRecommendationSignalConfig = (): RecommendationSignalConfig => {
     contextSignals: { ...currentSignalConfig.contextSignals },
     feedbackSignals: { ...currentSignalConfig.feedbackSignals },
     explorationExploitation: { ...currentSignalConfig.explorationExploitation },
+    diversityAwareRanking: { ...currentSignalConfig.diversityAwareRanking },
   };
 };
 
@@ -248,6 +278,7 @@ export const updateRecommendationSignalConfig = (
     contextSignals: Partial<ContextSignalWeights>;
     feedbackSignals: Partial<FeedbackSignalWeights>;
     explorationExploitation: Partial<ExplorationExploitationConfig>;
+    diversityAwareRanking: Partial<DiversityAwareRankingConfig>;
   }>
 ): RecommendationSignalConfig => {
   if (newConfig.baselineSignals) {
@@ -292,6 +323,12 @@ export const updateRecommendationSignalConfig = (
       ...newConfig.explorationExploitation,
     };
   }
+  if (newConfig.diversityAwareRanking) {
+    currentSignalConfig.diversityAwareRanking = {
+      ...currentSignalConfig.diversityAwareRanking,
+      ...newConfig.diversityAwareRanking,
+    };
+  }
 
   notifyChangeListeners();
   return getRecommendationSignalConfig();
@@ -309,6 +346,7 @@ export const resetRecommendationSignalConfig = (): RecommendationSignalConfig =>
     contextSignals: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.contextSignals },
     feedbackSignals: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.feedbackSignals },
     explorationExploitation: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.explorationExploitation },
+    diversityAwareRanking: { ...DEFAULT_RECOMMENDATION_SIGNAL_CONFIG.diversityAwareRanking },
   };
 
   notifyChangeListeners();
@@ -331,6 +369,24 @@ export const resetExplorationExploitationConfig = (): ExplorationExploitationCon
     explorationExploitation: { ...DEFAULT_EXPLORATION_EXPLOITATION_CONFIG },
   });
   return getExplorationExploitationConfig();
+};
+
+export const getDiversityAwareRankingConfig = (): DiversityAwareRankingConfig => {
+  return { ...currentSignalConfig.diversityAwareRanking };
+};
+
+export const updateDiversityAwareRankingConfig = (
+  newConfig: Partial<DiversityAwareRankingConfig>
+): DiversityAwareRankingConfig => {
+  updateRecommendationSignalConfig({ diversityAwareRanking: newConfig });
+  return getDiversityAwareRankingConfig();
+};
+
+export const resetDiversityAwareRankingConfig = (): DiversityAwareRankingConfig => {
+  updateRecommendationSignalConfig({
+    diversityAwareRanking: { ...DEFAULT_DIVERSITY_AWARE_RANKING_CONFIG },
+  });
+  return getDiversityAwareRankingConfig();
 };
 
 export type SignalConfigChangeListener = (config: RecommendationSignalConfig) => void;
