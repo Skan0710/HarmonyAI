@@ -19,6 +19,7 @@ import {
   UnifiedLayeredTasteProfile,
 } from './layeredTemporalTasteProfileService.js';
 import { RecommendationScoreCalibrationService } from './recommendationScoreCalibrationService.js';
+import { UserSpecificSignalWeightingService } from './userSpecificSignalWeightingService.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
@@ -53,6 +54,7 @@ export class HybridRecommendationService {
     temporalInfluence?: number;
     useTemporalProfile?: boolean;
     useScoreCalibration?: boolean;
+    useUserSpecificWeights?: boolean;
   }): Promise<HybridRecommendationServiceResult> {
     const {
       userId,
@@ -68,6 +70,7 @@ export class HybridRecommendationService {
       temporalInfluence,
       useTemporalProfile,
       useScoreCalibration,
+      useUserSpecificWeights,
     } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
@@ -170,17 +173,42 @@ export class HybridRecommendationService {
         }
       }
 
+      let effectiveWeights = weights;
+      let effectiveTemporalInf = temporalInfluence;
+      let effectiveSessionInf = sessionInfluence;
+
+      if (useUserSpecificWeights && !customWeights) {
+        try {
+          const userWeights = UserSpecificSignalWeightingService.calculateUserSpecificWeights({
+            userId,
+            userClassification,
+            temporalProfile: effectiveTemporalProfile,
+            activeSession: activeSessionDoc,
+            sessionProfile: effectiveSessionProfile,
+          });
+          effectiveWeights = userWeights.baselineWeights;
+          if (temporalInfluence === undefined) {
+            effectiveTemporalInf = userWeights.modulationLayers.temporalInfluence;
+          }
+          if (sessionInfluence === undefined) {
+            effectiveSessionInf = userWeights.modulationLayers.sessionInfluence;
+          }
+        } catch {
+          // Safe fallback to default weights
+        }
+      }
+
       let rankedResults = HybridRankingPipeline.rankCandidates(
         candidates,
         limit,
-        weights,
+        effectiveWeights,
         context,
         contextInfluence,
         effectiveSessionProfile,
-        sessionInfluence,
+        effectiveSessionInf,
         activeSessionDoc,
         effectiveTemporalProfile,
-        temporalInfluence
+        effectiveTemporalInf
       );
 
       // Score Calibration Layer based on historical feedback
