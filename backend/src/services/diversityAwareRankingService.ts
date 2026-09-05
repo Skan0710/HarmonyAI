@@ -405,6 +405,13 @@ export class DiversityAwareRankingService {
         };
       }
 
+      if (typeof (resItem as any).finalScore === 'number') {
+        (resItem as any).finalScore = Number(Math.max(0, Math.min(1, sel.marginalScore)).toFixed(4));
+      }
+      if (typeof (resItem as any).hybridScore === 'number' && typeof (resItem as any).finalScore !== 'number') {
+        (resItem as any).hybridScore = Number(Math.max(0, Math.min(1, sel.marginalScore)).toFixed(4));
+      }
+
       return resItem;
     });
 

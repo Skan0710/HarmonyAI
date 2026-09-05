@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { ISong, Song } from '../models/Song.js';
 import { IListeningSession } from '../models/ListeningSession.js';
 import { ListeningSessionService } from './listeningSessionService.js';
@@ -17,6 +17,7 @@ import {
   HybridRankingPipeline,
   HybridRankedResult,
 } from './hybridRankingPipeline.js';
+import { AdaptiveRecommendationRankingPipeline } from './adaptiveRecommendationRankingPipeline.js';
 import { ColdStartRecommendationService } from './coldStartRecommendationService.js';
 
 export interface AutoplayCandidateResult {
@@ -108,6 +109,7 @@ export interface GenerateAutoplayParams {
   diversityFactor?: number;
   noveltyFactor?: number;
   isDebugMode?: boolean;
+  useAdaptiveRanking?: boolean;
 }
 
 export interface GenerateAdaptiveQueueParams extends GenerateAutoplayParams {
@@ -181,9 +183,14 @@ export class SmartAutoplayService {
     const desiredSize = Math.max(1, Math.min(30, requestedQueueSize || limit || 5));
 
     // 1. Resolve Active Session, Current Track, and Session Profile
+    const isDbConnected = mongoose.connection?.readyState === 1;
     let session = params.sessionDoc;
-    if (!session) {
-      session = (await ListeningSessionService.getActiveSession(userId)) || undefined;
+    if (!session && isDbConnected) {
+      try {
+        session = (await ListeningSessionService.getActiveSession(userId)) || undefined;
+      } catch {
+        session = undefined;
+      }
     }
 
     const effectiveCurrentTrackId =
@@ -279,17 +286,31 @@ export class SmartAutoplayService {
       }));
     }
 
-    // 4. Rank candidates using HybridRankingPipeline (Long-Term Taste + Session Profile + Context)
-    const rankedResults: HybridRankedResult[] = HybridRankingPipeline.rankCandidates(
-      candidates,
-      candidates.length,
-      undefined,
-      effectiveContext,
-      undefined,
-      sessionProfile,
-      undefined,
-      session
-    );
+    // 4. Rank candidates using AdaptiveRecommendationRankingPipeline or HybridRankingPipeline
+    let rankedResults: HybridRankedResult[];
+    if (params.useAdaptiveRanking) {
+      const pipelineRes = await AdaptiveRecommendationRankingPipeline.executePipeline({
+        userId,
+        seedSongId: effectiveCurrentTrackId,
+        candidates,
+        context: effectiveContext || undefined,
+        session,
+        sessionProfile,
+        limit: candidates.length,
+      });
+      rankedResults = pipelineRes.recommendations;
+    } else {
+      rankedResults = HybridRankingPipeline.rankCandidates(
+        candidates,
+        candidates.length,
+        undefined,
+        effectiveContext,
+        undefined,
+        sessionProfile,
+        undefined,
+        session
+      );
+    }
 
     let filteredSkippedCount = 0;
     let filteredQueueCount = 0;
@@ -334,7 +355,7 @@ export class SmartAutoplayService {
         continue;
       }
 
-      let adjustedScore = res.hybridScore;
+      let adjustedScore = res.finalScore !== undefined ? res.finalScore : res.hybridScore;
 
       // Heavily dampen songs played earlier in session
       if (playedSongIdsSet.has(songId)) {
