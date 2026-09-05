@@ -20,15 +20,23 @@ export const getHybridConfigWeights = (): HybridScoringWeights => {
   return { ...currentHybridWeights };
 };
 
+let isSyncingFromMaster = false;
+
 export const updateHybridConfigWeights = (
   newWeights: Partial<HybridScoringWeights>
 ): HybridScoringWeights => {
   currentHybridWeights = { ...currentHybridWeights, ...newWeights };
+  if (!isSyncingFromMaster) {
+    updateRecommendationSignalConfig({ baselineSignals: newWeights });
+  }
   return { ...currentHybridWeights };
 };
 
 export const resetHybridConfigWeights = (): HybridScoringWeights => {
   currentHybridWeights = { ...DEFAULT_HYBRID_WEIGHTS };
+  if (!isSyncingFromMaster) {
+    updateRecommendationSignalConfig({ baselineSignals: DEFAULT_HYBRID_WEIGHTS });
+  }
   return { ...currentHybridWeights };
 };
 
@@ -544,3 +552,54 @@ export const resetRecommendationCalibrationConfig = (): RecommendationCalibratio
   currentCalibrationConfig = { ...DEFAULT_CALIBRATION_CONFIG };
   return { ...currentCalibrationConfig };
 };
+
+// ==========================================
+// Centralized Recommendation Signal Configuration
+// ==========================================
+export * from './recommendationSignalConfig.js';
+import {
+  registerSignalConfigChangeListener,
+  updateRecommendationSignalConfig,
+} from './recommendationSignalConfig.js';
+
+registerSignalConfigChangeListener((cfg) => {
+  isSyncingFromMaster = true;
+  try {
+    currentHybridWeights = { ...cfg.baselineSignals };
+    currentContextInfluenceConfig = {
+      ...currentContextInfluenceConfig,
+      defaultContextInfluence: cfg.modulationLayers.contextInfluence,
+      maxContextInfluence: cfg.modulationLayers.maxContextInfluence,
+      minContextInfluence: cfg.modulationLayers.minContextInfluence,
+    };
+    currentSessionInfluenceConfig = {
+      ...currentSessionInfluenceConfig,
+      defaultSessionInfluence: cfg.modulationLayers.sessionInfluence,
+      maxSessionInfluence: cfg.modulationLayers.maxSessionInfluence,
+      minSessionInfluence: cfg.modulationLayers.minSessionInfluence,
+      recentCompletionBoost: cfg.sessionBehavior.recentCompletionBoost,
+      repeatedSkipPenalty: cfg.sessionBehavior.repeatedSkipPenalty,
+      directSkippedSongSuppression: cfg.sessionBehavior.directSkippedSongSuppression,
+    };
+    currentTemporalInfluenceConfig = {
+      ...currentTemporalInfluenceConfig,
+      defaultTemporalInfluence: cfg.modulationLayers.temporalInfluence,
+      maxTemporalInfluence: cfg.modulationLayers.maxTemporalInfluence,
+      minTemporalInfluence: cfg.modulationLayers.minTemporalInfluence,
+      shortTermSignalWeight: cfg.temporalHorizons.shortTermWeight,
+      mediumTermSignalWeight: cfg.temporalHorizons.mediumTermWeight,
+      longTermSignalWeight: cfg.temporalHorizons.longTermWeight,
+      genreMatchWeight: cfg.temporalHorizons.genreMatchWeight,
+      artistMatchWeight: cfg.temporalHorizons.artistMatchWeight,
+      moodMatchWeight: cfg.temporalHorizons.moodMatchWeight,
+      acousticMatchWeight: cfg.temporalHorizons.acousticMatchWeight,
+    };
+    currentCalibrationConfig = {
+      ...currentCalibrationConfig,
+      ...cfg.feedbackSignals,
+    };
+  } finally {
+    isSyncingFromMaster = false;
+  }
+});
+
