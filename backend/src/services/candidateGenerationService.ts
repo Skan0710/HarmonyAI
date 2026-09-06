@@ -1,6 +1,8 @@
 import { Types } from 'mongoose';
 import { Song } from '../models/Song.js';
 import { User } from '../models/User.js';
+import { Genre } from '../models/Genre.js';
+import { Artist } from '../models/Artist.js';
 import { ContentRecommendationService } from './recommendationService.js';
 import { CollaborativeFilteringService } from './collaborativeFilteringService.js';
 import { TrendingService } from './trendingService.js';
@@ -28,8 +30,9 @@ export class CandidateGenerationService {
     userId: string;
     seedSongId?: string;
     candidateLimit?: number;
+    musicDnaProfile?: any;
   }): Promise<HybridCandidate[]> {
-    const { userId, seedSongId, candidateLimit = 50 } = params;
+    const { userId, seedSongId, candidateLimit = 50, musicDnaProfile } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
       throw new Error('Invalid user ID');
@@ -68,7 +71,7 @@ export class CandidateGenerationService {
 
     const mergeCandidate = (
       songDoc: any,
-      source: 'content' | 'collaborative' | 'trending' | 'taste_profile',
+      source: 'content' | 'collaborative' | 'trending' | 'taste_profile' | 'music_dna',
       rawScore: number
     ) => {
       if (!songDoc || !songDoc._id) return;
@@ -86,7 +89,7 @@ export class CandidateGenerationService {
           songDoc,
           contentScore: 0,
           collaborativeScore: 0,
-          userTasteAffinityScore: computeSongTasteAffinity(songDoc, tasteProfile),
+          userTasteAffinityScore: computeSongTasteAffinity(songDoc, tasteProfile, musicDnaProfile),
           popularitySignal: songDoc.playCount || 0,
           recencySignal: calculateRecencySignal(songDoc),
           sources: [],
@@ -104,6 +107,8 @@ export class CandidateGenerationService {
         existing.collaborativeScore = Math.max(existing.collaborativeScore, rawScore);
       } else if (source === 'trending') {
         existing.recencySignal = Math.max(existing.recencySignal, rawScore);
+      } else if (source === 'music_dna') {
+        existing.userTasteAffinityScore = Math.max(existing.userTasteAffinityScore, rawScore);
       }
     };
 
@@ -145,7 +150,61 @@ export class CandidateGenerationService {
       // Safe fallback
     }
 
-    // 5. Catalog Fallback if candidate pool is small
+    // 5. Candidate Source 4: Music DNA Profile Alignment (when available)
+    if (musicDnaProfile) {
+      try {
+        const topGenres = (musicDnaProfile.genreProfile?.topGenres || musicDnaProfile.genres || [])
+          .map((g: any) => g.name || '')
+          .filter(Boolean);
+        const topArtists = (musicDnaProfile.artistProfile?.strongestArtists || musicDnaProfile.artists || [])
+          .map((a: any) => a.name || '')
+          .filter(Boolean);
+
+        const genreIds: any[] = [];
+        const artistIds: any[] = [];
+
+        if (topGenres.length > 0) {
+          const matchedGenreDocs = await Genre.find({
+            name: { $in: topGenres.slice(0, 3).map((n: string) => new RegExp(`^${n}$`, 'i')) },
+          }).select('_id').lean();
+          genreIds.push(...matchedGenreDocs.map((g) => g._id));
+        }
+
+        if (topArtists.length > 0) {
+          const matchedArtistDocs = await Artist.find({
+            name: { $in: topArtists.slice(0, 3).map((n: string) => new RegExp(`^${n}$`, 'i')) },
+          }).select('_id').lean();
+          artistIds.push(...matchedArtistDocs.map((a) => a._id));
+        }
+
+        const matchConditions: any[] = [];
+        if (genreIds.length > 0) {
+          matchConditions.push({ genre: { $in: genreIds } });
+        }
+        if (artistIds.length > 0) {
+          matchConditions.push({ artist: { $in: artistIds } });
+        }
+
+        if (matchConditions.length > 0) {
+          const dnaLimit = Math.min(candidateLimit, 15);
+          const dnaSongs = await Song.find({ isPublished: true, $or: matchConditions })
+            .populate('artist', 'name profileImage avatar verified')
+            .populate('album', 'title coverImage releaseYear')
+            .populate('genre', 'name slug')
+            .sort({ playCount: -1 })
+            .limit(dnaLimit)
+            .lean();
+
+          for (const song of dnaSongs) {
+            mergeCandidate(song, 'music_dna', 0.85);
+          }
+        }
+      } catch (e) {
+        // Safe fallback
+      }
+    }
+
+    // 6. Catalog Fallback if candidate pool is small
     if (candidateMap.size < candidateLimit) {
       const catalogSongs = await Song.find({ isPublished: true })
         .populate('artist', 'name profileImage avatar verified')
@@ -166,34 +225,79 @@ export class CandidateGenerationService {
 
 /**
  * Computes a candidate song's user taste affinity score by checking genre and artist affinities
- * in short-term (70% weight) and long-term (30% weight) profiles.
+ * in short-term (70% weight) and long-term (30% weight) profiles, augmented by Music DNA when available.
  */
-export function computeSongTasteAffinity(songDoc: any, profile: UserTasteProfile | null): number {
-  if (!songDoc || !profile) return 0;
+export function computeSongTasteAffinity(
+  songDoc: any,
+  profile: UserTasteProfile | null,
+  musicDna?: any
+): number {
+  if (!songDoc) return 0;
+  let baseAffinity = 0;
 
-  const songGenreId =
-    typeof songDoc.genre === 'object' && songDoc.genre?._id
-      ? songDoc.genre._id.toString()
-      : String(songDoc.genre || '');
+  if (profile) {
+    const songGenreId =
+      typeof songDoc.genre === 'object' && songDoc.genre?._id
+        ? songDoc.genre._id.toString()
+        : String(songDoc.genre || '');
 
-  const songArtistId =
-    typeof songDoc.artist === 'object' && songDoc.artist?._id
-      ? songDoc.artist._id.toString()
-      : String(songDoc.artist || '');
+    const songArtistId =
+      typeof songDoc.artist === 'object' && songDoc.artist?._id
+        ? songDoc.artist._id.toString()
+        : String(songDoc.artist || '');
 
-  // Genre affinity lookup
-  const shortTermGenre = profile.shortTermProfile?.genres.find((g) => g.genreId === songGenreId)?.affinityScore || 0;
-  const longTermGenre = profile.longTermProfile?.genres.find((g) => g.genreId === songGenreId)?.affinityScore || 0;
-  // Short-term preference acts as stronger signal (70%), long-term as stabilizing foundation (30%)
-  const genreAffinity = 0.7 * shortTermGenre + 0.3 * longTermGenre;
+    // Genre affinity lookup
+    const shortTermGenre = profile.shortTermProfile?.genres.find((g) => g.genreId === songGenreId)?.affinityScore || 0;
+    const longTermGenre = profile.longTermProfile?.genres.find((g) => g.genreId === songGenreId)?.affinityScore || 0;
+    // Short-term preference acts as stronger signal (70%), long-term as stabilizing foundation (30%)
+    const genreAffinity = 0.7 * shortTermGenre + 0.3 * longTermGenre;
 
-  // Artist affinity lookup
-  const shortTermArtist = profile.shortTermProfile?.artists.find((a) => a.artistId === songArtistId)?.affinityScore || 0;
-  const longTermArtist = profile.longTermProfile?.artists.find((a) => a.artistId === songArtistId)?.affinityScore || 0;
-  const artistAffinity = 0.7 * shortTermArtist + 0.3 * longTermArtist;
+    // Artist affinity lookup
+    const shortTermArtist = profile.shortTermProfile?.artists.find((a) => a.artistId === songArtistId)?.affinityScore || 0;
+    const longTermArtist = profile.longTermProfile?.artists.find((a) => a.artistId === songArtistId)?.affinityScore || 0;
+    const artistAffinity = 0.7 * shortTermArtist + 0.3 * longTermArtist;
 
-  const combinedAffinity = 0.5 * genreAffinity + 0.5 * artistAffinity;
-  return Number(Math.max(0, Math.min(1, combinedAffinity)).toFixed(4));
+    const combinedAffinity = 0.5 * genreAffinity + 0.5 * artistAffinity;
+    baseAffinity = Number(Math.max(0, Math.min(1, combinedAffinity)).toFixed(4));
+  }
+
+  // Augment with Music DNA preferences if available
+  if (musicDna) {
+    const songGenreName = (
+      typeof songDoc.genre === 'object' && songDoc.genre?.name
+        ? songDoc.genre.name
+        : typeof songDoc.genre === 'string'
+        ? songDoc.genre
+        : ''
+    ).toLowerCase().trim();
+
+    const songArtistName = (
+      typeof songDoc.artist === 'object' && songDoc.artist?.name
+        ? songDoc.artist.name
+        : typeof songDoc.artist === 'string'
+        ? songDoc.artist
+        : ''
+    ).toLowerCase().trim();
+
+    const topGenres = (musicDna.genreProfile?.topGenres || musicDna.genres || []);
+    const matchedGenre = topGenres.find(
+      (g: any) => (g.name || '').toLowerCase().trim() === songGenreName
+    );
+    const genreScore = matchedGenre ? (matchedGenre.score ?? matchedGenre.affinityScore ?? 0.5) : 0;
+
+    const strongestArtists = (musicDna.artistProfile?.strongestArtists || musicDna.artists || []);
+    const matchedArtist = strongestArtists.find(
+      (a: any) => (a.name || '').toLowerCase().trim() === songArtistName
+    );
+    const artistScore = matchedArtist ? (matchedArtist.score ?? matchedArtist.affinityScore ?? 0.5) : 0;
+
+    const dnaAffinity = 0.5 * genreScore + 0.5 * artistScore;
+    if (dnaAffinity > 0) {
+      baseAffinity = Math.max(baseAffinity, Number(dnaAffinity.toFixed(4)));
+    }
+  }
+
+  return baseAffinity;
 }
 
 function calculateRecencySignal(songDoc: any): number {

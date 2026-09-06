@@ -22,6 +22,7 @@ export type RecommendationSignalIdentifier =
   | 'medium_term_taste'
   | 'session_behavior'
   | 'context'
+  | 'music_dna'
   | 'feedback_calibration'
   | 'popularity'
   | 'recency'
@@ -41,7 +42,7 @@ export interface BaselineSignalWeights {
 
 /**
  * Macro layer modulation bounds & influences.
- * Controls how strongly context, session, and temporal layers blend with baseline personalized scores.
+ * Controls how strongly context, session, temporal, and music DNA layers blend with baseline personalized scores.
  */
 export interface ModulationLayerWeights {
   temporalInfluence: number;              // default: 0.25 (25% temporal blend)
@@ -53,6 +54,9 @@ export interface ModulationLayerWeights {
   contextInfluence: number;               // default: 0.25 (25% context blend)
   maxContextInfluence: number;            // default: 0.40
   minContextInfluence: number;            // default: 0.00
+  musicDnaInfluence?: number;             // default: 0.15 (15% music DNA blend)
+  maxMusicDnaInfluence?: number;          // default: 0.35
+  minMusicDnaInfluence?: number;          // default: 0.00
   maxCombinedModulationInfluence: number; // default: 0.50 (guarantees baseline hybrid score retains >= 50%)
   minBaselineWeightFloor: number;         // default: 0.50
 }
@@ -221,6 +225,9 @@ export const DEFAULT_RECOMMENDATION_SIGNAL_CONFIG: RecommendationSignalConfig = 
     contextInfluence: 0.25,
     maxContextInfluence: 0.40,
     minContextInfluence: 0.00,
+    musicDnaInfluence: 0.15,
+    maxMusicDnaInfluence: 0.35,
+    minMusicDnaInfluence: 0.00,
     maxCombinedModulationInfluence: 0.50,
     minBaselineWeightFloor: 0.50,
   },
@@ -466,27 +473,31 @@ export const getEffectiveSignalDistribution = (activeLayers?: {
   useTemporal?: boolean;
   useSession?: boolean;
   useContext?: boolean;
+  useMusicDna?: boolean;
   useFeedback?: boolean;
 }): Record<RecommendationSignalIdentifier, { weight: number; percentage: number; active: boolean }> => {
   const config = getRecommendationSignalConfig();
   const useTemporal = activeLayers?.useTemporal ?? true;
   const useSession = activeLayers?.useSession ?? true;
   const useContext = activeLayers?.useContext ?? true;
+  const useMusicDna = activeLayers?.useMusicDna ?? false;
   const useFeedback = activeLayers?.useFeedback ?? config.feedbackSignals.enabled;
 
   let effectiveTemporal = useTemporal ? config.modulationLayers.temporalInfluence : 0;
   let effectiveSession = useSession ? config.modulationLayers.sessionInfluence : 0;
   let effectiveContext = useContext ? config.modulationLayers.contextInfluence : 0;
+  let effectiveMusicDna = useMusicDna ? (config.modulationLayers.musicDnaInfluence ?? 0.15) : 0;
 
-  const totalModulation = effectiveTemporal + effectiveSession + effectiveContext;
+  const totalModulation = effectiveTemporal + effectiveSession + effectiveContext + effectiveMusicDna;
   if (totalModulation > config.modulationLayers.maxCombinedModulationInfluence) {
     const scale = config.modulationLayers.maxCombinedModulationInfluence / totalModulation;
     effectiveTemporal *= scale;
     effectiveSession *= scale;
     effectiveContext *= scale;
+    effectiveMusicDna *= scale;
   }
 
-  const baselineFraction = 1 - effectiveTemporal - effectiveSession - effectiveContext;
+  const baselineFraction = 1 - effectiveTemporal - effectiveSession - effectiveContext - effectiveMusicDna;
   const base = config.baselineSignals;
   const baseSum =
     base.contentSimilarityWeight +
@@ -544,6 +555,11 @@ export const getEffectiveSignalDistribution = (activeLayers?: {
       weight: Number(effectiveContext.toFixed(4)),
       percentage: Number((effectiveContext * 100).toFixed(2)),
       active: useContext,
+    },
+    music_dna: {
+      weight: Number(effectiveMusicDna.toFixed(4)),
+      percentage: Number((effectiveMusicDna * 100).toFixed(2)),
+      active: useMusicDna,
     },
     feedback_calibration: {
       weight: useFeedback ? config.feedbackSignals.sourceWeightAdjustment : 0,

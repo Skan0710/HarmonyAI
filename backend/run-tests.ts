@@ -19,6 +19,7 @@ import { runMusicDNATasteExtractionTests } from './src/__tests__/musicDnaTasteEx
 import { runDetailedMusicDNAProfilingTests } from './src/__tests__/detailedMusicDnaProfiling.test.js';
 import { runMusicDNABehaviorProfilingTests } from './src/__tests__/musicDnaBehaviorProfiling.test.js';
 import { runUnifiedMusicDNAServiceTests } from './src/__tests__/unifiedMusicDnaService.test.js';
+import { runMusicDnaRecommendationIntegrationTests } from './src/__tests__/musicDnaRecommendationIntegration.test.js';
 
 const suites = [
   { name: 'Music DNA Model',                      fn: runMusicDNAModelTests },
@@ -26,6 +27,7 @@ const suites = [
   { name: 'Detailed Music DNA Profiling',         fn: runDetailedMusicDNAProfilingTests },
   { name: 'Music DNA Behavior Profiling',         fn: runMusicDNABehaviorProfilingTests },
   { name: 'Unified Music DNA Service',            fn: runUnifiedMusicDNAServiceTests },
+  { name: 'Music DNA Recommendation Integration', fn: runMusicDnaRecommendationIntegrationTests },
   { name: 'Adaptive Ranking Pipeline',            fn: runAdaptivePipelineTests },
   { name: 'Adaptive Integration (Day 30 T7)',     fn: runAdaptiveRecommendationIntegrationTests },
   { name: 'Smart Autoplay Service',               fn: runSmartAutoplayServiceTests },

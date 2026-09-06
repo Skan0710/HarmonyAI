@@ -474,6 +474,54 @@ export const resetTemporalTasteInfluenceConfig = (): TemporalTasteInfluenceConfi
 };
 
 // ==========================================
+// Music DNA Recommendation Influence Config
+// ==========================================
+
+export interface MusicDNAInfluenceConfig {
+  defaultMusicDNAInfluence: number;   // default: 0.15 (15% Music DNA blend)
+  maxMusicDNAInfluence: number;       // default: 0.35
+  minMusicDNAInfluence: number;       // default: 0.00
+  topGenreMatchWeight: number;        // default: 0.30
+  emergingGenreMatchWeight: number;   // default: 0.15
+  strongestArtistMatchWeight: number; // default: 0.25
+  emergingArtistMatchWeight: number;  // default: 0.10
+  moodMatchWeight: number;            // default: 0.10
+  acousticMatchWeight: number;        // default: 0.10
+}
+
+export const DEFAULT_MUSIC_DNA_INFLUENCE_CONFIG: MusicDNAInfluenceConfig = {
+  defaultMusicDNAInfluence: 0.15,
+  maxMusicDNAInfluence: 0.35,
+  minMusicDNAInfluence: 0.00,
+  topGenreMatchWeight: 0.30,
+  emergingGenreMatchWeight: 0.15,
+  strongestArtistMatchWeight: 0.25,
+  emergingArtistMatchWeight: 0.10,
+  moodMatchWeight: 0.10,
+  acousticMatchWeight: 0.10,
+};
+
+let currentMusicDNAInfluenceConfig: MusicDNAInfluenceConfig = {
+  ...DEFAULT_MUSIC_DNA_INFLUENCE_CONFIG,
+};
+
+export const getMusicDNAInfluenceConfig = (): MusicDNAInfluenceConfig => {
+  return { ...currentMusicDNAInfluenceConfig };
+};
+
+export const updateMusicDNAInfluenceConfig = (
+  newConfig: Partial<MusicDNAInfluenceConfig>
+): MusicDNAInfluenceConfig => {
+  currentMusicDNAInfluenceConfig = { ...currentMusicDNAInfluenceConfig, ...newConfig };
+  return { ...currentMusicDNAInfluenceConfig };
+};
+
+export const resetMusicDNAInfluenceConfig = (): MusicDNAInfluenceConfig => {
+  currentMusicDNAInfluenceConfig = { ...DEFAULT_MUSIC_DNA_INFLUENCE_CONFIG };
+  return { ...currentMusicDNAInfluenceConfig };
+};
+
+// ==========================================
 // Recommendation Quality Metrics & Evaluation Config
 // ==========================================
 
@@ -608,6 +656,16 @@ registerSignalConfigChangeListener((cfg) => {
       ...currentNoveltyWeights,
       ...cfg.noveltyScoring,
     };
+    if (cfg.modulationLayers.musicDnaInfluence !== undefined) {
+      currentMusicDNAInfluenceConfig = {
+        ...currentMusicDNAInfluenceConfig,
+        defaultMusicDNAInfluence: cfg.modulationLayers.musicDnaInfluence,
+        maxMusicDNAInfluence:
+          cfg.modulationLayers.maxMusicDnaInfluence ?? currentMusicDNAInfluenceConfig.maxMusicDNAInfluence,
+        minMusicDNAInfluence:
+          cfg.modulationLayers.minMusicDnaInfluence ?? currentMusicDNAInfluenceConfig.minMusicDNAInfluence,
+      };
+    }
   } finally {
     isSyncingFromMaster = false;
   }

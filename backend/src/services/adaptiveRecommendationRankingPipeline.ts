@@ -27,6 +27,12 @@ import { UserSpecificSignalWeightingService } from './userSpecificSignalWeightin
 import { AdaptiveExplorationService } from './adaptiveExplorationService.js';
 import { DiversityAwareRankingService } from './diversityAwareRankingService.js';
 import { NoveltyScoringService, UserFamiliarityProfile } from './noveltyScoringService.js';
+import {
+  UnifiedMusicDNA,
+  MusicDNAProfileAttributes,
+} from '../schemas/musicDnaSchema.js';
+import { IMusicDNA } from '../models/MusicDNA.js';
+import { UnifiedMusicDNAService } from './unifiedMusicDnaService.js';
 
 export interface AdaptivePipelineOptions {
   userId: string;
@@ -47,6 +53,9 @@ export interface AdaptivePipelineOptions {
   temporalProfile?: UnifiedLayeredTasteProfile | null;
   temporalInfluence?: number;
   useTemporalProfile?: boolean;
+  musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any;
+  musicDnaInfluence?: number;
+  useMusicDna?: boolean;
   useScoreCalibration?: boolean;
   feedbackProfile?: UserFeedbackProfile | null;
   useUserSpecificWeights?: boolean;
@@ -99,6 +108,12 @@ export interface AdaptivePipelineStageDiagnostics {
     finalCount: number;
     deterministicTieBreaksApplied: number;
   };
+  musicDna?: {
+    applied: boolean;
+    confidenceScore?: number;
+    effectiveInfluence?: number;
+    matchedCandidatesCount?: number;
+  };
 }
 
 export interface AdaptivePipelineResult {
@@ -134,6 +149,7 @@ export class AdaptiveRecommendationRankingPipeline {
     candidateLimit?: number;
     candidates?: HybridCandidate[];
     userClassification?: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
+    musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any;
   }): Promise<{
     candidates: HybridCandidate[];
     isColdStart: boolean;
@@ -141,7 +157,14 @@ export class AdaptiveRecommendationRankingPipeline {
     coldStartSongs?: any[];
     candidateSources?: string[];
   }> {
-    const { userId, seedSongId, candidateLimit = 50, candidates, userClassification: providedClass } = options;
+    const {
+      userId,
+      seedSongId,
+      candidateLimit = 50,
+      candidates,
+      userClassification: providedClass,
+      musicDnaProfile,
+    } = options;
 
     // If pre-generated candidates are supplied, use them directly without DB overhead
     if (candidates && Array.isArray(candidates) && candidates.length > 0) {
@@ -202,6 +225,7 @@ export class AdaptiveRecommendationRankingPipeline {
         userId,
         seedSongId,
         candidateLimit,
+        musicDnaProfile,
       });
 
       return {
@@ -221,7 +245,7 @@ export class AdaptiveRecommendationRankingPipeline {
   /**
    * Stage 2: Base Recommendation Score
    * Computes personalized hybrid score combining content similarity, collaborative filtering,
-   * long-term user taste affinity, popularity, recency, context fit, and temporal/session layers.
+   * long-term user taste affinity, popularity, recency, context fit, and temporal/session/music DNA layers.
    */
   static scoreBaseCandidatesStage(options: {
     candidates: HybridCandidate[];
@@ -234,6 +258,8 @@ export class AdaptiveRecommendationRankingPipeline {
     activeSessionDoc?: IListeningSession | null;
     temporalProfile?: UnifiedLayeredTasteProfile | null;
     temporalInfluence?: number;
+    musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any;
+    musicDnaInfluence?: number;
   }): HybridRankedResult[] {
     const {
       candidates,
@@ -246,6 +272,8 @@ export class AdaptiveRecommendationRankingPipeline {
       activeSessionDoc,
       temporalProfile,
       temporalInfluence,
+      musicDnaProfile,
+      musicDnaInfluence,
     } = options;
 
     if (!Array.isArray(candidates) || candidates.length === 0) {
@@ -262,7 +290,9 @@ export class AdaptiveRecommendationRankingPipeline {
       sessionInfluence,
       activeSessionDoc,
       temporalProfile,
-      temporalInfluence
+      temporalInfluence,
+      musicDnaProfile,
+      musicDnaInfluence
     );
   }
 
@@ -547,6 +577,9 @@ export class AdaptiveRecommendationRankingPipeline {
       temporalProfile,
       temporalInfluence,
       useTemporalProfile,
+      musicDnaProfile,
+      musicDnaInfluence,
+      useMusicDna,
       useScoreCalibration,
       feedbackProfile: providedFeedbackProfile,
       useUserSpecificWeights,
@@ -569,7 +602,25 @@ export class AdaptiveRecommendationRankingPipeline {
       noveltyAdjustment: { applied: false },
       diversityReranking: { applied: false },
       finalRanking: { finalCount: 0, deterministicTieBreaksApplied: 0 },
+      musicDna: { applied: false },
     };
+
+    // Resolve context & profiles early so candidate generation can benefit from Music DNA
+    const isDbConnected = mongoose.connection?.readyState === 1;
+    let effectiveMusicDnaProfile = musicDnaProfile || null;
+    if (
+      !effectiveMusicDnaProfile &&
+      (useMusicDna || enableAllStages) &&
+      userId &&
+      Types.ObjectId.isValid(userId) &&
+      isDbConnected
+    ) {
+      try {
+        effectiveMusicDnaProfile = await UnifiedMusicDNAService.getOrGenerateProfile(userId);
+      } catch {
+        // Safe fallback
+      }
+    }
 
     // =========================================================================
     // Stage 1: Candidate Generation
@@ -580,6 +631,7 @@ export class AdaptiveRecommendationRankingPipeline {
       candidateLimit,
       candidates: providedCandidates,
       userClassification: options.userClassification,
+      musicDnaProfile: effectiveMusicDnaProfile,
     });
 
     const userClassification = candidateStageRes.userClassification;
@@ -649,7 +701,6 @@ export class AdaptiveRecommendationRankingPipeline {
     }
 
     // Resolve context & profiles
-    const isDbConnected = mongoose.connection?.readyState === 1;
     let activeSessionDoc: IListeningSession | null =
       options.activeSession || options.sessionDoc || options.session || null;
     let effectiveSessionProfile = sessionProfile || null;
@@ -724,10 +775,21 @@ export class AdaptiveRecommendationRankingPipeline {
       activeSessionDoc,
       temporalProfile: effectiveTemporalProfile,
       temporalInfluence: effectiveTemporalInf,
+      musicDnaProfile: effectiveMusicDnaProfile,
+      musicDnaInfluence,
     });
 
     diagnostics.baseScoring.scoredCandidatesCount = rankedResults.length;
     diagnostics.baseScoring.topBaseScore = rankedResults[0]?.hybridScore || 0;
+
+    diagnostics.musicDna = {
+      applied: Boolean(effectiveMusicDnaProfile && (rankedResults[0]?.componentScores?.musicDnaScore !== undefined)),
+      confidenceScore: effectiveMusicDnaProfile?.confidenceScore,
+      effectiveInfluence: rankedResults[0]?.metadata?.musicDnaInfluence,
+      matchedCandidatesCount: rankedResults.filter(
+        (r) => r.componentScores?.musicDnaScore !== undefined && r.componentScores.musicDnaScore > 0.5
+      ).length,
+    };
 
     // =========================================================================
     // Stage 4: Feedback Adjustment
@@ -760,6 +822,12 @@ export class AdaptiveRecommendationRankingPipeline {
     // =========================================================================
     const shouldApplyExploration = enableAllStages || useAdaptiveExploration;
     if (shouldApplyExploration && userId) {
+      const dnaExplorationRate =
+        explorationRate ??
+        (effectiveMusicDnaProfile?.tendencies?.explorationPreference !== undefined
+          ? effectiveMusicDnaProfile.tendencies.explorationPreference * 0.35
+          : undefined);
+
       const explorationStageRes = this.applyExplorationAdjustmentStage({
         rankedResults,
         userId,
@@ -767,7 +835,7 @@ export class AdaptiveRecommendationRankingPipeline {
         temporalProfile: effectiveTemporalProfile,
         feedbackProfile,
         activeSession: activeSessionDoc,
-        customExplorationRate: explorationRate,
+        customExplorationRate: dnaExplorationRate,
       });
 
       rankedResults = explorationStageRes.results;
@@ -807,10 +875,16 @@ export class AdaptiveRecommendationRankingPipeline {
     // =========================================================================
     const shouldApplyDiversity = enableAllStages || useDiversityRanking;
     if (shouldApplyDiversity) {
+      const effectiveDiversity =
+        diversityStrength ??
+        (effectiveMusicDnaProfile?.tendencies?.diversityPreference !== undefined
+          ? 0.15 + effectiveMusicDnaProfile.tendencies.diversityPreference * 0.30
+          : undefined);
+
       const diversityStageRes = this.applyDiversityRerankingStage({
         rankedResults,
         targetLimit: limit,
-        diversityStrength,
+        diversityStrength: effectiveDiversity,
       });
 
       rankedResults = diversityStageRes.results;
