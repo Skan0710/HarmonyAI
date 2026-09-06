@@ -14,8 +14,10 @@ import { runTemporalRecommendationIntegrationTests } from './src/__tests__/tempo
 import { runRecommendationExplanationFeedbackTests } from './src/__tests__/recommendationExplanationFeedback.test.js';
 import { runRecommendationExplanationEndpointTests } from './src/__tests__/recommendationExplanationEndpoint.test.js';
 import { runTemporalTasteProfileEndpointTests } from './src/__tests__/temporalTasteProfileEndpoint.test.js';
+import { runMusicDNAModelTests } from './src/__tests__/musicDnaModel.test.js';
 
 const suites = [
+  { name: 'Music DNA Model',                      fn: runMusicDNAModelTests },
   { name: 'Adaptive Ranking Pipeline',            fn: runAdaptivePipelineTests },
   { name: 'Adaptive Integration (Day 30 T7)',     fn: runAdaptiveRecommendationIntegrationTests },
   { name: 'Smart Autoplay Service',               fn: runSmartAutoplayServiceTests },
