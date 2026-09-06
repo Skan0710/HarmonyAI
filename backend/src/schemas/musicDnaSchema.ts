@@ -178,6 +178,44 @@ export interface MusicDNAListeningBehaviorProfile {
   metadata?: Record<string, any>;
 }
 
+export interface UnifiedGenreProfile {
+  topGenres: DetailedTasteItem[];
+  emergingGenres: DetailedTasteItem[];
+  diversity: DiversityMetric;
+}
+
+export interface UnifiedArtistProfile {
+  strongestArtists: DetailedTasteItem[];
+  emergingArtists: DetailedTasteItem[];
+  diversity: DiversityMetric;
+}
+
+export interface UnifiedMoodProfile {
+  preferredMoods: DetailedTasteItem[];
+}
+
+export interface UnifiedMusicDNA {
+  userId: string;
+  dnaVersion: string;
+  genreProfile: UnifiedGenreProfile;
+  artistProfile: UnifiedArtistProfile;
+  moodProfile: UnifiedMoodProfile;
+  listeningBehavior: MusicDNAListeningBehaviorProfile;
+  temporalPreferences: MusicDNATemporalTaste;
+  tendencies: MusicDNATendencyDimensions;
+  listeningPatterns: MusicDNAListeningPatterns;
+  confidenceScore: number;
+  lastRefreshedAt: Date;
+  interactionsCountAtLastRefresh: number;
+  metadata?: Record<string, any>;
+}
+
+export interface UnifiedRefreshResult {
+  profile: UnifiedMusicDNA;
+  refreshed: boolean;
+  reason: string;
+}
+
 export interface MusicDNAValidationResult {
   isValid: boolean;
   errors: string[];
