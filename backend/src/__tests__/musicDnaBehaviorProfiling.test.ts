@@ -315,7 +315,7 @@ export async function runMusicDNABehaviorProfilingTests() {
 }
 
 // Self-executing runner
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1].endsWith('musicDnaBehaviorProfiling.test.ts')) {
+if (process.argv[1]?.includes('musicDnaBehaviorProfiling.test')) {
   runMusicDNABehaviorProfilingTests()
     .then(() => process.exit(0))
     .catch((err) => {

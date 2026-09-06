@@ -19,6 +19,7 @@ import {
   processFeedbackLoop,
 } from '../controllers/recommendationInteractionController.js';
 import { getTemporalTasteProfile } from '../controllers/temporalTasteProfileController.js';
+import { getMusicDNAProfile, refreshMusicDNAProfile } from '../controllers/musicDnaController.js';
 import {
   getRecommendationPerformance,
   getSignalPerformance,
@@ -35,6 +36,10 @@ router.get('/analytics', protect, getRecommendationAnalytics);
 router.get('/performance', protect, getRecommendationPerformance);
 router.get('/performance/signals', protect, getSignalPerformance);
 router.get('/performance/engagement', protect, getEngagementMetrics);
+
+// GET & POST /api/recommendations/music-dna (Protected JWT - Music DNA Profile)
+router.get('/music-dna', protect, getMusicDNAProfile);
+router.post('/music-dna/refresh', protect, refreshMusicDNAProfile);
 
 // GET /api/recommendations/temporal-taste-profile (Protected JWT - Multi-Horizon Temporal Taste Profile)
 router.get('/temporal-taste-profile', protect, getTemporalTasteProfile);

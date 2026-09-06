@@ -609,7 +609,7 @@ export async function runMusicDnaRecommendationIntegrationTests() {
 }
 
 // Standalone execution support
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`) {
+if (process.argv[1]?.includes('musicDnaRecommendationIntegration.test')) {
   runMusicDnaRecommendationIntegrationTests()
     .then(() => process.exit(0))
     .catch(() => process.exit(1));

@@ -14,6 +14,7 @@ import {
 } from '../controllers/userController.js';
 import { getPersonalizedFeed } from '../controllers/personalizedFeedController.js';
 import { getTemporalTasteProfile } from '../controllers/temporalTasteProfileController.js';
+import { getMusicDNAProfile, refreshMusicDNAProfile } from '../controllers/musicDnaController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
 const router = Router();
@@ -21,6 +22,12 @@ const router = Router();
 // Protected user profile routes
 router.get('/me', protect, getCurrentUser);
 router.put('/me', protect, updateCurrentUser);
+
+// Music DNA routes
+router.get('/me/music-dna', protect, getMusicDNAProfile);
+router.get('/music-dna', protect, getMusicDNAProfile);
+router.post('/me/music-dna/refresh', protect, refreshMusicDNAProfile);
+router.post('/music-dna/refresh', protect, refreshMusicDNAProfile);
 
 // Temporal Taste Profile routes
 router.get('/me/temporal-taste-profile', protect, getTemporalTasteProfile);

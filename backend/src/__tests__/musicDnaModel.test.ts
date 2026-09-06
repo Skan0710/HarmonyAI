@@ -148,7 +148,7 @@ export async function runMusicDNAModelTests() {
     assert.strictEqual(dnaDoc.listeningPatterns.avgSessionDurationMinutes, 45);
     assert.strictEqual(dnaDoc.temporalTaste.activeTimeWindow, 'short_term');
     assert.strictEqual(dnaDoc.confidenceScore, 0.85);
-    assert.strictEqual(dnaDoc.metadata.dominantAcousticProfile, 'electronic_retro');
+    assert.strictEqual(dnaDoc.metadata?.dominantAcousticProfile, 'electronic_retro');
 
     console.log('✓ Test 2 Passed: Full Music DNA document instantiates and validates all core dimensions.');
   }
@@ -257,8 +257,8 @@ export async function runMusicDNAModelTests() {
     });
 
     await extensibleDoc.validate();
-    assert.deepStrictEqual(extensibleDoc.metadata.neuralEmbedding, [0.12, -0.45, 0.88]);
-    assert.strictEqual(extensibleDoc.metadata.futureV2Metrics.acousticNoveltySensitivity, 0.77);
+    assert.deepStrictEqual(extensibleDoc.metadata?.neuralEmbedding, [0.12, -0.45, 0.88]);
+    assert.strictEqual(extensibleDoc.metadata?.futureV2Metrics?.acousticNoveltySensitivity, 0.77);
 
     console.log('✓ Test 6 Passed: Model extensibility and static methods verified.');
   }
@@ -267,7 +267,7 @@ export async function runMusicDNAModelTests() {
 }
 
 // Self-executing runner for standalone execution
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1].endsWith('musicDnaModel.test.ts')) {
+if (process.argv[1]?.includes('musicDnaModel.test')) {
   runMusicDNAModelTests()
     .then(() => process.exit(0))
     .catch((err) => {

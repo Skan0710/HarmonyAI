@@ -230,7 +230,7 @@ export async function runUnifiedMusicDNAServiceTests() {
 }
 
 // Self-executing runner
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1].endsWith('unifiedMusicDnaService.test.ts')) {
+if (process.argv[1]?.includes('unifiedMusicDnaService.test')) {
   runUnifiedMusicDNAServiceTests()
     .then(() => process.exit(0))
     .catch((err) => {

@@ -318,7 +318,7 @@ export async function runMusicDNATasteExtractionTests() {
     assert.strictEqual(doc.userId.toString(), userId.toString());
     assert.strictEqual(doc.genres[0].name, 'Classic Rock');
     assert.strictEqual(doc.artists[0].name, 'Queen');
-    assert.strictEqual(doc.metadata.totalPlaysAnalyzed, 1);
+    assert.strictEqual(doc.metadata?.totalPlaysAnalyzed, 1);
 
     console.log('✓ Test 6 Passed: Extracted DNA profile successfully validates against MusicDNA Mongoose schema.');
   }
@@ -327,7 +327,7 @@ export async function runMusicDNATasteExtractionTests() {
 }
 
 // Self-executing runner
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1].endsWith('musicDnaTasteExtraction.test.ts')) {
+if (process.argv[1]?.includes('musicDnaTasteExtraction.test')) {
   runMusicDNATasteExtractionTests()
     .then(() => process.exit(0))
     .catch((err) => {
