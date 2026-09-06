@@ -23,6 +23,7 @@ export type RecommendationSignalIdentifier =
   | 'session_behavior'
   | 'context'
   | 'music_dna'
+  | 'taste_evolution'
   | 'feedback_calibration'
   | 'popularity'
   | 'recency'
@@ -42,7 +43,7 @@ export interface BaselineSignalWeights {
 
 /**
  * Macro layer modulation bounds & influences.
- * Controls how strongly context, session, temporal, and music DNA layers blend with baseline personalized scores.
+ * Controls how strongly context, session, temporal, music DNA, and taste evolution layers blend with baseline personalized scores.
  */
 export interface ModulationLayerWeights {
   temporalInfluence: number;              // default: 0.25 (25% temporal blend)
@@ -57,6 +58,12 @@ export interface ModulationLayerWeights {
   musicDnaInfluence?: number;             // default: 0.15 (15% music DNA blend)
   maxMusicDnaInfluence?: number;          // default: 0.35
   minMusicDnaInfluence?: number;          // default: 0.00
+  evolutionInfluence?: number;            // default: 0.12 (12% taste evolution blend)
+  maxEvolutionInfluence?: number;         // default: 0.25
+  minEvolutionInfluence?: number;         // default: 0.00
+  tasteEvolutionInfluence?: number;
+  maxTasteEvolutionInfluence?: number;
+  minTasteEvolutionInfluence?: number;
   maxCombinedModulationInfluence: number; // default: 0.50 (guarantees baseline hybrid score retains >= 50%)
   minBaselineWeightFloor: number;         // default: 0.50
 }
@@ -474,6 +481,7 @@ export const getEffectiveSignalDistribution = (activeLayers?: {
   useSession?: boolean;
   useContext?: boolean;
   useMusicDna?: boolean;
+  useTasteEvolution?: boolean;
   useFeedback?: boolean;
 }): Record<RecommendationSignalIdentifier, { weight: number; percentage: number; active: boolean }> => {
   const config = getRecommendationSignalConfig();
@@ -481,23 +489,27 @@ export const getEffectiveSignalDistribution = (activeLayers?: {
   const useSession = activeLayers?.useSession ?? true;
   const useContext = activeLayers?.useContext ?? true;
   const useMusicDna = activeLayers?.useMusicDna ?? false;
+  const useTasteEvolution = activeLayers?.useTasteEvolution ?? false;
   const useFeedback = activeLayers?.useFeedback ?? config.feedbackSignals.enabled;
 
   let effectiveTemporal = useTemporal ? config.modulationLayers.temporalInfluence : 0;
   let effectiveSession = useSession ? config.modulationLayers.sessionInfluence : 0;
   let effectiveContext = useContext ? config.modulationLayers.contextInfluence : 0;
   let effectiveMusicDna = useMusicDna ? (config.modulationLayers.musicDnaInfluence ?? 0.15) : 0;
+  let effectiveEvolution = useTasteEvolution ? (config.modulationLayers.tasteEvolutionInfluence ?? 0.12) : 0;
 
-  const totalModulation = effectiveTemporal + effectiveSession + effectiveContext + effectiveMusicDna;
+  const totalModulation = effectiveTemporal + effectiveSession + effectiveContext + effectiveMusicDna + effectiveEvolution;
   if (totalModulation > config.modulationLayers.maxCombinedModulationInfluence) {
     const scale = config.modulationLayers.maxCombinedModulationInfluence / totalModulation;
     effectiveTemporal *= scale;
     effectiveSession *= scale;
     effectiveContext *= scale;
     effectiveMusicDna *= scale;
+    effectiveEvolution *= scale;
   }
 
-  const baselineFraction = 1 - effectiveTemporal - effectiveSession - effectiveContext - effectiveMusicDna;
+  const baselineFraction =
+    1 - effectiveTemporal - effectiveSession - effectiveContext - effectiveMusicDna - effectiveEvolution;
   const base = config.baselineSignals;
   const baseSum =
     base.contentSimilarityWeight +
@@ -580,6 +592,11 @@ export const getEffectiveSignalDistribution = (activeLayers?: {
       weight: config.noveltyScoring.noveltyWeight,
       percentage: Number((config.noveltyScoring.noveltyWeight * 100).toFixed(2)),
       active: config.noveltyScoring.enabled,
+    },
+    taste_evolution: {
+      weight: Number((effectiveEvolution || 0).toFixed(4)),
+      percentage: Number(((effectiveEvolution || 0) * 100).toFixed(2)),
+      active: useTasteEvolution,
     },
   };
 

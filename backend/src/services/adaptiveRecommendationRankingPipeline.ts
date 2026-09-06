@@ -1,6 +1,10 @@
 import mongoose, { Types } from 'mongoose';
 import { CandidateGenerationService, HybridCandidate } from './candidateGenerationService.js';
-import { HybridRankingPipeline, HybridRankedResult } from './hybridRankingPipeline.js';
+import {
+  HybridRankingPipeline,
+  HybridRankedResult,
+  TasteEvolutionSignal,
+} from './hybridRankingPipeline.js';
 import { ColdStartDetectionService } from './coldStartDetectionService.js';
 import { ColdStartRecommendationService } from './coldStartRecommendationService.js';
 import {
@@ -56,6 +60,10 @@ export interface AdaptivePipelineOptions {
   musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any;
   musicDnaInfluence?: number;
   useMusicDna?: boolean;
+  tasteEvolutionSignal?: TasteEvolutionSignal | null;
+  tasteEvolutionInfluence?: number;
+  useTasteEvolution?: boolean;
+  tasteStabilityMetrics?: any;
   useScoreCalibration?: boolean;
   feedbackProfile?: UserFeedbackProfile | null;
   useUserSpecificWeights?: boolean;
@@ -113,6 +121,12 @@ export interface AdaptivePipelineStageDiagnostics {
     confidenceScore?: number;
     effectiveInfluence?: number;
     matchedCandidatesCount?: number;
+  };
+  tasteEvolution?: {
+    applied: boolean;
+    effectiveInfluence?: number;
+    emergingBoostedCount?: number;
+    fadingAttenuatedCount?: number;
   };
 }
 
@@ -260,6 +274,8 @@ export class AdaptiveRecommendationRankingPipeline {
     temporalInfluence?: number;
     musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any;
     musicDnaInfluence?: number;
+    tasteEvolutionSignal?: TasteEvolutionSignal | null;
+    tasteEvolutionInfluence?: number;
   }): HybridRankedResult[] {
     const {
       candidates,
@@ -274,6 +290,8 @@ export class AdaptiveRecommendationRankingPipeline {
       temporalInfluence,
       musicDnaProfile,
       musicDnaInfluence,
+      tasteEvolutionSignal,
+      tasteEvolutionInfluence,
     } = options;
 
     if (!Array.isArray(candidates) || candidates.length === 0) {
@@ -292,7 +310,9 @@ export class AdaptiveRecommendationRankingPipeline {
       temporalProfile,
       temporalInfluence,
       musicDnaProfile,
-      musicDnaInfluence
+      musicDnaInfluence,
+      tasteEvolutionSignal,
+      tasteEvolutionInfluence
     );
   }
 
@@ -421,7 +441,10 @@ export class AdaptiveRecommendationRankingPipeline {
       return {
         results: explorationRes.results,
         applied: true,
-        explorationRateUsed: explorationRes.explorationDetails?.effectiveExplorationRate,
+        explorationRateUsed:
+          customExplorationRate !== undefined
+            ? customExplorationRate
+            : explorationRes.explorationDetails?.effectiveExplorationRate,
         exploredCandidatesCount: explorationRes.results.filter(
           (r) => (r.metadata as any)?.exploration?.isExplorationCandidate
         ).length,
@@ -580,6 +603,10 @@ export class AdaptiveRecommendationRankingPipeline {
       musicDnaProfile,
       musicDnaInfluence,
       useMusicDna,
+      tasteEvolutionSignal,
+      tasteEvolutionInfluence,
+      useTasteEvolution,
+      tasteStabilityMetrics,
       useScoreCalibration,
       feedbackProfile: providedFeedbackProfile,
       useUserSpecificWeights,
@@ -777,6 +804,8 @@ export class AdaptiveRecommendationRankingPipeline {
       temporalInfluence: effectiveTemporalInf,
       musicDnaProfile: effectiveMusicDnaProfile,
       musicDnaInfluence,
+      tasteEvolutionSignal,
+      tasteEvolutionInfluence,
     });
 
     diagnostics.baseScoring.scoredCandidatesCount = rankedResults.length;
@@ -788,6 +817,17 @@ export class AdaptiveRecommendationRankingPipeline {
       effectiveInfluence: rankedResults[0]?.metadata?.musicDnaInfluence,
       matchedCandidatesCount: rankedResults.filter(
         (r) => r.componentScores?.musicDnaScore !== undefined && r.componentScores.musicDnaScore > 0.5
+      ).length,
+    };
+
+    diagnostics.tasteEvolution = {
+      applied: Boolean(tasteEvolutionSignal && (rankedResults[0]?.componentScores?.tasteEvolutionScore !== undefined)),
+      effectiveInfluence: rankedResults[0]?.metadata?.tasteEvolutionInfluence,
+      emergingBoostedCount: rankedResults.filter(
+        (r) => (r.componentScores?.tasteEvolutionScore || 0) > 0.50
+      ).length,
+      fadingAttenuatedCount: rankedResults.filter(
+        (r) => (r.componentScores?.tasteEvolutionScore || 0) < 0.50 && r.componentScores?.tasteEvolutionScore !== undefined
       ).length,
     };
 
@@ -822,11 +862,25 @@ export class AdaptiveRecommendationRankingPipeline {
     // =========================================================================
     const shouldApplyExploration = enableAllStages || useAdaptiveExploration;
     if (shouldApplyExploration && userId) {
-      const dnaExplorationRate =
+      let dnaExplorationRate =
         explorationRate ??
         (effectiveMusicDnaProfile?.tendencies?.explorationPreference !== undefined
           ? effectiveMusicDnaProfile.tendencies.explorationPreference * 0.35
           : undefined);
+
+      // Day 32: Taste Evolution Exploration Modulation
+      // Rapid taste transformation/volatility prompts higher discovery exploration
+      // Highly stable/anchored taste prioritizes familiar core preservation
+      if (tasteEvolutionSignal) {
+        const stabilityRating = tasteEvolutionSignal.tasteStabilityRating;
+        const stabilityScore = tasteEvolutionSignal.tasteStabilityScore;
+        const currentExp = dnaExplorationRate ?? 0.20;
+        if (stabilityRating === 'rapid_transformation' || (stabilityScore !== undefined && stabilityScore < 0.35)) {
+          dnaExplorationRate = Math.min(0.85, currentExp + 0.15);
+        } else if (stabilityRating === 'highly_stable' || (stabilityScore !== undefined && stabilityScore > 0.80)) {
+          dnaExplorationRate = Math.max(0.05, currentExp - 0.08);
+        }
+      }
 
       const explorationStageRes = this.applyExplorationAdjustmentStage({
         rankedResults,

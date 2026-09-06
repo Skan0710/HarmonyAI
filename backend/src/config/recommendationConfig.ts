@@ -522,6 +522,52 @@ export const resetMusicDNAInfluenceConfig = (): MusicDNAInfluenceConfig => {
 };
 
 // ==========================================
+// Taste Evolution Recommendation Influence Config
+// ==========================================
+
+export interface TasteEvolutionInfluenceConfig {
+  defaultEvolutionInfluence: number;   // default: 0.12 (12% blend)
+  maxEvolutionInfluence: number;       // default: 0.25
+  minEvolutionInfluence: number;       // default: 0.00
+  emergingDiscoveryBoost: number;      // default: 0.20 (boost for tracks matching emerging preferences)
+  sustainedEmergingBoost: number;      // default: 0.25 (boost for sustained emerging preferences)
+  fadingPreferencePenalty: number;     // default: 0.20 (penalty for fading preferences)
+  stablePreferenceMultiplier: number;  // default: 1.10 (protection boost for stable foundational preferences)
+  rapidTransformationExplorationBonus: number; // default: 0.15 (increases exploration for transforming users)
+}
+
+export const DEFAULT_TASTE_EVOLUTION_INFLUENCE_CONFIG: TasteEvolutionInfluenceConfig = {
+  defaultEvolutionInfluence: 0.12,
+  maxEvolutionInfluence: 0.25,
+  minEvolutionInfluence: 0.00,
+  emergingDiscoveryBoost: 0.20,
+  sustainedEmergingBoost: 0.25,
+  fadingPreferencePenalty: 0.20,
+  stablePreferenceMultiplier: 1.10,
+  rapidTransformationExplorationBonus: 0.15,
+};
+
+let currentTasteEvolutionInfluenceConfig: TasteEvolutionInfluenceConfig = {
+  ...DEFAULT_TASTE_EVOLUTION_INFLUENCE_CONFIG,
+};
+
+export const getTasteEvolutionInfluenceConfig = (): TasteEvolutionInfluenceConfig => {
+  return { ...currentTasteEvolutionInfluenceConfig };
+};
+
+export const updateTasteEvolutionInfluenceConfig = (
+  newConfig: Partial<TasteEvolutionInfluenceConfig>
+): TasteEvolutionInfluenceConfig => {
+  currentTasteEvolutionInfluenceConfig = { ...currentTasteEvolutionInfluenceConfig, ...newConfig };
+  return { ...currentTasteEvolutionInfluenceConfig };
+};
+
+export const resetTasteEvolutionInfluenceConfig = (): TasteEvolutionInfluenceConfig => {
+  currentTasteEvolutionInfluenceConfig = { ...DEFAULT_TASTE_EVOLUTION_INFLUENCE_CONFIG };
+  return { ...currentTasteEvolutionInfluenceConfig };
+};
+
+// ==========================================
 // Recommendation Quality Metrics & Evaluation Config
 // ==========================================
 

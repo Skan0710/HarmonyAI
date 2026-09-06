@@ -8,6 +8,8 @@ import {
   TemporalTasteInfluenceConfig,
   getMusicDNAInfluenceConfig,
   MusicDNAInfluenceConfig,
+  getTasteEvolutionInfluenceConfig,
+  TasteEvolutionInfluenceConfig,
   getRecommendationSignalConfig,
 } from '../config/recommendationConfig.js';
 import {
@@ -30,6 +32,22 @@ import {
 } from '../schemas/musicDnaSchema.js';
 import { IMusicDNA } from '../models/MusicDNA.js';
 
+export interface TasteEvolutionSignal {
+  emergingGenres?: string[];
+  emergingArtists?: string[];
+  sustainedEmergingGenres?: string[];
+  sustainedEmergingArtists?: string[];
+  fadingGenres?: string[];
+  fadingArtists?: string[];
+  stableGenres?: string[];
+  stableArtists?: string[];
+  tasteStabilityRating?: string;
+  tasteStabilityScore?: number;
+  transformationIntensityScore?: number;
+  tasteVolatilityRating?: string;
+  archetype?: string;
+}
+
 export interface HybridRankedResult {
   song: any;
   hybridScore: number;
@@ -50,6 +68,7 @@ export interface HybridRankedResult {
     longTermScore?: number;
     temporalTasteScore?: number;
     musicDnaScore?: number;
+    tasteEvolutionScore?: number;
     calibrationMultiplier?: number;
     calibrationScore?: number;
     feedbackContribution?: number;
@@ -492,12 +511,91 @@ export class HybridRankingPipeline {
   }
 
   /**
+   * Helper: Calculates a candidate song's Taste Evolution fit score (0.0 to 1.0)
+   * based on directional taste evolution: boosts emerging & sustained emerging preferences,
+   * dampens fading preferences, and reinforces stable foundational favorites.
+   */
+  private static calculateTasteEvolutionFitScore(
+    songDoc: any,
+    evolution: TasteEvolutionSignal | null | undefined,
+    config: TasteEvolutionInfluenceConfig
+  ): number {
+    if (!songDoc || !evolution) return 0.5;
+
+    const songGenre = (
+      typeof songDoc.genre === 'object' && songDoc.genre?.name
+        ? songDoc.genre.name
+        : typeof songDoc.genre === 'string'
+        ? songDoc.genre
+        : ''
+    ).toLowerCase().trim();
+
+    const songArtist = (
+      typeof songDoc.artist === 'object' && songDoc.artist?.name
+        ? songDoc.artist.name
+        : typeof songDoc.artist === 'string'
+        ? songDoc.artist
+        : ''
+    ).toLowerCase().trim();
+
+    // Baseline neutral score
+    let baseScore = 0.50;
+
+    const isEmergingGenre = (evolution.emergingGenres || []).some(
+      (g) => g.toLowerCase().trim() === songGenre
+    );
+    const isSustainedEmergingGenre = (evolution.sustainedEmergingGenres || []).some(
+      (g) => g.toLowerCase().trim() === songGenre
+    );
+    const isEmergingArtist = (evolution.emergingArtists || []).some(
+      (a) => a.toLowerCase().trim() === songArtist
+    );
+    const isSustainedEmergingArtist = (evolution.sustainedEmergingArtists || []).some(
+      (a) => a.toLowerCase().trim() === songArtist
+    );
+
+    const isFadingGenre = (evolution.fadingGenres || []).some(
+      (g) => g.toLowerCase().trim() === songGenre
+    );
+    const isFadingArtist = (evolution.fadingArtists || []).some(
+      (a) => a.toLowerCase().trim() === songArtist
+    );
+
+    const isStableGenre = (evolution.stableGenres || []).some(
+      (g) => g.toLowerCase().trim() === songGenre
+    );
+    const isStableArtist = (evolution.stableArtists || []).some(
+      (a) => a.toLowerCase().trim() === songArtist
+    );
+
+    // 1. Emerging Boost: Directional Discovery
+    if (isSustainedEmergingGenre || isSustainedEmergingArtist) {
+      baseScore += config.sustainedEmergingBoost;
+    } else if (isEmergingGenre || isEmergingArtist) {
+      baseScore += config.emergingDiscoveryBoost;
+    }
+
+    // 2. Fading Attenuation: Directional De-prioritization
+    if (isFadingGenre || isFadingArtist) {
+      baseScore -= config.fadingPreferencePenalty;
+    }
+
+    // 3. Stable Preference Protection: Foundational Retention
+    if (isStableGenre || isStableArtist) {
+      baseScore = Math.min(1.0, baseScore * config.stablePreferenceMultiplier);
+    }
+
+    return Number(Math.max(0.0, Math.min(1.0, baseScore)).toFixed(4));
+  }
+
+  /**
    * Evaluates a candidate pool, applies Min-Max normalization across feature components,
    * calculates final weighted hybrid recommendation scores (incorporating content, collaborative,
    * user taste profile affinity, popularity, and recency signals), optionally applies context modulation,
    * optionally applies listening session taste profile modulation, optionally applies multi-layer
    * temporal taste profile modulation (short, medium, long term signals), optionally applies
-   * Music DNA profile modulation, ranks candidates descending, and returns top items up to configurable limit.
+   * Music DNA profile modulation, optionally applies Taste Evolution modulation,
+   * ranks candidates descending, and returns top items up to configurable limit.
    */
   static rankCandidates(
     candidates: HybridCandidate[],
@@ -511,7 +609,9 @@ export class HybridRankingPipeline {
     temporalProfile?: UnifiedLayeredTasteProfile | null,
     customTemporalInfluence?: number,
     musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any,
-    customMusicDnaInfluence?: number
+    customMusicDnaInfluence?: number,
+    tasteEvolutionSignal?: TasteEvolutionSignal | null,
+    customEvolutionInfluence?: number
   ): HybridRankedResult[] {
     if (!candidates || candidates.length === 0) {
       return [];
@@ -621,7 +721,22 @@ export class HybridRankingPipeline {
       );
     }
 
-    // Bound total contextual + session + temporal + music DNA influence so personalized baseline is preserved >= minBaselineWeightFloor
+    // 6. Resolve Taste Evolution Influence if Taste Evolution signal is provided
+    let effectiveEvolutionInfluence = 0;
+    const evolutionConfig = getTasteEvolutionInfluenceConfig();
+    if (tasteEvolutionSignal) {
+      const requestedInfluence =
+        customEvolutionInfluence !== undefined
+          ? customEvolutionInfluence
+          : evolutionConfig.defaultEvolutionInfluence;
+
+      effectiveEvolutionInfluence = Math.max(
+        evolutionConfig.minEvolutionInfluence,
+        Math.min(evolutionConfig.maxEvolutionInfluence, requestedInfluence)
+      );
+    }
+
+    // Bound total contextual + session + temporal + music DNA + evolution influence so personalized baseline is preserved >= minBaselineWeightFloor
     const signalConfig = getRecommendationSignalConfig();
     const maxModulation = signalConfig.modulationLayers.maxCombinedModulationInfluence;
 
@@ -629,7 +744,8 @@ export class HybridRankingPipeline {
       effectiveContextInfluence +
       effectiveSessionInfluence +
       effectiveTemporalInfluence +
-      effectiveMusicDnaInfluence;
+      effectiveMusicDnaInfluence +
+      effectiveEvolutionInfluence;
 
     if (totalExtraInfluence > maxModulation) {
       const scaleFactor = maxModulation / totalExtraInfluence;
@@ -637,6 +753,7 @@ export class HybridRankingPipeline {
       effectiveSessionInfluence *= scaleFactor;
       effectiveTemporalInfluence *= scaleFactor;
       effectiveMusicDnaInfluence *= scaleFactor;
+      effectiveEvolutionInfluence *= scaleFactor;
     }
 
     const baselineHybridWeight =
@@ -644,7 +761,8 @@ export class HybridRankingPipeline {
       effectiveContextInfluence -
       effectiveSessionInfluence -
       effectiveTemporalInfluence -
-      effectiveMusicDnaInfluence;
+      effectiveMusicDnaInfluence -
+      effectiveEvolutionInfluence;
 
     // 5. Compute normalized component scores & weighted multi-layer fusion per candidate
     const scoredItems: HybridRankedResult[] = candidates.map((cand) => {
@@ -713,6 +831,16 @@ export class HybridRankingPipeline {
         musicDnaScore = this.calculateMusicDnaFitScore(cand.songDoc, musicDnaProfile, musicDnaConfig);
       }
 
+      // Calculate Taste Evolution adjustment if active
+      let tasteEvolutionScore: number | undefined = undefined;
+      if (tasteEvolutionSignal && effectiveEvolutionInfluence > 0) {
+        tasteEvolutionScore = this.calculateTasteEvolutionFitScore(
+          cand.songDoc,
+          tasteEvolutionSignal,
+          evolutionConfig
+        );
+      }
+
       // Blended multi-layer score
       let blended = baselineHybridWeight * baseHybridScore;
       if (contextFitScore !== undefined) {
@@ -726,6 +854,9 @@ export class HybridRankingPipeline {
       }
       if (musicDnaScore !== undefined) {
         blended += effectiveMusicDnaInfluence * musicDnaScore;
+      }
+      if (tasteEvolutionScore !== undefined) {
+        blended += effectiveEvolutionInfluence * tasteEvolutionScore;
       }
 
       const finalScore = Number(Math.max(0, Math.min(1, blended)).toFixed(4));
@@ -748,10 +879,15 @@ export class HybridRankingPipeline {
           longTermScore,
           temporalTasteScore,
           musicDnaScore,
+          tasteEvolutionScore,
         },
         sources: cand.sources || [],
         metadata:
-          derivedPreferences || sessionProfile || temporalProfile || (musicDnaProfile && effectiveMusicDnaInfluence > 0)
+          derivedPreferences ||
+          sessionProfile ||
+          temporalProfile ||
+          (musicDnaProfile && effectiveMusicDnaInfluence > 0) ||
+          (tasteEvolutionSignal && effectiveEvolutionInfluence > 0)
             ? {
                 ...(derivedPreferences
                   ? {
@@ -782,6 +918,14 @@ export class HybridRankingPipeline {
                       musicDnaInfluence: effectiveMusicDnaInfluence,
                       musicDnaConfidence: musicDnaProfile.confidenceScore,
                       musicDnaFitScore: musicDnaScore,
+                    }
+                  : {}),
+                ...(tasteEvolutionSignal && effectiveEvolutionInfluence > 0
+                  ? {
+                      tasteEvolutionInfluence: effectiveEvolutionInfluence,
+                      tasteEvolutionScore,
+                      tasteStabilityRating: tasteEvolutionSignal.tasteStabilityRating,
+                      evolutionArchetype: tasteEvolutionSignal.archetype,
                     }
                   : {}),
               }
