@@ -136,6 +136,48 @@ export interface DetailedMusicDNAProfile {
   metadata?: Record<string, any>;
 }
 
+export type ListenerArchetype =
+  | 'Loyalist'
+  | 'Adventurer'
+  | 'Eclectic Nomad'
+  | 'Restless Searcher'
+  | 'Focused Devotee'
+  | 'Casual Listener'
+  | 'Balanced Listener';
+
+export interface BehavioralMetricsBreakdown {
+  totalPlaysAnalyzed: number;
+  uniqueTracksCount: number;
+  uniqueArtistsCount: number;
+  uniqueGenresCount: number;
+  totalSessionsAnalyzed: number;
+  avgTracksPerSession: number;
+  avgSessionDurationMinutes: number;
+  skipRatio: number;
+  completionRatio: number;
+  replayRatio: number;
+  feedbackCount?: number;
+}
+
+export interface MusicDNAListeningBehaviorProfile {
+  userId: string;
+  repeatListeningTendency: number; // [0.0, 1.0]
+  discoveryTendency: number; // [0.0, 1.0]
+  skipTendency: number; // [0.0, 1.0]
+  familiarityPreference: number; // [0.0, 1.0]
+  explorationTendency: number; // [0.0, 1.0]
+  diversityPreference: number; // [0.0, 1.0]
+  sessionListeningIntensity: number; // [0.0, 1.0]
+  preferenceStability: number; // [0.0, 1.0]
+  preferenceChangeRate: number; // [0.0, 1.0]
+  listenerArchetype: ListenerArchetype;
+  isDataSufficient: boolean;
+  metricsBreakdown: BehavioralMetricsBreakdown;
+  confidenceScore: number; // [0.0, 1.0]
+  generatedAt: Date;
+  metadata?: Record<string, any>;
+}
+
 export interface MusicDNAValidationResult {
   isValid: boolean;
   errors: string[];

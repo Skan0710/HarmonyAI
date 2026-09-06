@@ -12,6 +12,7 @@ import {
   MusicDNATemporalWindowPreference,
   MusicDNAProfileAttributes,
   DetailedMusicDNAProfile,
+  MusicDNAListeningBehaviorProfile,
   DEFAULT_TENDENCY_DIMENSIONS,
   DEFAULT_LISTENING_PATTERNS,
   DEFAULT_TEMPORAL_TASTE,
@@ -19,6 +20,7 @@ import {
 } from '../schemas/musicDnaSchema.js';
 import { IAudioFeatures } from '../models/Song.js';
 import { MusicDNAProfilingService } from './musicDnaProfilingService.js';
+import { MusicDNABehaviorProfilingService, BehaviorProfilingRawInputs } from './musicDnaBehaviorProfilingService.js';
 
 export interface RawSongData {
   _id: string;
@@ -223,6 +225,28 @@ export class MusicDNAExtractionService {
     options: ExtractionOptions = {}
   ): Promise<DetailedMusicDNAProfile> {
     return await MusicDNAProfilingService.generateDetailedProfile(userId, options);
+  }
+
+  /**
+   * Analyzes how the user listens to music, computing behavioral metrics:
+   * repeat listening, discovery, skip, familiarity, exploration, diversity,
+   * session intensity, stability, and change rate.
+   */
+  static profileListeningBehaviorFromData(
+    inputs: BehaviorProfilingRawInputs,
+    options: ExtractionOptions = {}
+  ): MusicDNAListeningBehaviorProfile {
+    return MusicDNABehaviorProfilingService.profileListeningBehaviorFromData(inputs, options);
+  }
+
+  /**
+   * Fetches user history, sessions, and feedback to generate the Listening Behavior Profile.
+   */
+  static async profileListeningBehavior(
+    userId: string,
+    options: ExtractionOptions = {}
+  ): Promise<MusicDNAListeningBehaviorProfile> {
+    return await MusicDNABehaviorProfilingService.profileListeningBehavior(userId, options);
   }
 
   // --------------------------------------------------------------------------
