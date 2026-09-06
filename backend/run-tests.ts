@@ -16,10 +16,12 @@ import { runRecommendationExplanationEndpointTests } from './src/__tests__/recom
 import { runTemporalTasteProfileEndpointTests } from './src/__tests__/temporalTasteProfileEndpoint.test.js';
 import { runMusicDNAModelTests } from './src/__tests__/musicDnaModel.test.js';
 import { runMusicDNATasteExtractionTests } from './src/__tests__/musicDnaTasteExtraction.test.js';
+import { runDetailedMusicDNAProfilingTests } from './src/__tests__/detailedMusicDnaProfiling.test.js';
 
 const suites = [
   { name: 'Music DNA Model',                      fn: runMusicDNAModelTests },
   { name: 'Music DNA Taste Extraction',           fn: runMusicDNATasteExtractionTests },
+  { name: 'Detailed Music DNA Profiling',         fn: runDetailedMusicDNAProfilingTests },
   { name: 'Adaptive Ranking Pipeline',            fn: runAdaptivePipelineTests },
   { name: 'Adaptive Integration (Day 30 T7)',     fn: runAdaptiveRecommendationIntegrationTests },
   { name: 'Smart Autoplay Service',               fn: runSmartAutoplayServiceTests },

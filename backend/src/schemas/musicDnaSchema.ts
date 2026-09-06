@@ -91,6 +91,51 @@ export interface MusicDNAProfileAttributes {
   metadata?: Record<string, any>;
 }
 
+export type PreferenceEvolutionType = 'established' | 'emerging' | 'rising' | 'cooling' | 'stable';
+
+export interface DetailedTasteItem {
+  id?: string;
+  name: string;
+  score: number; // Normalized [0.0, 1.0]
+  preferenceType: PreferenceEvolutionType;
+  playCount: number;
+  shortTermScore: number; // Normalized [0.0, 1.0]
+  longTermScore: number; // Normalized [0.0, 1.0]
+  momentumDelta: number; // shortTermScore - longTermScore
+  explanation: string;
+}
+
+export type DiversityLevel = 'low' | 'moderate' | 'high' | 'very_high';
+
+export interface DiversityMetric {
+  score: number; // Normalized [0.0, 1.0]
+  effectiveCount: number;
+  normalizedEntropy: number; // [0.0, 1.0]
+  level: DiversityLevel;
+  summary: string;
+}
+
+export interface DetailedMusicDNAProfile {
+  userId: string;
+  dnaVersion: string;
+  topGenres: DetailedTasteItem[];
+  emergingGenres: DetailedTasteItem[];
+  strongestArtists: DetailedTasteItem[];
+  emergingArtists: DetailedTasteItem[];
+  preferredMoods: DetailedTasteItem[];
+  genreDiversity: DiversityMetric;
+  artistDiversity: DiversityMetric;
+  temporalOverview: {
+    stabilityScore: number;
+    activeWindow: TemporalTimeWindow;
+    establishedTasteSummary: string;
+    emergingTasteSummary: string;
+  };
+  confidenceScore: number;
+  generatedAt: Date;
+  metadata?: Record<string, any>;
+}
+
 export interface MusicDNAValidationResult {
   isValid: boolean;
   errors: string[];

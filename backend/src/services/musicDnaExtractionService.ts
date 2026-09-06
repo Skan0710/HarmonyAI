@@ -11,12 +11,14 @@ import {
   MusicDNATemporalTaste,
   MusicDNATemporalWindowPreference,
   MusicDNAProfileAttributes,
+  DetailedMusicDNAProfile,
   DEFAULT_TENDENCY_DIMENSIONS,
   DEFAULT_LISTENING_PATTERNS,
   DEFAULT_TEMPORAL_TASTE,
   clampNumber,
 } from '../schemas/musicDnaSchema.js';
 import { IAudioFeatures } from '../models/Song.js';
+import { MusicDNAProfilingService } from './musicDnaProfilingService.js';
 
 export interface RawSongData {
   _id: string;
@@ -200,6 +202,27 @@ export class MusicDNAExtractionService {
 
     const newDoc = new MusicDNA(extracted);
     return await newDoc.save();
+  }
+
+  /**
+   * Generates a Detailed Music DNA Profile from in-memory inputs, distinguishing
+   * established vs emerging preferences and evaluating genre & artist diversity.
+   */
+  static generateDetailedProfileFromData(
+    inputs: ExtractionRawInputs,
+    options: ExtractionOptions = {}
+  ): DetailedMusicDNAProfile {
+    return MusicDNAProfilingService.generateDetailedProfileFromData(inputs, options);
+  }
+
+  /**
+   * Fetches user history from MongoDB and generates a Detailed Music DNA Profile.
+   */
+  static async generateDetailedProfile(
+    userId: string,
+    options: ExtractionOptions = {}
+  ): Promise<DetailedMusicDNAProfile> {
+    return await MusicDNAProfilingService.generateDetailedProfile(userId, options);
   }
 
   // --------------------------------------------------------------------------
