@@ -23,6 +23,7 @@ import { runMusicDnaRecommendationIntegrationTests } from './src/__tests__/music
 import { runMusicDnaEndpointTests } from './src/__tests__/musicDnaEndpoint.test.js';
 import { runMusicDnaSnapshotTests } from './src/__tests__/musicDnaSnapshot.test.js';
 import { runMusicDnaChangeDetectionTests } from './src/__tests__/musicDnaChangeDetection.test.js';
+import { runEmergingTasteDetectionTests } from './src/__tests__/emergingTasteDetection.test.js';
 
 const suites = [
   { name: 'Music DNA Model',                      fn: runMusicDNAModelTests },
@@ -34,6 +35,7 @@ const suites = [
   { name: 'Music DNA API Endpoint',               fn: runMusicDnaEndpointTests },
   { name: 'Music DNA Snapshots',                  fn: runMusicDnaSnapshotTests },
   { name: 'Music DNA Change Detection',           fn: runMusicDnaChangeDetectionTests },
+  { name: 'Emerging Taste Detection',             fn: runEmergingTasteDetectionTests },
   { name: 'Adaptive Ranking Pipeline',            fn: runAdaptivePipelineTests },
   { name: 'Adaptive Integration (Day 30 T7)',     fn: runAdaptiveRecommendationIntegrationTests },
   { name: 'Smart Autoplay Service',               fn: runSmartAutoplayServiceTests },
