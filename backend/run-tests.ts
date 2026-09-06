@@ -27,6 +27,7 @@ import { runEmergingTasteDetectionTests } from './src/__tests__/emergingTasteDet
 import { runTasteEvolutionTimelineTests } from './src/__tests__/tasteEvolutionTimeline.test.js';
 import { runTasteStabilityTransformationTests } from './src/__tests__/tasteStabilityTransformation.test.js';
 import { runTasteEvolutionRecommendationIntegrationTests } from './src/__tests__/tasteEvolutionRecommendationIntegration.test.js';
+import { runMusicDnaEvolutionEndpointTests } from './src/__tests__/musicDnaEvolutionEndpoint.test.js';
 
 const suites = [
   { name: 'Music DNA Model',                      fn: runMusicDNAModelTests },
@@ -42,6 +43,7 @@ const suites = [
   { name: 'Taste Evolution Timeline',             fn: runTasteEvolutionTimelineTests },
   { name: 'Taste Stability & Transformation',     fn: runTasteStabilityTransformationTests },
   { name: 'Taste Evolution Recommendation Integration', fn: runTasteEvolutionRecommendationIntegrationTests },
+  { name: 'Music DNA Evolution API Endpoint',     fn: runMusicDnaEvolutionEndpointTests },
   { name: 'Adaptive Ranking Pipeline',            fn: runAdaptivePipelineTests },
   { name: 'Adaptive Integration (Day 30 T7)',     fn: runAdaptiveRecommendationIntegrationTests },
   { name: 'Smart Autoplay Service',               fn: runSmartAutoplayServiceTests },

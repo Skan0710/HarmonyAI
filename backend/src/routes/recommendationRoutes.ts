@@ -21,6 +21,15 @@ import {
 import { getTemporalTasteProfile } from '../controllers/temporalTasteProfileController.js';
 import { getMusicDNAProfile, refreshMusicDNAProfile } from '../controllers/musicDnaController.js';
 import {
+  getEvolutionOverview,
+  getEvolutionTimeline,
+  getTasteStability,
+  getTasteChanges,
+  getEmergingTastes,
+  getSnapshots,
+  createSnapshot,
+} from '../controllers/musicDnaEvolutionController.js';
+import {
   getRecommendationPerformance,
   getSignalPerformance,
   getEngagementMetrics,
@@ -40,6 +49,15 @@ router.get('/performance/engagement', protect, getEngagementMetrics);
 // GET & POST /api/recommendations/music-dna (Protected JWT - Music DNA Profile)
 router.get('/music-dna', protect, getMusicDNAProfile);
 router.post('/music-dna/refresh', protect, refreshMusicDNAProfile);
+
+// Music DNA Evolution routes
+router.get('/music-dna/evolution', protect, getEvolutionOverview);
+router.get('/music-dna/evolution/timeline', protect, getEvolutionTimeline);
+router.get('/music-dna/evolution/stability', protect, getTasteStability);
+router.get('/music-dna/evolution/changes', protect, getTasteChanges);
+router.get('/music-dna/evolution/emerging', protect, getEmergingTastes);
+router.get('/music-dna/snapshots', protect, getSnapshots);
+router.post('/music-dna/snapshots', protect, createSnapshot);
 
 // GET /api/recommendations/temporal-taste-profile (Protected JWT - Multi-Horizon Temporal Taste Profile)
 router.get('/temporal-taste-profile', protect, getTemporalTasteProfile);

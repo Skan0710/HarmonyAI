@@ -15,6 +15,15 @@ import {
 import { getPersonalizedFeed } from '../controllers/personalizedFeedController.js';
 import { getTemporalTasteProfile } from '../controllers/temporalTasteProfileController.js';
 import { getMusicDNAProfile, refreshMusicDNAProfile } from '../controllers/musicDnaController.js';
+import {
+  getEvolutionOverview,
+  getEvolutionTimeline,
+  getTasteStability,
+  getTasteChanges,
+  getEmergingTastes,
+  getSnapshots,
+  createSnapshot,
+} from '../controllers/musicDnaEvolutionController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
 const router = Router();
@@ -28,6 +37,22 @@ router.get('/me/music-dna', protect, getMusicDNAProfile);
 router.get('/music-dna', protect, getMusicDNAProfile);
 router.post('/me/music-dna/refresh', protect, refreshMusicDNAProfile);
 router.post('/music-dna/refresh', protect, refreshMusicDNAProfile);
+
+// Music DNA Evolution routes
+router.get('/me/music-dna/evolution', protect, getEvolutionOverview);
+router.get('/music-dna/evolution', protect, getEvolutionOverview);
+router.get('/me/music-dna/evolution/timeline', protect, getEvolutionTimeline);
+router.get('/music-dna/evolution/timeline', protect, getEvolutionTimeline);
+router.get('/me/music-dna/evolution/stability', protect, getTasteStability);
+router.get('/music-dna/evolution/stability', protect, getTasteStability);
+router.get('/me/music-dna/evolution/changes', protect, getTasteChanges);
+router.get('/music-dna/evolution/changes', protect, getTasteChanges);
+router.get('/me/music-dna/evolution/emerging', protect, getEmergingTastes);
+router.get('/music-dna/evolution/emerging', protect, getEmergingTastes);
+router.get('/me/music-dna/snapshots', protect, getSnapshots);
+router.get('/music-dna/snapshots', protect, getSnapshots);
+router.post('/me/music-dna/snapshots', protect, createSnapshot);
+router.post('/music-dna/snapshots', protect, createSnapshot);
 
 // Temporal Taste Profile routes
 router.get('/me/temporal-taste-profile', protect, getTemporalTasteProfile);
