@@ -30,6 +30,10 @@ import {
   createSnapshot,
 } from '../controllers/musicDnaEvolutionController.js';
 import {
+  getPersonalMusicTwin,
+  refreshPersonalMusicTwin,
+} from '../controllers/personalMusicTwinController.js';
+import {
   getRecommendationPerformance,
   getSignalPerformance,
   getEngagementMetrics,
@@ -49,6 +53,10 @@ router.get('/performance/engagement', protect, getEngagementMetrics);
 // GET & POST /api/recommendations/music-dna (Protected JWT - Music DNA Profile)
 router.get('/music-dna', protect, getMusicDNAProfile);
 router.post('/music-dna/refresh', protect, refreshMusicDNAProfile);
+
+// GET & POST /api/recommendations/personal-music-twin (Protected JWT - Personal Music Twin)
+router.get('/personal-music-twin', protect, getPersonalMusicTwin);
+router.post('/personal-music-twin/refresh', protect, refreshPersonalMusicTwin);
 
 // Music DNA Evolution routes
 router.get('/music-dna/evolution', protect, getEvolutionOverview);

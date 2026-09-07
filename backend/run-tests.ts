@@ -34,8 +34,10 @@ import { runMusicalPersonalityProfileTests } from './src/__tests__/musicalPerson
 import { runPersonalMusicTwinServiceTests } from './src/__tests__/personalMusicTwinService.test.js';
 import { runMusicTwinEvolutionTests } from './src/__tests__/musicTwinEvolution.test.js';
 import { runPersonalMusicTwinRecommendationIntegrationTests } from './src/__tests__/personalMusicTwinRecommendationIntegration.test.js';
+import { runPersonalMusicTwinEndpointTests } from './src/__tests__/personalMusicTwinEndpoint.test.js';
 
 const suites = [
+  { name: 'Personal Music Twin API Endpoint',     fn: runPersonalMusicTwinEndpointTests },
   { name: 'Personal Music Twin Recommendation Integration', fn: runPersonalMusicTwinRecommendationIntegrationTests },
   { name: 'Music Twin Evolution & Confidence',    fn: runMusicTwinEvolutionTests },
   { name: 'Personal Music Twin Service',          fn: runPersonalMusicTwinServiceTests },

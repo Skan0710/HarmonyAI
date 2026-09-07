@@ -24,6 +24,10 @@ import {
   getSnapshots,
   createSnapshot,
 } from '../controllers/musicDnaEvolutionController.js';
+import {
+  getPersonalMusicTwin,
+  refreshPersonalMusicTwin,
+} from '../controllers/personalMusicTwinController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
 const router = Router();
@@ -37,6 +41,12 @@ router.get('/me/music-dna', protect, getMusicDNAProfile);
 router.get('/music-dna', protect, getMusicDNAProfile);
 router.post('/me/music-dna/refresh', protect, refreshMusicDNAProfile);
 router.post('/music-dna/refresh', protect, refreshMusicDNAProfile);
+
+// Personal Music Twin routes
+router.get('/me/personal-music-twin', protect, getPersonalMusicTwin);
+router.get('/personal-music-twin', protect, getPersonalMusicTwin);
+router.post('/me/personal-music-twin/refresh', protect, refreshPersonalMusicTwin);
+router.post('/personal-music-twin/refresh', protect, refreshPersonalMusicTwin);
 
 // Music DNA Evolution routes
 router.get('/me/music-dna/evolution', protect, getEvolutionOverview);
