@@ -28,8 +28,10 @@ import { runTasteEvolutionTimelineTests } from './src/__tests__/tasteEvolutionTi
 import { runTasteStabilityTransformationTests } from './src/__tests__/tasteStabilityTransformation.test.js';
 import { runTasteEvolutionRecommendationIntegrationTests } from './src/__tests__/tasteEvolutionRecommendationIntegration.test.js';
 import { runMusicDnaEvolutionEndpointTests } from './src/__tests__/musicDnaEvolutionEndpoint.test.js';
+import { runPersonalMusicTwinModelTests } from './src/__tests__/personalMusicTwinModel.test.js';
 
 const suites = [
+  { name: 'Personal Music Twin Model',            fn: runPersonalMusicTwinModelTests },
   { name: 'Music DNA Model',                      fn: runMusicDNAModelTests },
   { name: 'Music DNA Taste Extraction',           fn: runMusicDNATasteExtractionTests },
   { name: 'Detailed Music DNA Profiling',         fn: runDetailedMusicDNAProfilingTests },
