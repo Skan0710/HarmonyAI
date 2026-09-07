@@ -37,6 +37,8 @@ import {
 } from '../schemas/musicDnaSchema.js';
 import { IMusicDNA } from '../models/MusicDNA.js';
 import { UnifiedMusicDNAService } from './unifiedMusicDnaService.js';
+import { PersonalMusicTwinAttributes } from '../schemas/personalMusicTwinSchema.js';
+import { PersonalMusicTwinService } from './personalMusicTwinService.js';
 
 export interface AdaptivePipelineOptions {
   userId: string;
@@ -63,6 +65,9 @@ export interface AdaptivePipelineOptions {
   tasteEvolutionSignal?: TasteEvolutionSignal | null;
   tasteEvolutionInfluence?: number;
   useTasteEvolution?: boolean;
+  personalMusicTwin?: PersonalMusicTwinAttributes | any | null;
+  personalMusicTwinInfluence?: number;
+  usePersonalMusicTwin?: boolean;
   tasteStabilityMetrics?: any;
   useScoreCalibration?: boolean;
   feedbackProfile?: UserFeedbackProfile | null;
@@ -127,6 +132,13 @@ export interface AdaptivePipelineStageDiagnostics {
     effectiveInfluence?: number;
     emergingBoostedCount?: number;
     fadingAttenuatedCount?: number;
+  };
+  personalMusicTwin?: {
+    applied: boolean;
+    twinArchetype?: string;
+    confidenceScore?: number;
+    effectiveInfluence?: number;
+    matchedCandidatesCount?: number;
   };
 }
 
@@ -276,6 +288,8 @@ export class AdaptiveRecommendationRankingPipeline {
     musicDnaInfluence?: number;
     tasteEvolutionSignal?: TasteEvolutionSignal | null;
     tasteEvolutionInfluence?: number;
+    personalMusicTwin?: PersonalMusicTwinAttributes | any | null;
+    personalMusicTwinInfluence?: number;
   }): HybridRankedResult[] {
     const {
       candidates,
@@ -292,6 +306,8 @@ export class AdaptiveRecommendationRankingPipeline {
       musicDnaInfluence,
       tasteEvolutionSignal,
       tasteEvolutionInfluence,
+      personalMusicTwin,
+      personalMusicTwinInfluence,
     } = options;
 
     if (!Array.isArray(candidates) || candidates.length === 0) {
@@ -312,7 +328,9 @@ export class AdaptiveRecommendationRankingPipeline {
       musicDnaProfile,
       musicDnaInfluence,
       tasteEvolutionSignal,
-      tasteEvolutionInfluence
+      tasteEvolutionInfluence,
+      personalMusicTwin,
+      personalMusicTwinInfluence
     );
   }
 
@@ -606,6 +624,9 @@ export class AdaptiveRecommendationRankingPipeline {
       tasteEvolutionSignal,
       tasteEvolutionInfluence,
       useTasteEvolution,
+      personalMusicTwin,
+      personalMusicTwinInfluence,
+      usePersonalMusicTwin,
       tasteStabilityMetrics,
       useScoreCalibration,
       feedbackProfile: providedFeedbackProfile,
@@ -644,6 +665,21 @@ export class AdaptiveRecommendationRankingPipeline {
     ) {
       try {
         effectiveMusicDnaProfile = await UnifiedMusicDNAService.getOrGenerateProfile(userId);
+      } catch {
+        // Safe fallback
+      }
+    }
+
+    let effectivePersonalMusicTwin = personalMusicTwin || null;
+    if (
+      !effectivePersonalMusicTwin &&
+      (usePersonalMusicTwin || enableAllStages) &&
+      userId &&
+      Types.ObjectId.isValid(userId) &&
+      isDbConnected
+    ) {
+      try {
+        effectivePersonalMusicTwin = await PersonalMusicTwinService.getOrGenerateTwin(userId);
       } catch {
         // Safe fallback
       }
@@ -806,6 +842,8 @@ export class AdaptiveRecommendationRankingPipeline {
       musicDnaInfluence,
       tasteEvolutionSignal,
       tasteEvolutionInfluence,
+      personalMusicTwin: effectivePersonalMusicTwin,
+      personalMusicTwinInfluence,
     });
 
     diagnostics.baseScoring.scoredCandidatesCount = rankedResults.length;
@@ -828,6 +866,21 @@ export class AdaptiveRecommendationRankingPipeline {
       ).length,
       fadingAttenuatedCount: rankedResults.filter(
         (r) => (r.componentScores?.tasteEvolutionScore || 0) < 0.50 && r.componentScores?.tasteEvolutionScore !== undefined
+      ).length,
+    };
+
+    diagnostics.personalMusicTwin = {
+      applied: Boolean(
+        effectivePersonalMusicTwin &&
+          rankedResults[0]?.componentScores?.personalMusicTwinScore !== undefined
+      ),
+      twinArchetype: effectivePersonalMusicTwin?.listenerArchetype,
+      confidenceScore: effectivePersonalMusicTwin?.confidenceScore,
+      effectiveInfluence: rankedResults[0]?.metadata?.personalMusicTwinInfluence,
+      matchedCandidatesCount: rankedResults.filter(
+        (r) =>
+          r.componentScores?.personalMusicTwinScore !== undefined &&
+          r.componentScores.personalMusicTwinScore > 0.5
       ).length,
     };
 

@@ -10,6 +10,8 @@ import {
   MusicDNAInfluenceConfig,
   getTasteEvolutionInfluenceConfig,
   TasteEvolutionInfluenceConfig,
+  getPersonalMusicTwinInfluenceConfig,
+  PersonalMusicTwinInfluenceConfig,
   getRecommendationSignalConfig,
 } from '../config/recommendationConfig.js';
 import {
@@ -31,6 +33,7 @@ import {
   MusicDNAProfileAttributes,
 } from '../schemas/musicDnaSchema.js';
 import { IMusicDNA } from '../models/MusicDNA.js';
+import { PersonalMusicTwinAttributes } from '../schemas/personalMusicTwinSchema.js';
 
 export interface TasteEvolutionSignal {
   emergingGenres?: string[];
@@ -69,6 +72,7 @@ export interface HybridRankedResult {
     temporalTasteScore?: number;
     musicDnaScore?: number;
     tasteEvolutionScore?: number;
+    personalMusicTwinScore?: number;
     calibrationMultiplier?: number;
     calibrationScore?: number;
     feedbackContribution?: number;
@@ -589,12 +593,206 @@ export class HybridRankingPipeline {
   }
 
   /**
+   * Helper: Calculates a candidate song's fit with the user's Personal Music Twin (0.0 to 1.0)
+   * incorporating listener archetype, personality traits, exploration/familiarity preferences,
+   * acoustic traits, and directional taste evolution.
+   */
+  private static calculatePersonalMusicTwinFitScore(
+    songDoc: any,
+    twin: PersonalMusicTwinAttributes | null | undefined,
+    config: PersonalMusicTwinInfluenceConfig
+  ): number {
+    if (!songDoc || !twin) return 0.50;
+
+    const songGenre = (
+      typeof songDoc.genre === 'object' && songDoc.genre?.name
+        ? songDoc.genre.name
+        : typeof songDoc.genre === 'string'
+        ? songDoc.genre
+        : ''
+    ).toLowerCase().trim();
+
+    const songArtist = (
+      typeof songDoc.artist === 'object' && songDoc.artist?.name
+        ? songDoc.artist.name
+        : typeof songDoc.artist === 'string'
+        ? songDoc.artist
+        : ''
+    ).toLowerCase().trim();
+
+    // 1. Genre Core Alignment
+    let genreScore = 0.50;
+    const isPrimaryGenre = (twin.genreIdentity?.coreGenres || []).some(
+      (g) => g.isPrimary && g.name.toLowerCase().trim() === songGenre
+    );
+    const isCoreGenre = (twin.genreIdentity?.coreGenres || []).some(
+      (g) => g.name.toLowerCase().trim() === songGenre
+    );
+    const isSecondaryGenre = (twin.genreIdentity?.secondaryGenres || []).some(
+      (g) => g.name.toLowerCase().trim() === songGenre
+    );
+
+    if (isPrimaryGenre) {
+      genreScore = 0.90;
+    } else if (isCoreGenre) {
+      genreScore = 0.80;
+    } else if (isSecondaryGenre) {
+      genreScore = 0.65;
+    } else {
+      const explorationBonus = Math.max(0, (twin.explorationTendency ?? 0.5) - 0.5) * 0.40;
+      genreScore = 0.35 + explorationBonus;
+    }
+
+    // 2. Mood Alignment
+    const songMood = (
+      songDoc.mood ||
+      songDoc.primaryMood ||
+      (songDoc.song && (songDoc.song.mood || songDoc.song.primaryMood)) ||
+      ''
+    ).toLowerCase().trim();
+
+    let moodScore = 0.50;
+    const dominantMoods = twin.moodIdentity?.dominantMoods || [];
+    const matchedMood = dominantMoods.find(
+      (m) => m.mood.toLowerCase().trim() === songMood
+    );
+    const matchesDominantMood = Boolean(matchedMood);
+    if (matchesDominantMood && matchedMood) {
+      moodScore = 0.70 + 0.30 * (matchedMood.affinityScore ?? 0.8);
+    } else if (dominantMoods.length > 0 && songMood) {
+      moodScore = 0.40;
+    }
+
+    // 3. Archetype Modulation
+    let archetypeScore = 0.50;
+    const archetype = twin.listenerArchetype;
+
+    if (archetype === 'Explorer') {
+      // Explorer: rewards uncore genres and tracks that broaden horizons
+      archetypeScore = !isCoreGenre ? 0.85 : 0.45;
+      archetypeScore += 0.20 * ((twin.explorationTendency ?? 0.5) - 0.5);
+    } else if (archetype === 'Loyal Listener') {
+      // Loyal Listener: rewards core genres and familiar tracks
+      archetypeScore = isCoreGenre ? 0.88 : 0.32;
+      archetypeScore += 0.20 * ((twin.familiarityTendency ?? 0.5) - 0.5);
+    } else if (archetype === 'Mood Listener') {
+      // Mood Listener: rewards emotional atmospheric alignment
+      archetypeScore = matchesDominantMood ? 0.92 : 0.38;
+      if (matchesDominantMood) {
+        genreScore = Math.max(genreScore, 0.75);
+      }
+    } else if (archetype === 'Genre Hopper') {
+      // Genre Hopper: rewards variety and transitions
+      archetypeScore = isSecondaryGenre || !isCoreGenre ? 0.82 : 0.52;
+      archetypeScore += 0.15 * ((twin.diversityPreference ?? 0.5) - 0.5);
+    } else if (archetype === 'Discovery Seeker') {
+      // Discovery Seeker: rewards newly released / novel tracks and emerging interests
+      const isEmergingGenreCheck = (twin.currentEmergingInterests?.genres || []).some(
+        (g) => g.name.toLowerCase().trim() === songGenre
+      );
+      const isRecent = songDoc.releaseDate
+        ? (Date.now() - new Date(songDoc.releaseDate).getTime()) < 180 * 24 * 3600 * 1000
+        : false;
+      archetypeScore = isEmergingGenreCheck || isRecent || !isCoreGenre ? 0.88 : 0.42;
+    } else if (archetype === 'Comfort Listener') {
+      // Comfort Listener: rewards stable core catalog
+      archetypeScore = isCoreGenre ? 0.88 : 0.32;
+      archetypeScore += 0.15 * ((twin.familiarityTendency ?? 0.5) - 0.5);
+    } else {
+      // Balanced Listener
+      archetypeScore = 0.55;
+    }
+
+    // 4. Personality Traits Alignment
+    let traitsBonus = 0.0;
+    const rawTraits: any[] = twin.metadata?.personalityTraits || [];
+    const traitNames = rawTraits.map((t: any) => t.trait || t.id || '');
+
+    if (traitNames.includes('highly exploratory') && !isCoreGenre) {
+      traitsBonus += 0.12;
+    }
+    if (traitNames.includes('genre loyal') && isCoreGenre) {
+      traitsBonus += 0.12;
+    }
+    if (traitNames.includes('comfort oriented') && isCoreGenre) {
+      traitsBonus += 0.10;
+    }
+    if (
+      traitNames.includes('discovery oriented') &&
+      (!isCoreGenre ||
+        Boolean(
+          twin.currentEmergingInterests?.genres?.some(
+            (g) => g.name.toLowerCase().trim() === songGenre
+          )
+        ))
+    ) {
+      traitsBonus += 0.12;
+    }
+    if (traitNames.includes('mood driven') && matchesDominantMood) {
+      traitsBonus += 0.15;
+    }
+    if (traitNames.includes('highly diverse') && (!isCoreGenre || isSecondaryGenre)) {
+      traitsBonus += 0.08;
+    }
+
+    // 5. Taste Evolution / Emerging Preferences Alignment
+    let evolutionBonus = 0.0;
+    const isEmergingGenre = (twin.currentEmergingInterests?.genres || []).some(
+      (g) => g.name.toLowerCase().trim() === songGenre
+    );
+    const isEmergingArtist = (twin.currentEmergingInterests?.artists || []).some(
+      (a) => a.name.toLowerCase().trim() === songArtist
+    );
+    const isFading = (twin.metadata?.fadingPreferences?.genres || []).some(
+      (g: string) => g.toLowerCase().trim() === songGenre
+    );
+
+    if (isEmergingGenre || isEmergingArtist) {
+      evolutionBonus += 0.18 * (1.0 + (twin.tasteEvolution?.transformationIntensity || 0.0));
+    }
+    if (isFading) {
+      evolutionBonus -= 0.15;
+    }
+
+    // 6. Acoustic Trait Harmony
+    let acousticHarmony = 0.50;
+    if (songDoc.energy !== undefined && twin.dominantMusicalTraits?.energyPreference !== undefined) {
+      const energyDelta = Math.abs(songDoc.energy - twin.dominantMusicalTraits.energyPreference);
+      acousticHarmony = Math.max(0.0, 1.0 - energyDelta);
+    }
+
+    // Synthesize component weights
+    let compositeScore =
+      0.25 * genreScore +
+      0.25 * archetypeScore +
+      0.20 * moodScore +
+      0.15 * acousticHarmony +
+      0.15 *
+        (twin.explorationTendency !== undefined && !isCoreGenre
+          ? twin.explorationTendency
+          : twin.familiarityTendency !== undefined && isCoreGenre
+          ? twin.familiarityTendency
+          : 0.50) +
+      traitsBonus +
+      evolutionBonus;
+
+    compositeScore = Math.max(0.0, Math.min(1.0, compositeScore));
+
+    // Modulate by Twin confidence score (ensures low-data twins do not perturb ranking)
+    const confidenceWeight = Math.max(0.20, Math.min(1.0, twin.confidenceScore || 0.5));
+    const finalFitScore = confidenceWeight * compositeScore + (1.0 - confidenceWeight) * 0.50;
+
+    return Number(finalFitScore.toFixed(4));
+  }
+
+  /**
    * Evaluates a candidate pool, applies Min-Max normalization across feature components,
    * calculates final weighted hybrid recommendation scores (incorporating content, collaborative,
    * user taste profile affinity, popularity, and recency signals), optionally applies context modulation,
    * optionally applies listening session taste profile modulation, optionally applies multi-layer
    * temporal taste profile modulation (short, medium, long term signals), optionally applies
    * Music DNA profile modulation, optionally applies Taste Evolution modulation,
+   * optionally applies Personal Music Twin modulation,
    * ranks candidates descending, and returns top items up to configurable limit.
    */
   static rankCandidates(
@@ -611,7 +809,9 @@ export class HybridRankingPipeline {
     musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any,
     customMusicDnaInfluence?: number,
     tasteEvolutionSignal?: TasteEvolutionSignal | null,
-    customEvolutionInfluence?: number
+    customEvolutionInfluence?: number,
+    personalMusicTwin?: PersonalMusicTwinAttributes | any | null,
+    customTwinInfluence?: number
   ): HybridRankedResult[] {
     if (!candidates || candidates.length === 0) {
       return [];
@@ -736,7 +936,22 @@ export class HybridRankingPipeline {
       );
     }
 
-    // Bound total contextual + session + temporal + music DNA + evolution influence so personalized baseline is preserved >= minBaselineWeightFloor
+    // 7. Resolve Personal Music Twin Influence if Personal Music Twin is provided
+    let effectiveTwinInfluence = 0;
+    const twinConfig = getPersonalMusicTwinInfluenceConfig();
+    if (personalMusicTwin) {
+      const requestedInfluence =
+        customTwinInfluence !== undefined
+          ? customTwinInfluence
+          : twinConfig.defaultTwinInfluence;
+
+      effectiveTwinInfluence = Math.max(
+        twinConfig.minTwinInfluence,
+        Math.min(twinConfig.maxTwinInfluence, requestedInfluence)
+      );
+    }
+
+    // Bound total contextual + session + temporal + music DNA + evolution + twin influence so personalized baseline is preserved >= minBaselineWeightFloor
     const signalConfig = getRecommendationSignalConfig();
     const maxModulation = signalConfig.modulationLayers.maxCombinedModulationInfluence;
 
@@ -745,7 +960,8 @@ export class HybridRankingPipeline {
       effectiveSessionInfluence +
       effectiveTemporalInfluence +
       effectiveMusicDnaInfluence +
-      effectiveEvolutionInfluence;
+      effectiveEvolutionInfluence +
+      effectiveTwinInfluence;
 
     if (totalExtraInfluence > maxModulation) {
       const scaleFactor = maxModulation / totalExtraInfluence;
@@ -754,6 +970,7 @@ export class HybridRankingPipeline {
       effectiveTemporalInfluence *= scaleFactor;
       effectiveMusicDnaInfluence *= scaleFactor;
       effectiveEvolutionInfluence *= scaleFactor;
+      effectiveTwinInfluence *= scaleFactor;
     }
 
     const baselineHybridWeight =
@@ -762,7 +979,8 @@ export class HybridRankingPipeline {
       effectiveSessionInfluence -
       effectiveTemporalInfluence -
       effectiveMusicDnaInfluence -
-      effectiveEvolutionInfluence;
+      effectiveEvolutionInfluence -
+      effectiveTwinInfluence;
 
     // 5. Compute normalized component scores & weighted multi-layer fusion per candidate
     const scoredItems: HybridRankedResult[] = candidates.map((cand) => {
@@ -841,6 +1059,16 @@ export class HybridRankingPipeline {
         );
       }
 
+      // Calculate Personal Music Twin adjustment if active
+      let personalMusicTwinScore: number | undefined = undefined;
+      if (personalMusicTwin && effectiveTwinInfluence > 0) {
+        personalMusicTwinScore = this.calculatePersonalMusicTwinFitScore(
+          cand.songDoc,
+          personalMusicTwin,
+          twinConfig
+        );
+      }
+
       // Blended multi-layer score
       let blended = baselineHybridWeight * baseHybridScore;
       if (contextFitScore !== undefined) {
@@ -857,6 +1085,9 @@ export class HybridRankingPipeline {
       }
       if (tasteEvolutionScore !== undefined) {
         blended += effectiveEvolutionInfluence * tasteEvolutionScore;
+      }
+      if (personalMusicTwinScore !== undefined) {
+        blended += effectiveTwinInfluence * personalMusicTwinScore;
       }
 
       const finalScore = Number(Math.max(0, Math.min(1, blended)).toFixed(4));
@@ -880,6 +1111,7 @@ export class HybridRankingPipeline {
           temporalTasteScore,
           musicDnaScore,
           tasteEvolutionScore,
+          personalMusicTwinScore,
         },
         sources: cand.sources || [],
         metadata:
@@ -887,7 +1119,8 @@ export class HybridRankingPipeline {
           sessionProfile ||
           temporalProfile ||
           (musicDnaProfile && effectiveMusicDnaInfluence > 0) ||
-          (tasteEvolutionSignal && effectiveEvolutionInfluence > 0)
+          (tasteEvolutionSignal && effectiveEvolutionInfluence > 0) ||
+          (personalMusicTwin && effectiveTwinInfluence > 0)
             ? {
                 ...(derivedPreferences
                   ? {
@@ -926,6 +1159,14 @@ export class HybridRankingPipeline {
                       tasteEvolutionScore,
                       tasteStabilityRating: tasteEvolutionSignal.tasteStabilityRating,
                       evolutionArchetype: tasteEvolutionSignal.archetype,
+                    }
+                  : {}),
+                ...(personalMusicTwin && effectiveTwinInfluence > 0
+                  ? {
+                      personalMusicTwinInfluence: effectiveTwinInfluence,
+                      personalMusicTwinScore,
+                      twinArchetype: personalMusicTwin.listenerArchetype,
+                      twinConfidence: personalMusicTwin.confidenceScore,
                     }
                   : {}),
               }

@@ -568,6 +568,53 @@ export const resetTasteEvolutionInfluenceConfig = (): TasteEvolutionInfluenceCon
 };
 
 // ==========================================
+// Personal Music Twin Recommendation Influence Config
+// ==========================================
+
+export interface PersonalMusicTwinInfluenceConfig {
+  defaultTwinInfluence: number;          // default: 0.15 (15% blend, balanced without overpowering feedback/session)
+  maxTwinInfluence: number;              // default: 0.25
+  minTwinInfluence: number;              // default: 0.00
+  archetypeWeight: number;               // default: 0.35
+  personalityTraitsWeight: number;       // default: 0.25
+  explorationFamiliarityWeight: number;  // default: 0.20
+  tasteEvolutionWeight: number;          // default: 0.20
+}
+
+export const DEFAULT_PERSONAL_MUSIC_TWIN_INFLUENCE_CONFIG: PersonalMusicTwinInfluenceConfig = {
+  defaultTwinInfluence: 0.15,
+  maxTwinInfluence: 0.25,
+  minTwinInfluence: 0.00,
+  archetypeWeight: 0.35,
+  personalityTraitsWeight: 0.25,
+  explorationFamiliarityWeight: 0.20,
+  tasteEvolutionWeight: 0.20,
+};
+
+let currentPersonalMusicTwinInfluenceConfig: PersonalMusicTwinInfluenceConfig = {
+  ...DEFAULT_PERSONAL_MUSIC_TWIN_INFLUENCE_CONFIG,
+};
+
+export const getPersonalMusicTwinInfluenceConfig = (): PersonalMusicTwinInfluenceConfig => {
+  return { ...currentPersonalMusicTwinInfluenceConfig };
+};
+
+export const updatePersonalMusicTwinInfluenceConfig = (
+  newConfig: Partial<PersonalMusicTwinInfluenceConfig>
+): PersonalMusicTwinInfluenceConfig => {
+  currentPersonalMusicTwinInfluenceConfig = {
+    ...currentPersonalMusicTwinInfluenceConfig,
+    ...newConfig,
+  };
+  return { ...currentPersonalMusicTwinInfluenceConfig };
+};
+
+export const resetPersonalMusicTwinInfluenceConfig = (): PersonalMusicTwinInfluenceConfig => {
+  currentPersonalMusicTwinInfluenceConfig = { ...DEFAULT_PERSONAL_MUSIC_TWIN_INFLUENCE_CONFIG };
+  return { ...currentPersonalMusicTwinInfluenceConfig };
+};
+
+// ==========================================
 // Recommendation Quality Metrics & Evaluation Config
 // ==========================================
 

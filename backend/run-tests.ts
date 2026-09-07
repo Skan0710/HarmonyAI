@@ -33,8 +33,10 @@ import { runListenerArchetypeEngineTests } from './src/__tests__/listenerArchety
 import { runMusicalPersonalityProfileTests } from './src/__tests__/musicalPersonalityProfile.test.js';
 import { runPersonalMusicTwinServiceTests } from './src/__tests__/personalMusicTwinService.test.js';
 import { runMusicTwinEvolutionTests } from './src/__tests__/musicTwinEvolution.test.js';
+import { runPersonalMusicTwinRecommendationIntegrationTests } from './src/__tests__/personalMusicTwinRecommendationIntegration.test.js';
 
 const suites = [
+  { name: 'Personal Music Twin Recommendation Integration', fn: runPersonalMusicTwinRecommendationIntegrationTests },
   { name: 'Music Twin Evolution & Confidence',    fn: runMusicTwinEvolutionTests },
   { name: 'Personal Music Twin Service',          fn: runPersonalMusicTwinServiceTests },
   { name: 'Musical Personality Profile',          fn: runMusicalPersonalityProfileTests },
