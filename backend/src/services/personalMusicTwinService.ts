@@ -40,6 +40,9 @@ import {
   MusicalPersonalityProfileService,
   MusicalPersonalityProfile,
 } from './musicalPersonalityProfileService.js';
+import {
+  MusicTwinEvolutionService,
+} from './musicTwinEvolutionService.js';
 import { UnifiedMusicDNA } from '../schemas/musicDnaSchema.js';
 import { IMusicDNASnapshot } from '../models/MusicDNASnapshot.js';
 
@@ -417,8 +420,23 @@ export class PersonalMusicTwinService {
       options,
     });
 
+    // Check if previous twin exists to evolve characteristics smoothly
+    const existingTwin = await PersonalMusicTwin.findByUserId(userId).catch(() => null);
+
+    let finalAttributes = twinAttributes;
+    if (existingTwin) {
+      const evolutionResult = MusicTwinEvolutionService.evolveTwin(
+        existingTwin.toObject() as any,
+        twinAttributes,
+        {
+          totalInteractionCount: dna.interactionsCountAtLastRefresh,
+        }
+      );
+      finalAttributes = evolutionResult.evolvedTwin;
+    }
+
     // Persist or update existing document
-    const updatedTwin = await PersonalMusicTwin.updateDerivedTwin(userId, twinAttributes);
+    const updatedTwin = await PersonalMusicTwin.updateDerivedTwin(userId, finalAttributes);
     return updatedTwin;
   }
 
