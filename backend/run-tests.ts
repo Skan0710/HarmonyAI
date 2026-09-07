@@ -29,8 +29,10 @@ import { runTasteStabilityTransformationTests } from './src/__tests__/tasteStabi
 import { runTasteEvolutionRecommendationIntegrationTests } from './src/__tests__/tasteEvolutionRecommendationIntegration.test.js';
 import { runMusicDnaEvolutionEndpointTests } from './src/__tests__/musicDnaEvolutionEndpoint.test.js';
 import { runPersonalMusicTwinModelTests } from './src/__tests__/personalMusicTwinModel.test.js';
+import { runListenerArchetypeEngineTests } from './src/__tests__/listenerArchetypeEngine.test.js';
 
 const suites = [
+  { name: 'Listener Archetype Engine',            fn: runListenerArchetypeEngineTests },
   { name: 'Personal Music Twin Model',            fn: runPersonalMusicTwinModelTests },
   { name: 'Music DNA Model',                      fn: runMusicDNAModelTests },
   { name: 'Music DNA Taste Extraction',           fn: runMusicDNATasteExtractionTests },
@@ -92,6 +94,7 @@ async function main() {
     process.exit(1);
   } else {
     process.stdout.write('\n🎉 ALL SUITES PASSED!\n');
+    process.exit(0);
   }
 }
 
