@@ -30,8 +30,10 @@ import { runTasteEvolutionRecommendationIntegrationTests } from './src/__tests__
 import { runMusicDnaEvolutionEndpointTests } from './src/__tests__/musicDnaEvolutionEndpoint.test.js';
 import { runPersonalMusicTwinModelTests } from './src/__tests__/personalMusicTwinModel.test.js';
 import { runListenerArchetypeEngineTests } from './src/__tests__/listenerArchetypeEngine.test.js';
+import { runMusicalPersonalityProfileTests } from './src/__tests__/musicalPersonalityProfile.test.js';
 
 const suites = [
+  { name: 'Musical Personality Profile',          fn: runMusicalPersonalityProfileTests },
   { name: 'Listener Archetype Engine',            fn: runListenerArchetypeEngineTests },
   { name: 'Personal Music Twin Model',            fn: runPersonalMusicTwinModelTests },
   { name: 'Music DNA Model',                      fn: runMusicDNAModelTests },
