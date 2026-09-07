@@ -31,8 +31,10 @@ import { runMusicDnaEvolutionEndpointTests } from './src/__tests__/musicDnaEvolu
 import { runPersonalMusicTwinModelTests } from './src/__tests__/personalMusicTwinModel.test.js';
 import { runListenerArchetypeEngineTests } from './src/__tests__/listenerArchetypeEngine.test.js';
 import { runMusicalPersonalityProfileTests } from './src/__tests__/musicalPersonalityProfile.test.js';
+import { runPersonalMusicTwinServiceTests } from './src/__tests__/personalMusicTwinService.test.js';
 
 const suites = [
+  { name: 'Personal Music Twin Service',          fn: runPersonalMusicTwinServiceTests },
   { name: 'Musical Personality Profile',          fn: runMusicalPersonalityProfileTests },
   { name: 'Listener Archetype Engine',            fn: runListenerArchetypeEngineTests },
   { name: 'Personal Music Twin Model',            fn: runPersonalMusicTwinModelTests },
