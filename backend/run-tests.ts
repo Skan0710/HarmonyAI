@@ -35,8 +35,10 @@ import { runPersonalMusicTwinServiceTests } from './src/__tests__/personalMusicT
 import { runMusicTwinEvolutionTests } from './src/__tests__/musicTwinEvolution.test.js';
 import { runPersonalMusicTwinRecommendationIntegrationTests } from './src/__tests__/personalMusicTwinRecommendationIntegration.test.js';
 import { runPersonalMusicTwinEndpointTests } from './src/__tests__/personalMusicTwinEndpoint.test.js';
+import { runComfortDiscoveryScoringServiceTests } from './src/__tests__/comfortDiscoveryScoringService.test.js';
 
 const suites = [
+  { name: 'Comfort vs Discovery Scoring Service', fn: runComfortDiscoveryScoringServiceTests },
   { name: 'Personal Music Twin API Endpoint',     fn: runPersonalMusicTwinEndpointTests },
   { name: 'Personal Music Twin Recommendation Integration', fn: runPersonalMusicTwinRecommendationIntegrationTests },
   { name: 'Music Twin Evolution & Confidence',    fn: runMusicTwinEvolutionTests },

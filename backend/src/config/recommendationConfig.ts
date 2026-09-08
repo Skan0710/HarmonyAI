@@ -764,3 +764,8 @@ registerSignalConfigChangeListener((cfg) => {
   }
 });
 
+// ==========================================
+// Comfort vs Discovery Configuration
+// ==========================================
+export * from './comfortDiscoveryConfig.js';
+
