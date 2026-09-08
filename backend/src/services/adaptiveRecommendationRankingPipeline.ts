@@ -51,6 +51,7 @@ import {
 import { TasteEvolutionDiscoveryConfig } from '../config/tasteEvolutionDiscoveryConfig.js';
 import { TasteBoundaryProfile } from './tasteBoundaryDetectionService.js';
 import { ComfortDiscoveryScoreResult } from './comfortDiscoveryScoringService.js';
+import { RecommendationExplanationService } from './recommendationExplanationService.js';
 
 export interface AdaptivePipelineOptions {
   userId: string;
@@ -68,6 +69,7 @@ export interface AdaptivePipelineOptions {
   sessionDoc?: IListeningSession | null;
   session?: IListeningSession | null;
   useActiveSession?: boolean;
+  explainRecommendations?: boolean;
   temporalProfile?: UnifiedLayeredTasteProfile | null;
   temporalInfluence?: number;
   useTemporalProfile?: boolean;
@@ -94,10 +96,12 @@ export interface AdaptivePipelineOptions {
   enableAllStages?: boolean;
   userClassification?: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
   recommendationMode?: 'STANDARD' | 'OUTSIDE_COMFORT_ZONE' | 'TASTE_EVOLUTION_DISCOVERY' | string;
+  discoveryMode?: string;
   tasteBoundaries?: TasteBoundaryProfile | null;
   comfortDiscoveryScore?: ComfortDiscoveryScoreResult | null;
   outsideComfortZoneConfig?: Partial<OutsideComfortZoneConfig>;
   tasteEvolutionDiscoveryConfig?: Partial<TasteEvolutionDiscoveryConfig>;
+  emergingTasteReport?: any;
 }
 
 export interface AdaptivePipelineStageDiagnostics {
@@ -884,6 +888,8 @@ export class AdaptiveRecommendationRankingPipeline {
         personalMusicTwin: effectivePersonalMusicTwin,
         temporalProfile: effectiveTemporalProfile,
         tasteStabilityMetrics,
+        emergingTasteReport: options.emergingTasteReport,
+        tasteEvolutionSignal,
         configOverride: options.tasteEvolutionDiscoveryConfig,
       });
 
@@ -1121,6 +1127,34 @@ export class AdaptiveRecommendationRankingPipeline {
       results: rankedResults,
       limit,
     });
+
+    // =========================================================================
+    // Stage 9: Intelligent Recommendation Reasons & Explanation
+    // =========================================================================
+    if (options.explainRecommendations) {
+      for (const res of finalStageRes.finalResults) {
+        if (!res.explanation) {
+          try {
+            res.explanation = RecommendationExplanationService.explainSong({
+              song: res.song,
+              componentScores: res.componentScores,
+              sources: res.sources,
+              similarityScore: res.componentScores?.contentScore,
+              personalMusicTwin: effectivePersonalMusicTwin,
+              temporalProfile: effectiveTemporalProfile,
+              comfortDiscoveryScore: options.comfortDiscoveryScore,
+              tasteBoundaries: options.tasteBoundaries,
+              musicDna: effectiveMusicDnaProfile,
+              tasteEvolutionSignal,
+              discoveryMode: options.discoveryMode || options.recommendationMode,
+            });
+            res.reasons = res.explanation.reasons;
+          } catch {
+            // Non-blocking fallback
+          }
+        }
+      }
+    }
 
     diagnostics.finalRanking.finalCount = finalStageRes.finalResults.length;
     diagnostics.finalRanking.deterministicTieBreaksApplied = finalStageRes.tieBreaksApplied;

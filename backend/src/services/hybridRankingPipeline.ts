@@ -80,6 +80,8 @@ export interface HybridRankedResult {
   };
   sources: string[];
   metadata?: Record<string, any>;
+  explanation?: any;
+  reasons?: any[];
 }
 
 export class HybridRankingPipeline {

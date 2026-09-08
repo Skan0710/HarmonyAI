@@ -869,12 +869,15 @@ export class RecommendationExplanationService {
     if (discoveryPref >= thresholds.minDiscoveryPreferenceThreshold && effectiveNovelty >= 0.35) {
       const combinedFit = this.clampScore((discoveryPref + effectiveNovelty) / 2);
       const pct = this.toPercent(combinedFit);
+      const isDiscoverMode = discoveryMode === 'DISCOVER' || discoveryPref >= 0.75;
+      const baseFit = isDiscoverMode ? Math.max(discoveryPref, combinedFit) : combinedFit;
+      const boostMultiplier = isDiscoverMode ? 1.08 : 0.92;
       rawReasons.push({
         type: 'FITS_DISCOVERY_PREFERENCE',
         label: 'Fits your discovery preference',
         message: `Fits your active discovery preference for unearthing new and unfamiliar music (${pct}% discovery fit).`,
         supportingValue: combinedFit,
-        importanceScore: this.clampScore(Number((combinedFit * 0.88).toFixed(4))),
+        importanceScore: this.clampScore(Number((baseFit * boostMultiplier).toFixed(4))),
         metadata: {
           discoveryPreference: discoveryPref,
           noveltyScore: effectiveNovelty,

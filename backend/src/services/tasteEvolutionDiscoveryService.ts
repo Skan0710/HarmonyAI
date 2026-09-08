@@ -67,6 +67,7 @@ export interface TasteEvolutionDiscoveryInputs {
   personalMusicTwin?: PersonalMusicTwinAttributes | any | null;
   temporalProfile?: UnifiedLayeredTasteProfile | any | null;
   emergingTasteReport?: EmergingTasteReport | any | null;
+  tasteEvolutionSignal?: any | null;
   tasteStabilityMetrics?: TasteStabilityTransformationMetrics | any | null;
   snapshots?: any[] | null;
   configOverride?: Partial<TasteEvolutionDiscoveryConfig>;
@@ -548,6 +549,40 @@ export class TasteEvolutionDiscoveryService {
           confidence: 0.80,
           interactionCount: 0,
           evidenceReason: 'Declining artist listens',
+        });
+      }
+    }
+
+    // 1b. From TasteEvolutionSignal
+    if (inputs.tasteEvolutionSignal) {
+      const sig = inputs.tasteEvolutionSignal;
+      for (const g of sig.emergingGenres || []) {
+        const gName = typeof g === 'string' ? g : g.genre || g.name;
+        const plays = typeof g === 'object' ? (g.recentPlayCount ?? g.recentPlays ?? 5) : 5;
+        const conf = typeof g === 'object' ? (g.emergenceConfidence ?? g.confidence ?? 0.85) : 0.85;
+        addTrend({
+          name: gName,
+          type: 'genre',
+          status: 'emerging',
+          isVerifiedTrend: conf >= config.minEmergenceConfidence,
+          momentumDelta: 0.35,
+          confidence: conf,
+          interactionCount: plays,
+          hasPositiveFeedback: typeof g === 'object' ? g.hasPositiveFeedback : true,
+          evidenceReason: 'Taste evolution emerging genre',
+        });
+      }
+      for (const fg of sig.fadingGenres || []) {
+        const fgName = typeof fg === 'string' ? fg : fg.genre || fg.name;
+        addTrend({
+          name: fgName,
+          type: 'genre',
+          status: 'fading',
+          isVerifiedTrend: true,
+          momentumDelta: -0.30,
+          confidence: 0.80,
+          interactionCount: 0,
+          evidenceReason: 'Taste evolution fading genre',
         });
       }
     }

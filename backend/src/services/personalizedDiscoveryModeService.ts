@@ -11,7 +11,7 @@ import {
   NoveltyScoringWeights,
 } from '../config/recommendationConfig.js';
 import { HybridCandidate } from './candidateGenerationService.js';
-import { HybridRankedResult } from './hybridRankingPipeline.js';
+import { HybridRankedResult, TasteEvolutionSignal } from './hybridRankingPipeline.js';
 import {
   AdaptiveRecommendationRankingPipeline,
   AdaptivePipelineStageDiagnostics,
@@ -77,6 +77,8 @@ export interface PersonalizedDiscoveryModeParams {
   comfortDiscoveryScore?: ComfortDiscoveryScoreResult | any | null;
   tasteBoundaries?: TasteBoundaryProfile | any | null;
   temporalProfile?: UnifiedLayeredTasteProfile | any | null;
+  tasteEvolutionSignal?: TasteEvolutionSignal | any | null;
+  emergingTasteReport?: any | null;
   configOverride?: Partial<PersonalizedDiscoveryModeConfig>;
 }
 
@@ -237,6 +239,8 @@ export class PersonalizedDiscoveryModeService {
       comfortDiscoveryScore,
       tasteBoundaries,
       temporalProfile,
+      tasteEvolutionSignal,
+      emergingTasteReport,
       configOverride,
     } = params;
 
@@ -315,9 +319,13 @@ export class PersonalizedDiscoveryModeService {
       diversityStrength: adapted.diversityStrength,
       musicDnaInfluence: adapted.musicDnaInfluence,
       personalMusicTwinInfluence: adapted.personalMusicTwinInfluence,
+      tasteEvolutionSignal,
+      emergingTasteReport,
       recommendationMode: mergedConfig.strategyType,
+      discoveryMode: resolvedMode,
       outsideComfortZoneConfig: mergedConfig.outsideComfortZoneOverrides,
       tasteEvolutionDiscoveryConfig: mergedConfig.tasteEvolutionOverrides,
+      explainRecommendations: true,
     });
 
     const diagnostics: PersonalizedDiscoveryModeDiagnostics = {

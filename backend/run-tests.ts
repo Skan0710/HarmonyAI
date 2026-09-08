@@ -41,8 +41,10 @@ import { runOutsideComfortZoneRecommendationTests } from './src/__tests__/outsid
 import { runTasteEvolutionDiscoveryTests } from './src/__tests__/tasteEvolutionDiscoveryService.test.js';
 import { runPersonalizedDiscoveryModeTests } from './src/__tests__/personalizedDiscoveryModeService.test.js';
 import { runIntelligentRecommendationReasonsTests } from './src/__tests__/intelligentRecommendationReasons.test.js';
+import { runAdvancedPersonalizationFullIntegrationTests } from './src/__tests__/advancedPersonalizationFullIntegration.test.js';
 
 const suites = [
+  { name: 'Full Advanced Personalization Integration (Day 34)', fn: runAdvancedPersonalizationFullIntegrationTests },
   { name: 'Intelligent Recommendation Reasons',   fn: runIntelligentRecommendationReasonsTests },
   { name: 'Personalized Discovery Modes',         fn: runPersonalizedDiscoveryModeTests },
   { name: 'Taste-Evolution-Aware Discovery',      fn: runTasteEvolutionDiscoveryTests },
