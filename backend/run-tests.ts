@@ -37,8 +37,10 @@ import { runPersonalMusicTwinRecommendationIntegrationTests } from './src/__test
 import { runPersonalMusicTwinEndpointTests } from './src/__tests__/personalMusicTwinEndpoint.test.js';
 import { runComfortDiscoveryScoringServiceTests } from './src/__tests__/comfortDiscoveryScoringService.test.js';
 import { runTasteBoundaryDetectionTests } from './src/__tests__/tasteBoundaryDetection.test.js';
+import { runOutsideComfortZoneRecommendationTests } from './src/__tests__/outsideComfortZoneRecommendationService.test.js';
 
 const suites = [
+  { name: 'Outside-Comfort-Zone Recommendations', fn: runOutsideComfortZoneRecommendationTests },
   { name: 'Taste Boundary Detection',             fn: runTasteBoundaryDetectionTests },
   { name: 'Comfort vs Discovery Scoring Service', fn: runComfortDiscoveryScoringServiceTests },
   { name: 'Personal Music Twin API Endpoint',     fn: runPersonalMusicTwinEndpointTests },

@@ -39,6 +39,13 @@ import { IMusicDNA } from '../models/MusicDNA.js';
 import { UnifiedMusicDNAService } from './unifiedMusicDnaService.js';
 import { PersonalMusicTwinAttributes } from '../schemas/personalMusicTwinSchema.js';
 import { PersonalMusicTwinService } from './personalMusicTwinService.js';
+import {
+  OutsideComfortZoneRecommendationService,
+  OutsideComfortZoneRankedResult,
+} from './outsideComfortZoneRecommendationService.js';
+import { OutsideComfortZoneConfig } from '../config/outsideComfortZoneConfig.js';
+import { TasteBoundaryProfile } from './tasteBoundaryDetectionService.js';
+import { ComfortDiscoveryScoreResult } from './comfortDiscoveryScoringService.js';
 
 export interface AdaptivePipelineOptions {
   userId: string;
@@ -81,6 +88,10 @@ export interface AdaptivePipelineOptions {
   diversityStrength?: number;
   enableAllStages?: boolean;
   userClassification?: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
+  recommendationMode?: 'STANDARD' | 'OUTSIDE_COMFORT_ZONE' | string;
+  tasteBoundaries?: TasteBoundaryProfile | null;
+  comfortDiscoveryScore?: ComfortDiscoveryScoreResult | null;
+  outsideComfortZoneConfig?: Partial<OutsideComfortZoneConfig>;
 }
 
 export interface AdaptivePipelineStageDiagnostics {
@@ -140,10 +151,22 @@ export interface AdaptivePipelineStageDiagnostics {
     effectiveInfluence?: number;
     matchedCandidatesCount?: number;
   };
+  outsideComfortZone?: {
+    applied: boolean;
+    totalCandidatesEvaluated?: number;
+    qualifiedCount?: number;
+    rejectedUnrelatedCount?: number;
+    rejectedTooFamiliarCount?: number;
+    userDominantMode?: string;
+    effectiveRelevanceWeight?: number;
+    effectiveNoveltyWeight?: number;
+    averageRelevanceScore?: number;
+    averageNoveltyScore?: number;
+  };
 }
 
 export interface AdaptivePipelineResult {
-  strategyUsed: 'COLD_START' | 'HYBRID_PERSONALIZED';
+  strategyUsed: 'COLD_START' | 'HYBRID_PERSONALIZED' | 'OUTSIDE_COMFORT_ZONE';
   userClassification: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
   recommendations: HybridRankedResult[];
   diagnostics: AdaptivePipelineStageDiagnostics;
@@ -759,6 +782,43 @@ export class AdaptiveRecommendationRankingPipeline {
         strategyUsed: 'COLD_START',
         userClassification,
         recommendations: finalRes.finalResults,
+        diagnostics,
+      };
+    }
+
+    // =========================================================================
+    // Optional Strategy: Outside-Comfort-Zone Discovery Mode
+    // =========================================================================
+    if (options.recommendationMode === 'OUTSIDE_COMFORT_ZONE') {
+      const outsideResult = OutsideComfortZoneRecommendationService.rankOutsideComfortZone({
+        userId,
+        candidates: candidateList,
+        limit,
+        tasteBoundaries: options.tasteBoundaries,
+        comfortDiscoveryScore: options.comfortDiscoveryScore,
+        musicDna: effectiveMusicDnaProfile,
+        personalMusicTwin: effectivePersonalMusicTwin,
+        configOverride: options.outsideComfortZoneConfig,
+      });
+
+      diagnostics.finalRanking.finalCount = outsideResult.recommendations.length;
+      diagnostics.outsideComfortZone = {
+        applied: true,
+        totalCandidatesEvaluated: outsideResult.diagnostics.totalCandidatesEvaluated,
+        qualifiedCount: outsideResult.diagnostics.qualifiedCount,
+        rejectedUnrelatedCount: outsideResult.diagnostics.rejectedUnrelatedCount,
+        rejectedTooFamiliarCount: outsideResult.diagnostics.rejectedTooFamiliarCount,
+        userDominantMode: outsideResult.diagnostics.userDominantMode,
+        effectiveRelevanceWeight: outsideResult.diagnostics.effectiveRelevanceWeight,
+        effectiveNoveltyWeight: outsideResult.diagnostics.effectiveNoveltyWeight,
+        averageRelevanceScore: outsideResult.diagnostics.averageRelevanceScore,
+        averageNoveltyScore: outsideResult.diagnostics.averageNoveltyScore,
+      };
+
+      return {
+        strategyUsed: 'OUTSIDE_COMFORT_ZONE',
+        userClassification,
+        recommendations: outsideResult.recommendations,
         diagnostics,
       };
     }

@@ -12,11 +12,14 @@ import {
   AdaptiveRecommendationRankingPipeline,
   AdaptivePipelineStageDiagnostics,
 } from './adaptiveRecommendationRankingPipeline.js';
+import { TasteBoundaryProfile } from './tasteBoundaryDetectionService.js';
+import { ComfortDiscoveryScoreResult } from './comfortDiscoveryScoringService.js';
+import { OutsideComfortZoneConfig } from '../config/outsideComfortZoneConfig.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
 export interface HybridRecommendationServiceResult {
-  strategyUsed: 'COLD_START' | 'HYBRID_PERSONALIZED';
+  strategyUsed: 'COLD_START' | 'HYBRID_PERSONALIZED' | 'OUTSIDE_COMFORT_ZONE';
   userClassification: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
   recommendations: HybridRankedResult[];
   pipelineDiagnostics?: AdaptivePipelineStageDiagnostics;
@@ -52,6 +55,10 @@ export class HybridRecommendationService {
     useDiversityRanking?: boolean;
     useNoveltyScoring?: boolean;
     noveltyWeights?: Partial<NoveltyScoringWeights>;
+    recommendationMode?: 'STANDARD' | 'OUTSIDE_COMFORT_ZONE' | string;
+    tasteBoundaries?: TasteBoundaryProfile | null;
+    comfortDiscoveryScore?: ComfortDiscoveryScoreResult | null;
+    outsideComfortZoneConfig?: Partial<OutsideComfortZoneConfig>;
   }): Promise<HybridRecommendationServiceResult> {
     const {
       userId,
@@ -73,6 +80,10 @@ export class HybridRecommendationService {
       useDiversityRanking,
       useNoveltyScoring,
       noveltyWeights,
+      recommendationMode,
+      tasteBoundaries,
+      comfortDiscoveryScore,
+      outsideComfortZoneConfig,
     } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
@@ -100,6 +111,10 @@ export class HybridRecommendationService {
         useDiversityRanking,
         useNoveltyScoring,
         noveltyWeights,
+        recommendationMode,
+        tasteBoundaries,
+        comfortDiscoveryScore,
+        outsideComfortZoneConfig,
       });
 
       return {

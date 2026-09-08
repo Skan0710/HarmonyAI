@@ -774,3 +774,8 @@ export * from './comfortDiscoveryConfig.js';
 // ==========================================
 export * from './tasteBoundaryConfig.js';
 
+// ==========================================
+// Outside-Comfort-Zone Configuration
+// ==========================================
+export * from './outsideComfortZoneConfig.js';
+
