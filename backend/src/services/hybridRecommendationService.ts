@@ -15,11 +15,12 @@ import {
 import { TasteBoundaryProfile } from './tasteBoundaryDetectionService.js';
 import { ComfortDiscoveryScoreResult } from './comfortDiscoveryScoringService.js';
 import { OutsideComfortZoneConfig } from '../config/outsideComfortZoneConfig.js';
+import { TasteEvolutionDiscoveryConfig } from '../config/tasteEvolutionDiscoveryConfig.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
 export interface HybridRecommendationServiceResult {
-  strategyUsed: 'COLD_START' | 'HYBRID_PERSONALIZED' | 'OUTSIDE_COMFORT_ZONE';
+  strategyUsed: 'COLD_START' | 'HYBRID_PERSONALIZED' | 'OUTSIDE_COMFORT_ZONE' | 'TASTE_EVOLUTION_DISCOVERY';
   userClassification: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
   recommendations: HybridRankedResult[];
   pipelineDiagnostics?: AdaptivePipelineStageDiagnostics;
@@ -59,6 +60,7 @@ export class HybridRecommendationService {
     tasteBoundaries?: TasteBoundaryProfile | null;
     comfortDiscoveryScore?: ComfortDiscoveryScoreResult | null;
     outsideComfortZoneConfig?: Partial<OutsideComfortZoneConfig>;
+    tasteEvolutionDiscoveryConfig?: Partial<TasteEvolutionDiscoveryConfig>;
   }): Promise<HybridRecommendationServiceResult> {
     const {
       userId,
@@ -84,6 +86,7 @@ export class HybridRecommendationService {
       tasteBoundaries,
       comfortDiscoveryScore,
       outsideComfortZoneConfig,
+      tasteEvolutionDiscoveryConfig,
     } = params;
 
     if (!Types.ObjectId.isValid(userId)) {
@@ -115,6 +118,7 @@ export class HybridRecommendationService {
         tasteBoundaries,
         comfortDiscoveryScore,
         outsideComfortZoneConfig,
+        tasteEvolutionDiscoveryConfig,
       });
 
       return {

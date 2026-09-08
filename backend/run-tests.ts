@@ -38,8 +38,10 @@ import { runPersonalMusicTwinEndpointTests } from './src/__tests__/personalMusic
 import { runComfortDiscoveryScoringServiceTests } from './src/__tests__/comfortDiscoveryScoringService.test.js';
 import { runTasteBoundaryDetectionTests } from './src/__tests__/tasteBoundaryDetection.test.js';
 import { runOutsideComfortZoneRecommendationTests } from './src/__tests__/outsideComfortZoneRecommendationService.test.js';
+import { runTasteEvolutionDiscoveryTests } from './src/__tests__/tasteEvolutionDiscoveryService.test.js';
 
 const suites = [
+  { name: 'Taste-Evolution-Aware Discovery',      fn: runTasteEvolutionDiscoveryTests },
   { name: 'Outside-Comfort-Zone Recommendations', fn: runOutsideComfortZoneRecommendationTests },
   { name: 'Taste Boundary Detection',             fn: runTasteBoundaryDetectionTests },
   { name: 'Comfort vs Discovery Scoring Service', fn: runComfortDiscoveryScoringServiceTests },

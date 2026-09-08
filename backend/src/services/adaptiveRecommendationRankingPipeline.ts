@@ -44,6 +44,11 @@ import {
   OutsideComfortZoneRankedResult,
 } from './outsideComfortZoneRecommendationService.js';
 import { OutsideComfortZoneConfig } from '../config/outsideComfortZoneConfig.js';
+import {
+  TasteEvolutionDiscoveryService,
+  TasteEvolutionRankedResult,
+} from './tasteEvolutionDiscoveryService.js';
+import { TasteEvolutionDiscoveryConfig } from '../config/tasteEvolutionDiscoveryConfig.js';
 import { TasteBoundaryProfile } from './tasteBoundaryDetectionService.js';
 import { ComfortDiscoveryScoreResult } from './comfortDiscoveryScoringService.js';
 
@@ -88,10 +93,11 @@ export interface AdaptivePipelineOptions {
   diversityStrength?: number;
   enableAllStages?: boolean;
   userClassification?: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
-  recommendationMode?: 'STANDARD' | 'OUTSIDE_COMFORT_ZONE' | string;
+  recommendationMode?: 'STANDARD' | 'OUTSIDE_COMFORT_ZONE' | 'TASTE_EVOLUTION_DISCOVERY' | string;
   tasteBoundaries?: TasteBoundaryProfile | null;
   comfortDiscoveryScore?: ComfortDiscoveryScoreResult | null;
   outsideComfortZoneConfig?: Partial<OutsideComfortZoneConfig>;
+  tasteEvolutionDiscoveryConfig?: Partial<TasteEvolutionDiscoveryConfig>;
 }
 
 export interface AdaptivePipelineStageDiagnostics {
@@ -163,10 +169,22 @@ export interface AdaptivePipelineStageDiagnostics {
     averageRelevanceScore?: number;
     averageNoveltyScore?: number;
   };
+  tasteEvolutionDiscovery?: {
+    applied: boolean;
+    totalCandidatesEvaluated?: number;
+    emergingMatchesCount?: number;
+    relatedArtistMatchesCount?: number;
+    risingMoodMatchesCount?: number;
+    fadingPenalizedCount?: number;
+    flukesSuppressedCount?: number;
+    transformationIntensity?: number;
+    evolutionArchetype?: string;
+    dominantDirection?: string;
+  };
 }
 
 export interface AdaptivePipelineResult {
-  strategyUsed: 'COLD_START' | 'HYBRID_PERSONALIZED' | 'OUTSIDE_COMFORT_ZONE';
+  strategyUsed: 'COLD_START' | 'HYBRID_PERSONALIZED' | 'OUTSIDE_COMFORT_ZONE' | 'TASTE_EVOLUTION_DISCOVERY';
   userClassification: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
   recommendations: HybridRankedResult[];
   diagnostics: AdaptivePipelineStageDiagnostics;
@@ -846,12 +864,49 @@ export class AdaptiveRecommendationRankingPipeline {
     }
 
     let effectiveTemporalProfile = temporalProfile || null;
-    if (!effectiveTemporalProfile && useTemporalProfile && userId && Types.ObjectId.isValid(userId) && isDbConnected) {
+    if (!effectiveTemporalProfile && (useTemporalProfile || enableAllStages || options.recommendationMode === 'TASTE_EVOLUTION_DISCOVERY') && userId && Types.ObjectId.isValid(userId) && isDbConnected) {
       try {
         effectiveTemporalProfile = await LayeredTemporalTasteProfileService.generateLayeredTasteProfile(userId);
       } catch {
         // Safe fallback
       }
+    }
+
+    // =========================================================================
+    // Optional Strategy: Taste-Evolution-Aware Discovery Mode
+    // =========================================================================
+    if (options.recommendationMode === 'TASTE_EVOLUTION_DISCOVERY') {
+      const evoResult = TasteEvolutionDiscoveryService.rankTasteEvolutionDiscovery({
+        userId,
+        candidates: candidateList,
+        limit,
+        musicDna: effectiveMusicDnaProfile,
+        personalMusicTwin: effectivePersonalMusicTwin,
+        temporalProfile: effectiveTemporalProfile,
+        tasteStabilityMetrics,
+        configOverride: options.tasteEvolutionDiscoveryConfig,
+      });
+
+      diagnostics.finalRanking.finalCount = evoResult.recommendations.length;
+      diagnostics.tasteEvolutionDiscovery = {
+        applied: true,
+        totalCandidatesEvaluated: evoResult.diagnostics.totalCandidatesEvaluated,
+        emergingMatchesCount: evoResult.diagnostics.emergingMatchesCount,
+        relatedArtistMatchesCount: evoResult.diagnostics.relatedArtistMatchesCount,
+        risingMoodMatchesCount: evoResult.diagnostics.risingMoodMatchesCount,
+        fadingPenalizedCount: evoResult.diagnostics.fadingPenalizedCount,
+        flukesSuppressedCount: evoResult.diagnostics.flukesSuppressedCount,
+        transformationIntensity: evoResult.diagnostics.transformationIntensity,
+        evolutionArchetype: evoResult.diagnostics.evolutionArchetype,
+        dominantDirection: evoResult.diagnostics.dominantDirection,
+      };
+
+      return {
+        strategyUsed: 'TASTE_EVOLUTION_DISCOVERY',
+        userClassification,
+        recommendations: evoResult.recommendations,
+        diagnostics,
+      };
     }
 
     // =========================================================================

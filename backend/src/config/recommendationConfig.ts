@@ -779,3 +779,8 @@ export * from './tasteBoundaryConfig.js';
 // ==========================================
 export * from './outsideComfortZoneConfig.js';
 
+// ==========================================
+// Taste-Evolution-Aware Discovery Configuration
+// ==========================================
+export * from './tasteEvolutionDiscoveryConfig.js';
+
