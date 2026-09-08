@@ -39,8 +39,10 @@ import { runComfortDiscoveryScoringServiceTests } from './src/__tests__/comfortD
 import { runTasteBoundaryDetectionTests } from './src/__tests__/tasteBoundaryDetection.test.js';
 import { runOutsideComfortZoneRecommendationTests } from './src/__tests__/outsideComfortZoneRecommendationService.test.js';
 import { runTasteEvolutionDiscoveryTests } from './src/__tests__/tasteEvolutionDiscoveryService.test.js';
+import { runPersonalizedDiscoveryModeTests } from './src/__tests__/personalizedDiscoveryModeService.test.js';
 
 const suites = [
+  { name: 'Personalized Discovery Modes',         fn: runPersonalizedDiscoveryModeTests },
   { name: 'Taste-Evolution-Aware Discovery',      fn: runTasteEvolutionDiscoveryTests },
   { name: 'Outside-Comfort-Zone Recommendations', fn: runOutsideComfortZoneRecommendationTests },
   { name: 'Taste Boundary Detection',             fn: runTasteBoundaryDetectionTests },
@@ -96,8 +98,8 @@ async function main() {
       process.stdout.write(`✅ PASSED: ${suite.name}\n`);
     } catch (err: any) {
       failed++;
-      const msg = err?.message || String(err);
-      failures.push({ name: suite.name, error: msg });
+      const msg = err?.stack || err?.message || String(err);
+      failures.push({ name: suite.name, error: err?.message || String(err) });
       process.stderr.write(`❌ FAILED: ${suite.name}\n   ${msg}\n`);
     }
   }

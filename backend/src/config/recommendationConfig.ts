@@ -784,3 +784,8 @@ export * from './outsideComfortZoneConfig.js';
 // ==========================================
 export * from './tasteEvolutionDiscoveryConfig.js';
 
+// ==========================================
+// Personalized Discovery Mode Configuration
+// ==========================================
+export * from './personalizedDiscoveryModeConfig.js';
+

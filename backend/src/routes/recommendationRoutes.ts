@@ -10,6 +10,8 @@ import {
   getRecommendationExplanation,
   getContextAwareRecommendations,
   getRecommendationAnalytics,
+  getDiscoveryModes,
+  getPersonalizedDiscoveryModeRecommendations,
 } from '../controllers/recommendationController.js';
 import {
   trackInteraction,
@@ -96,8 +98,15 @@ router.post('/assistant', optionalAuth, processContextualAssistantRequest);
 // GET /api/recommendations/contextual?mood=...&activity=...&energy=...&duration=... (Optional Auth)
 router.get('/contextual', optionalAuth, getContextualRecommendations);
 
-// GET /api/recommendations/hybrid?limit=10&seedSongId=... (Protected JWT)
+// GET /api/recommendations/hybrid?limit=10&seedSongId=...&mode=... (Protected JWT)
 router.get('/hybrid', protect, getHybridRecommendations);
+
+// GET /api/recommendations/modes (Protected JWT - Available personalized discovery modes)
+router.get('/modes', protect, getDiscoveryModes);
+router.get('/discovery-modes', protect, getDiscoveryModes);
+
+// GET /api/recommendations/modes/:mode (Protected JWT - Mode-tailored recommendations)
+router.get('/modes/:mode', protect, getPersonalizedDiscoveryModeRecommendations);
 
 // GET /api/recommendations/collaborative?limit=10 (Protected JWT)
 router.get('/collaborative', protect, getCollaborativeRecommendations);

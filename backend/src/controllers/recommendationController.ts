@@ -19,6 +19,7 @@ import { RecommendationExplanationService } from '../services/recommendationExpl
 import { RecommendationAnalyticsService } from '../services/recommendationAnalyticsService.js';
 import { validateAndSanitizeRecommendationContext } from '../schemas/recommendationContextSchema.js';
 import { ContextPreferenceMappingService } from '../services/contextPreferenceMappingService.js';
+import { PersonalizedDiscoveryModeService } from '../services/personalizedDiscoveryModeService.js';
 import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
 import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
 
@@ -113,6 +114,10 @@ export const getHybridRecommendations = controllerWrapper(async (req: Request, r
   const influenceParam = req.query.contextInfluence;
   const contextInfluence = influenceParam && !isNaN(parseFloat(String(influenceParam))) ? parseFloat(String(influenceParam)) : undefined;
 
+  // Optional Personalized Discovery Mode Support
+  const modeParam = req.query.mode || req.query.discoveryMode;
+  const discoveryMode = modeParam ? String(modeParam) : undefined;
+
   let contextObj: any = undefined;
   if (situation || mood || desiredEnergy !== undefined || desiredTempo !== undefined || preferredGenres) {
     contextObj = {
@@ -131,6 +136,7 @@ export const getHybridRecommendations = controllerWrapper(async (req: Request, r
       limit: parsedLimit,
       context: contextObj,
       contextInfluence,
+      mode: discoveryMode,
     });
 
     const isDebugRequested = req.query.debug === 'true' || req.query.analytics === 'true';
@@ -146,6 +152,7 @@ export const getHybridRecommendations = controllerWrapper(async (req: Request, r
       strategyUsed: result.strategyUsed,
       userClassification: result.userClassification,
       count: result.recommendations.length,
+      ...(result.discoveryModeDiagnostics ? { discoveryMode: result.discoveryModeDiagnostics } : {}),
       ...(analytics ? { analytics } : {}),
       data: result.recommendations || [],
     });
@@ -783,4 +790,55 @@ export const getContextAwareRecommendations = controllerWrapper(async (req: Requ
     });
   }
 });
+
+export const getDiscoveryModes = controllerWrapper(async (_req: Request, res: Response) => {
+  const modes = PersonalizedDiscoveryModeService.getAvailableModes();
+  res.status(200).json({
+    success: true,
+    data: modes,
+  });
+});
+
+export const getPersonalizedDiscoveryModeRecommendations = controllerWrapper(
+  async (req: Request, res: Response) => {
+    const user = ensureAuth(req, res);
+    if (!user) return;
+
+    const { mode } = req.params;
+    const q = extractQueryParams(req, { limit: 'int' });
+    const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 10 : q.limit;
+    const seedSongId = req.query.seedSongId ? String(req.query.seedSongId) : undefined;
+
+    try {
+      const result = await PersonalizedDiscoveryModeService.getRecommendationsForMode({
+        userId: user._id.toString(),
+        mode,
+        limit: parsedLimit,
+        seedSongId,
+      });
+
+      res.status(200).json({
+        success: true,
+        mode: result.mode,
+        label: result.label,
+        description: result.description,
+        strategyUsed: result.strategyUsed,
+        userClassification: result.userClassification,
+        count: result.recommendations.length,
+        diagnostics: result.diagnostics,
+        data: result.recommendations,
+      });
+    } catch (error: any) {
+      res.status(200).json({
+        success: true,
+        mode: PersonalizedDiscoveryModeService.resolveMode(mode),
+        strategyUsed: 'COLD_START',
+        userClassification: 'NEW',
+        count: 0,
+        data: [],
+        message: error.message || 'Failed to retrieve personalized discovery mode recommendations',
+      });
+    }
+  }
+);
 

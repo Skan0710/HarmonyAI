@@ -141,22 +141,26 @@ export class OutsideComfortZoneRecommendationService {
 
     const adjacentGenreMap = new Map<string, TasteBoundaryItem>();
     for (const g of (boundaries.adjacentGenres || [])) {
-      adjacentGenreMap.set(g.name.toLowerCase().trim(), g);
+      const gName = (g.name || (g as any).adjacentGenre || '').toLowerCase().trim();
+      if (gName) adjacentGenreMap.set(gName, g);
     }
 
     const adjacentArtistMap = new Map<string, TasteBoundaryItem>();
     for (const a of (boundaries.adjacentArtists || [])) {
-      adjacentArtistMap.set(a.name.toLowerCase().trim(), a);
+      const aName = (a.name || (a as any).adjacentArtist || (a as any).artist || '').toLowerCase().trim();
+      if (aName) adjacentArtistMap.set(aName, a);
     }
 
     const underexploredGenreMap = new Map<string, TasteBoundaryItem>();
     for (const g of (boundaries.familiarUnderexploredAreas || []).filter((i) => i.type === 'genre')) {
-      underexploredGenreMap.set(g.name.toLowerCase().trim(), g);
+      const gName = (g.name || '').toLowerCase().trim();
+      if (gName) underexploredGenreMap.set(gName, g);
     }
 
     const potentialFrontierMap = new Map<string, TasteBoundaryItem>();
     for (const g of (boundaries.potentiallyInterestingAreas || [])) {
-      potentialFrontierMap.set(g.name.toLowerCase().trim(), g);
+      const gName = (g.name || '').toLowerCase().trim();
+      if (gName) potentialFrontierMap.set(gName, g);
     }
 
     // Dominant moods

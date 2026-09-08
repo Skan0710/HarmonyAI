@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { HybridCandidate } from './candidateGenerationService.js';
 import { HybridRankedResult } from './hybridRankingPipeline.js';
 import { ColdStartRecommendationService } from './coldStartRecommendationService.js';
 import {
@@ -16,6 +17,14 @@ import { TasteBoundaryProfile } from './tasteBoundaryDetectionService.js';
 import { ComfortDiscoveryScoreResult } from './comfortDiscoveryScoringService.js';
 import { OutsideComfortZoneConfig } from '../config/outsideComfortZoneConfig.js';
 import { TasteEvolutionDiscoveryConfig } from '../config/tasteEvolutionDiscoveryConfig.js';
+import {
+  PersonalizedDiscoveryMode,
+  PersonalizedDiscoveryModeConfig,
+} from '../config/personalizedDiscoveryModeConfig.js';
+import {
+  PersonalizedDiscoveryModeService,
+  PersonalizedDiscoveryModeDiagnostics,
+} from './personalizedDiscoveryModeService.js';
 
 export { HybridRankedResult as HybridCandidateItem };
 
@@ -24,6 +33,7 @@ export interface HybridRecommendationServiceResult {
   userClassification: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
   recommendations: HybridRankedResult[];
   pipelineDiagnostics?: AdaptivePipelineStageDiagnostics;
+  discoveryModeDiagnostics?: PersonalizedDiscoveryModeDiagnostics;
 }
 
 export class HybridRecommendationService {
@@ -40,6 +50,7 @@ export class HybridRecommendationService {
     userId: string;
     seedSongId?: string;
     limit?: number;
+    candidates?: HybridCandidate[];
     customWeights?: Partial<HybridScoringWeights>;
     context?: RecommendationContextAttributes | string | null;
     contextInfluence?: number;
@@ -57,6 +68,9 @@ export class HybridRecommendationService {
     useNoveltyScoring?: boolean;
     noveltyWeights?: Partial<NoveltyScoringWeights>;
     recommendationMode?: 'STANDARD' | 'OUTSIDE_COMFORT_ZONE' | string;
+    mode?: PersonalizedDiscoveryMode | string;
+    discoveryMode?: PersonalizedDiscoveryMode | string;
+    personalizedDiscoveryModeConfig?: Partial<PersonalizedDiscoveryModeConfig>;
     tasteBoundaries?: TasteBoundaryProfile | null;
     comfortDiscoveryScore?: ComfortDiscoveryScoreResult | null;
     outsideComfortZoneConfig?: Partial<OutsideComfortZoneConfig>;
@@ -66,6 +80,7 @@ export class HybridRecommendationService {
       userId,
       seedSongId,
       limit = 10,
+      candidates,
       customWeights,
       context,
       contextInfluence,
@@ -83,6 +98,9 @@ export class HybridRecommendationService {
       useNoveltyScoring,
       noveltyWeights,
       recommendationMode,
+      mode,
+      discoveryMode,
+      personalizedDiscoveryModeConfig,
       tasteBoundaries,
       comfortDiscoveryScore,
       outsideComfortZoneConfig,
@@ -94,10 +112,36 @@ export class HybridRecommendationService {
     }
 
     try {
+      const activeDiscoveryMode = mode || discoveryMode;
+      if (activeDiscoveryMode) {
+        const modeRes = await PersonalizedDiscoveryModeService.getRecommendationsForMode({
+          userId,
+          mode: activeDiscoveryMode,
+          limit,
+          seedSongId,
+          candidates,
+          context,
+          contextInfluence,
+          temporalProfile,
+          comfortDiscoveryScore,
+          tasteBoundaries,
+          configOverride: personalizedDiscoveryModeConfig,
+        });
+
+        return {
+          strategyUsed: modeRes.strategyUsed,
+          userClassification: modeRes.userClassification,
+          recommendations: modeRes.recommendations,
+          pipelineDiagnostics: modeRes.diagnostics.pipelineDiagnostics,
+          discoveryModeDiagnostics: modeRes.diagnostics,
+        };
+      }
+
       const pipelineRes = await AdaptiveRecommendationRankingPipeline.executePipeline({
         userId,
         seedSongId,
         limit,
+        candidates,
         customWeights,
         context,
         contextInfluence,
