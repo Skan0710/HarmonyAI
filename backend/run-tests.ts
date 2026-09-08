@@ -36,8 +36,10 @@ import { runMusicTwinEvolutionTests } from './src/__tests__/musicTwinEvolution.t
 import { runPersonalMusicTwinRecommendationIntegrationTests } from './src/__tests__/personalMusicTwinRecommendationIntegration.test.js';
 import { runPersonalMusicTwinEndpointTests } from './src/__tests__/personalMusicTwinEndpoint.test.js';
 import { runComfortDiscoveryScoringServiceTests } from './src/__tests__/comfortDiscoveryScoringService.test.js';
+import { runTasteBoundaryDetectionTests } from './src/__tests__/tasteBoundaryDetection.test.js';
 
 const suites = [
+  { name: 'Taste Boundary Detection',             fn: runTasteBoundaryDetectionTests },
   { name: 'Comfort vs Discovery Scoring Service', fn: runComfortDiscoveryScoringServiceTests },
   { name: 'Personal Music Twin API Endpoint',     fn: runPersonalMusicTwinEndpointTests },
   { name: 'Personal Music Twin Recommendation Integration', fn: runPersonalMusicTwinRecommendationIntegrationTests },

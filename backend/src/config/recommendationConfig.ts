@@ -769,3 +769,8 @@ registerSignalConfigChangeListener((cfg) => {
 // ==========================================
 export * from './comfortDiscoveryConfig.js';
 
+// ==========================================
+// Taste Boundary Configuration
+// ==========================================
+export * from './tasteBoundaryConfig.js';
+
