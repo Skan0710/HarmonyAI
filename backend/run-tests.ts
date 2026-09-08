@@ -40,8 +40,10 @@ import { runTasteBoundaryDetectionTests } from './src/__tests__/tasteBoundaryDet
 import { runOutsideComfortZoneRecommendationTests } from './src/__tests__/outsideComfortZoneRecommendationService.test.js';
 import { runTasteEvolutionDiscoveryTests } from './src/__tests__/tasteEvolutionDiscoveryService.test.js';
 import { runPersonalizedDiscoveryModeTests } from './src/__tests__/personalizedDiscoveryModeService.test.js';
+import { runIntelligentRecommendationReasonsTests } from './src/__tests__/intelligentRecommendationReasons.test.js';
 
 const suites = [
+  { name: 'Intelligent Recommendation Reasons',   fn: runIntelligentRecommendationReasonsTests },
   { name: 'Personalized Discovery Modes',         fn: runPersonalizedDiscoveryModeTests },
   { name: 'Taste-Evolution-Aware Discovery',      fn: runTasteEvolutionDiscoveryTests },
   { name: 'Outside-Comfort-Zone Recommendations', fn: runOutsideComfortZoneRecommendationTests },

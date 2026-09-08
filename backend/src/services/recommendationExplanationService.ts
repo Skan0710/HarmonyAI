@@ -10,12 +10,20 @@ export type RecommendationReasonType =
   | 'COLLABORATIVE_SIMILARITY'
   | 'USER_TASTE_SIMILARITY'
   | 'CONTENT_SIMILARITY'
-  | 'POPULARITY';
+  | 'POPULARITY'
+  | 'MATCHES_LONG_TERM_TASTE'
+  | 'ALIGNS_WITH_RECENT_LISTENING'
+  | 'EMERGING_PREFERENCE'
+  | 'EXPANDS_BEYOND_USUAL'
+  | 'FITS_DISCOVERY_PREFERENCE'
+  | 'MATCHES_LISTENING_BEHAVIOR'
+  | 'SIMILAR_TO_FREQUENT_ARTISTS';
 
 export type RecommendationExplanationType = RecommendationReasonType;
 
 export interface ExplanationItem {
   type: RecommendationReasonType;
+  label?: string;
   message: string;
   supportingValue?: number | string | Record<string, any>;
   importanceScore: number; // strictly bounded to [0.0, 1.0]
@@ -29,6 +37,7 @@ export interface RecommendationExplanation {
   reasons: ExplanationItem[];
   summary: string;
   confidenceScore: number; // strictly bounded to [0.0, 1.0]
+  signalsUsed?: string[];
 }
 
 export interface ExplanationThresholdConfig {
@@ -41,6 +50,13 @@ export interface ExplanationThresholdConfig {
   minArtistAffinityThreshold: number;
   minMoodMatchThreshold: number;
   minEnergyProximityThreshold: number;
+  minLongTermTasteThreshold: number;
+  minRecentListeningThreshold: number;
+  minEmergingPreferenceThreshold: number;
+  minBoundaryExpansionThreshold: number;
+  minDiscoveryPreferenceThreshold: number;
+  minListeningBehaviorMatchThreshold: number;
+  minFrequentArtistSimilarityThreshold: number;
   maxReasonsReturned: number;
   contradictionSuppression: boolean;
 }
@@ -55,6 +71,13 @@ export const DEFAULT_EXPLANATION_THRESHOLDS: ExplanationThresholdConfig = {
   minArtistAffinityThreshold: 0.40,
   minMoodMatchThreshold: 0.50,
   minEnergyProximityThreshold: 0.25,
+  minLongTermTasteThreshold: 0.55,
+  minRecentListeningThreshold: 0.55,
+  minEmergingPreferenceThreshold: 0.40,
+  minBoundaryExpansionThreshold: 0.50,
+  minDiscoveryPreferenceThreshold: 0.55,
+  minListeningBehaviorMatchThreshold: 0.55,
+  minFrequentArtistSimilarityThreshold: 0.55,
   maxReasonsReturned: 3,
   contradictionSuppression: true,
 };
@@ -118,6 +141,19 @@ export interface ExplanationSignalInput {
   matchReason?: string;
   isDiscoveryOpportunity?: boolean;
   similarArtistName?: string;
+
+  // Day 34 Task 6: Intelligent Personalized Intelligence Signals
+  musicDna?: any | null;
+  personalMusicTwin?: any | null;
+  temporalProfile?: any | null;
+  tasteEvolutionSignal?: any | null;
+  emergingTasteReport?: any | null;
+  comfortDiscoveryScore?: any | null;
+  tasteBoundaries?: any | null;
+  feedbackProfile?: any | null;
+  context?: any | null;
+  discoveryMode?: string | null;
+  diagnostics?: any | null;
 }
 
 export class RecommendationExplanationService {
@@ -201,6 +237,15 @@ export class RecommendationExplanationService {
       diversityAdjustment,
       isDiscoveryOpportunity,
       similarArtistName,
+      musicDna,
+      personalMusicTwin,
+      temporalProfile,
+      tasteEvolutionSignal,
+      emergingTasteReport,
+      comfortDiscoveryScore,
+      tasteBoundaries,
+      discoveryMode,
+      diagnostics,
     } = input;
 
     const artistName = this.extractArtistName(song?.artist);
@@ -486,7 +531,485 @@ export class RecommendationExplanationService {
       });
     }
 
-    // 10. Contradiction Resolution & Filtering
+    // 10. Intelligent Personalized Reasons (Day 34 Task 6)
+
+    // 10A. Matches Long-Term Taste (Foundational Bedrock)
+    let longTermAffinity = 0;
+    let longTermName = '';
+    let longTermDimension: 'genre' | 'artist' = 'genre';
+
+    if (temporalProfile?.longTermHorizon || (temporalProfile as any)?.longTermLayer || (temporalProfile as any)?.layers?.long_term) {
+      const horizon = temporalProfile.longTermHorizon || (temporalProfile as any).longTermLayer || (temporalProfile as any).layers?.long_term;
+      const ltGenres = horizon.genreAffinities;
+      if (ltGenres && genreName) {
+        const val = ltGenres instanceof Map ? ltGenres.get(genreName.toLowerCase()) : ltGenres[genreName.toLowerCase()];
+        if (typeof val === 'number') {
+          longTermAffinity = this.clampScore(val);
+          longTermName = genreName;
+          longTermDimension = 'genre';
+        }
+      }
+      const topGenres = horizon.topGenres || horizon.genres;
+      if (genreName && Array.isArray(topGenres)) {
+        const matched = topGenres.find((g: any) => (g.name || g.genre || '').toLowerCase() === genreName.toLowerCase());
+        if (matched && typeof (matched.score ?? matched.affinityScore ?? matched.affinity) === 'number') {
+          const val = this.clampScore(matched.score ?? matched.affinityScore ?? matched.affinity);
+          if (val > longTermAffinity) {
+            longTermAffinity = val;
+            longTermName = genreName;
+            longTermDimension = 'genre';
+          }
+        }
+      }
+      const ltArtists = horizon.artistAffinities;
+      if (ltArtists && artistName) {
+        const val = ltArtists instanceof Map ? ltArtists.get(artistName.toLowerCase()) : ltArtists[artistName.toLowerCase()];
+        if (typeof val === 'number' && val > longTermAffinity) {
+          longTermAffinity = this.clampScore(val);
+          longTermName = artistName;
+          longTermDimension = 'artist';
+        }
+      }
+      const topArtists = horizon.topArtists || horizon.artists;
+      if (artistName && Array.isArray(topArtists)) {
+        const matched = topArtists.find((a: any) => (a.name || a.artist || '').toLowerCase() === artistName.toLowerCase());
+        if (matched && typeof (matched.score ?? matched.affinityScore ?? matched.affinity) === 'number') {
+          const val = this.clampScore(matched.score ?? matched.affinityScore ?? matched.affinity);
+          if (val > longTermAffinity) {
+            longTermAffinity = val;
+            longTermName = artistName;
+            longTermDimension = 'artist';
+          }
+        }
+      }
+    }
+
+    if (longTermAffinity === 0 && musicDna) {
+      if (genreName && Array.isArray(musicDna.genreProfile?.topGenres)) {
+        const matched = musicDna.genreProfile.topGenres.find(
+          (g: any) => (g.name || g.id || '').toLowerCase() === genreName.toLowerCase()
+        );
+        if (matched && typeof (matched.score ?? matched.affinityScore) === 'number') {
+          longTermAffinity = this.clampScore(matched.score ?? matched.affinityScore);
+          longTermName = genreName;
+          longTermDimension = 'genre';
+        }
+      }
+      if (artistName && Array.isArray(musicDna.artistProfile?.strongestArtists)) {
+        const matched = musicDna.artistProfile.strongestArtists.find(
+          (a: any) => (a.name || a.id || '').toLowerCase() === artistName.toLowerCase()
+        );
+        if (matched && typeof (matched.score ?? matched.affinityScore) === 'number') {
+          const score = this.clampScore(matched.score ?? matched.affinityScore);
+          if (score > longTermAffinity) {
+            longTermAffinity = score;
+            longTermName = artistName;
+            longTermDimension = 'artist';
+          }
+        }
+      }
+    }
+
+    if (longTermAffinity === 0 && typeof componentScores.longTermScore === 'number') {
+      longTermAffinity = this.clampScore(componentScores.longTermScore);
+      longTermName = genreName || artistName;
+    }
+
+    if (longTermAffinity >= thresholds.minLongTermTasteThreshold) {
+      const pct = this.toPercent(longTermAffinity);
+      rawReasons.push({
+        type: 'MATCHES_LONG_TERM_TASTE',
+        label: 'Matches your long-term taste',
+        message: `Matches your long-term taste in ${longTermName || 'this style'} (${pct}% foundational affinity).`,
+        supportingValue: longTermAffinity,
+        importanceScore: this.clampScore(Number((longTermAffinity * 0.94).toFixed(4))),
+        metadata: {
+          dimension: longTermDimension,
+          name: longTermName,
+          longTermScore: longTermAffinity,
+          source: 'temporal_long_term',
+          signalSource: 'temporal_long_term',
+        },
+      });
+    }
+
+    // 10B. Aligns With Recent Listening
+    let recentAffinity = 0;
+    let recentName = '';
+    let recentDimension: 'genre' | 'artist' | 'mood' = 'genre';
+
+    if (temporalProfile?.shortTermHorizon || (temporalProfile as any)?.shortTermLayer || (temporalProfile as any)?.layers?.short_term) {
+      const horizon = temporalProfile.shortTermHorizon || (temporalProfile as any).shortTermLayer || (temporalProfile as any).layers?.short_term;
+      const stGenres = horizon.genreAffinities;
+      if (stGenres && genreName) {
+        const val = stGenres instanceof Map ? stGenres.get(genreName.toLowerCase()) : stGenres[genreName.toLowerCase()];
+        if (typeof val === 'number') {
+          recentAffinity = this.clampScore(val);
+          recentName = genreName;
+          recentDimension = 'genre';
+        }
+      }
+      const topGenres = horizon.topGenres || horizon.genres;
+      if (genreName && Array.isArray(topGenres)) {
+        const matched = topGenres.find((g: any) => (g.name || g.genre || '').toLowerCase() === genreName.toLowerCase());
+        if (matched && typeof (matched.momentum ?? matched.score ?? matched.affinityScore) === 'number') {
+          const val = this.clampScore(matched.momentum ?? matched.score ?? matched.affinityScore);
+          if (val > recentAffinity) {
+            recentAffinity = val;
+            recentName = genreName;
+            recentDimension = 'genre';
+          }
+        }
+      }
+      const stArtists = horizon.artistAffinities;
+      if (stArtists && artistName) {
+        const val = stArtists instanceof Map ? stArtists.get(artistName.toLowerCase()) : stArtists[artistName.toLowerCase()];
+        if (typeof val === 'number' && val > recentAffinity) {
+          recentAffinity = this.clampScore(val);
+          recentName = artistName;
+          recentDimension = 'artist';
+        }
+      }
+      const topArtists = horizon.topArtists || horizon.artists;
+      if (artistName && Array.isArray(topArtists)) {
+        const matched = topArtists.find((a: any) => (a.name || a.artist || '').toLowerCase() === artistName.toLowerCase());
+        if (matched && typeof (matched.momentum ?? matched.score ?? matched.affinityScore) === 'number') {
+          const val = this.clampScore(matched.momentum ?? matched.score ?? matched.affinityScore);
+          if (val > recentAffinity) {
+            recentAffinity = val;
+            recentName = artistName;
+            recentDimension = 'artist';
+          }
+        }
+      }
+    }
+
+    if (recentAffinity === 0 && typeof componentScores.shortTermScore === 'number') {
+      recentAffinity = this.clampScore(componentScores.shortTermScore);
+      recentName = genreName || artistName;
+    } else if (recentAffinity === 0 && typeof componentScores.recencyScore === 'number' && componentScores.recencyScore >= 0.75) {
+      recentAffinity = this.clampScore(componentScores.recencyScore);
+      recentName = genreName || artistName;
+    }
+
+    if (recentAffinity >= thresholds.minRecentListeningThreshold) {
+      rawReasons.push({
+        type: 'ALIGNS_WITH_RECENT_LISTENING',
+        label: 'Aligns with your recent listening',
+        message: `Aligns with your recent listening to ${recentName || 'similar music'} over the past days.`,
+        supportingValue: recentAffinity,
+        importanceScore: this.clampScore(Number((recentAffinity * 0.93).toFixed(4))),
+        metadata: {
+          dimension: recentDimension,
+          name: recentName,
+          shortTermScore: recentAffinity,
+          source: 'temporal_short_term',
+          signalSource: 'temporal_short_term',
+        },
+      });
+    }
+
+    // 10C. Related to an Emerging Preference
+    let emergingConfidence = 0;
+    let emergingTarget = '';
+
+    if (personalMusicTwin?.currentEmergingInterests) {
+      const emGenres = personalMusicTwin.currentEmergingInterests.genres || [];
+      if (genreName && Array.isArray(emGenres)) {
+        const match = emGenres.find((g: any) => (g.name || '').toLowerCase() === genreName.toLowerCase());
+        if (match && typeof match.confidence === 'number') {
+          emergingConfidence = this.clampScore(match.confidence);
+          emergingTarget = genreName;
+        }
+      }
+      const emArtists = personalMusicTwin.currentEmergingInterests.artists || [];
+      if (artistName && Array.isArray(emArtists)) {
+        const match = emArtists.find((a: any) => (a.name || '').toLowerCase() === artistName.toLowerCase());
+        if (match && typeof match.confidence === 'number' && match.confidence > emergingConfidence) {
+          emergingConfidence = this.clampScore(match.confidence);
+          emergingTarget = artistName;
+        }
+      }
+    }
+
+    if (emergingConfidence === 0 && emergingTasteReport) {
+      const repGenres = emergingTasteReport.emergingGenres || [];
+      if (genreName && Array.isArray(repGenres)) {
+        const match = repGenres.find((g: any) => (g.name || '').toLowerCase() === genreName.toLowerCase());
+        if (match && (match.hasPositiveFeedback || (match.recentPlayCount ?? 0) >= 2 || (match.recentPlays ?? 0) >= 2 || typeof match.confidence === 'number')) {
+          emergingConfidence = this.clampScore(match.confidence ?? match.emergenceConfidence ?? match.currentScore ?? 0.75);
+          emergingTarget = genreName;
+        }
+      }
+      const repArtists = emergingTasteReport.emergingArtists || [];
+      if (artistName && Array.isArray(repArtists)) {
+        const match = repArtists.find((a: any) => (a.name || '').toLowerCase() === artistName.toLowerCase());
+        if (match && (match.hasPositiveFeedback || (match.recentPlayCount ?? 0) >= 2 || (match.recentPlays ?? 0) >= 2 || typeof match.confidence === 'number')) {
+          const conf = this.clampScore(match.confidence ?? match.emergenceConfidence ?? match.currentScore ?? 0.75);
+          if (conf > emergingConfidence) {
+            emergingConfidence = conf;
+            emergingTarget = artistName;
+          }
+        }
+      }
+    }
+
+    if (emergingConfidence === 0 && (diagnostics?.tasteEvolutionDiscovery || diagnostics?.isEmergingGenre)) {
+      if (diagnostics?.isEmergingGenre || (diagnostics?.tasteEvolutionDiscovery?.emergingMatchesCount ?? 0) > 0) {
+        emergingConfidence = 0.85;
+        emergingTarget = genreName || artistName;
+      }
+    }
+
+    if (emergingConfidence === 0 && typeof componentScores.emergingScore === 'number') {
+      emergingConfidence = this.clampScore(componentScores.emergingScore);
+      emergingTarget = genreName || artistName;
+    }
+
+    if (emergingConfidence >= thresholds.minEmergingPreferenceThreshold) {
+      rawReasons.push({
+        type: 'EMERGING_PREFERENCE',
+        label: 'Related to an emerging preference',
+        message: `Related to an emerging preference for ${emergingTarget || 'new directions'} that you've been actively exploring.`,
+        supportingValue: emergingConfidence,
+        importanceScore: this.clampScore(Number((emergingConfidence * 0.92).toFixed(4))),
+        metadata: {
+          target: emergingTarget,
+          emergingTarget,
+          emergenceConfidence: emergingConfidence,
+          source: 'emerging_taste',
+          signalSource: 'taste_evolution',
+        },
+      });
+    }
+
+    // 10D. Expands Beyond Usual Artists (Taste Boundary Expansion)
+    let boundaryProximity = 0;
+    let adjacentStyle = '';
+
+    if (tasteBoundaries) {
+      const adjGenres = tasteBoundaries.adjacentGenres || [];
+      if (genreName && Array.isArray(adjGenres)) {
+        const match = adjGenres.find((g: any) => {
+          const str = typeof g === 'string' ? g : (g?.name || g?.adjacentGenre || '');
+          return str.toLowerCase() === genreName.toLowerCase();
+        });
+        if (match) {
+          boundaryProximity = typeof match === 'object' ? this.clampScore(match.proximityScore ?? match.adjacencyStrength ?? 0.80) : 0.80;
+          adjacentStyle = genreName;
+        }
+      }
+      const adjArtists = tasteBoundaries.adjacentArtists || [];
+      if (artistName && Array.isArray(adjArtists)) {
+        const match = adjArtists.find((a: any) => {
+          const str = typeof a === 'string' ? a : (a?.name || '');
+          return str.toLowerCase() === artistName.toLowerCase();
+        });
+        if (match) {
+          const prox = typeof match === 'object' ? this.clampScore(match.proximityScore ?? 0.80) : 0.80;
+          if (prox > boundaryProximity) {
+            boundaryProximity = prox;
+            adjacentStyle = artistName;
+          }
+        }
+      }
+    }
+
+    if (boundaryProximity === 0 && (sources.includes('boundary_frontier') || sources.includes('outside_comfort_zone') || diagnostics?.outsideComfortZone?.applied || discoveryMode === 'OUTSIDE_YOUR_TASTE')) {
+      boundaryProximity = 0.78;
+      adjacentStyle = genreName || artistName;
+    }
+
+    if (boundaryProximity === 0 && typeof componentScores.boundaryScore === 'number') {
+      boundaryProximity = this.clampScore(componentScores.boundaryScore);
+      adjacentStyle = genreName || artistName;
+    }
+
+    if (boundaryProximity >= thresholds.minBoundaryExpansionThreshold && artistAffinity < 0.75) {
+      rawReasons.push({
+        type: 'EXPANDS_BEYOND_USUAL',
+        label: 'Expands beyond your usual artists',
+        message: `Expands beyond your usual artists into adjacent ${adjacentStyle || 'musical frontiers'} while staying musically relevant.`,
+        supportingValue: boundaryProximity,
+        importanceScore: this.clampScore(Number((boundaryProximity * 0.89).toFixed(4))),
+        metadata: {
+          target: adjacentStyle,
+          adjacentStyle,
+          boundaryProximity,
+          source: 'taste_boundary',
+          signalSource: 'taste_boundaries',
+        },
+      });
+    }
+
+    // 10E. Fits Discovery Preference
+    let discoveryPref = 0;
+    if (comfortDiscoveryScore) {
+      if (typeof comfortDiscoveryScore.discoveryScore === 'number') {
+        discoveryPref = this.clampScore(comfortDiscoveryScore.discoveryScore);
+      } else if (typeof comfortDiscoveryScore.discoveryTendency === 'number') {
+        discoveryPref = this.clampScore(comfortDiscoveryScore.discoveryTendency);
+      } else if (comfortDiscoveryScore.dominantMode === 'DISCOVERY') {
+        discoveryPref = 0.80;
+      }
+    }
+
+    if (discoveryPref === 0 && personalMusicTwin) {
+      const twinDisc = personalMusicTwin.explorationTendency ?? personalMusicTwin.listeningBehavior?.discoveryTendency;
+      if (typeof twinDisc === 'number') {
+        discoveryPref = this.clampScore(twinDisc);
+      }
+    }
+
+    if (discoveryPref === 0 && (discoveryMode === 'DISCOVER' || sources.includes('collaborative_discovery'))) {
+      discoveryPref = 0.80;
+    }
+
+    const effectiveNovelty = this.clampScore(noveltyScore ?? componentScores.noveltyScore ?? (sources.includes('collaborative_discovery') ? 0.75 : 0.60));
+    if (discoveryPref >= thresholds.minDiscoveryPreferenceThreshold && effectiveNovelty >= 0.35) {
+      const combinedFit = this.clampScore((discoveryPref + effectiveNovelty) / 2);
+      const pct = this.toPercent(combinedFit);
+      rawReasons.push({
+        type: 'FITS_DISCOVERY_PREFERENCE',
+        label: 'Fits your discovery preference',
+        message: `Fits your active discovery preference for unearthing new and unfamiliar music (${pct}% discovery fit).`,
+        supportingValue: combinedFit,
+        importanceScore: this.clampScore(Number((combinedFit * 0.88).toFixed(4))),
+        metadata: {
+          discoveryPreference: discoveryPref,
+          noveltyScore: effectiveNovelty,
+          source: 'comfort_discovery',
+          signalSource: 'comfort_discovery_scoring',
+        },
+      });
+    }
+
+    // 10F. Matches Listening Behavior
+    let behaviorMatchScore = 0;
+    const traitsMatched: string[] = [];
+    const archetypeName = personalMusicTwin?.listenerArchetype;
+
+    if (personalMusicTwin && audioFeatures) {
+      const traits = personalMusicTwin.dominantMusicalTraits || personalMusicTwin.behavioralTraits;
+      let matchedTraits = 0;
+      let totalTraits = 0;
+
+      if (traits) {
+        if (typeof (traits.energyPreference ?? traits.energyAffinity) === 'number' && typeof audioFeatures.energy === 'number') {
+          totalTraits++;
+          const targetEnergy = traits.energyPreference ?? traits.energyAffinity;
+          if (Math.abs(targetEnergy - audioFeatures.energy) <= 0.20) {
+            matchedTraits++;
+            traitsMatched.push('energy pace');
+          }
+        }
+
+        if (typeof (traits.acousticnessAffinity ?? traits.acousticPreference) === 'number' && typeof audioFeatures.acousticness === 'number') {
+          totalTraits++;
+          const targetAcoustic = traits.acousticnessAffinity ?? traits.acousticPreference;
+          if (Math.abs(targetAcoustic - audioFeatures.acousticness) <= 0.20) {
+            matchedTraits++;
+            traitsMatched.push('acoustic resonance');
+          }
+        }
+
+        if (typeof (traits.valencePreference ?? traits.valenceAffinity) === 'number' && typeof audioFeatures.valence === 'number') {
+          totalTraits++;
+          const targetValence = traits.valencePreference ?? traits.valenceAffinity;
+          if (Math.abs(targetValence - audioFeatures.valence) <= 0.25) {
+            matchedTraits++;
+            traitsMatched.push('emotional mood');
+          }
+        }
+
+        if (typeof (traits.targetTempoBpm ?? traits.tempoPreference) === 'number' && typeof audioFeatures.tempo === 'number' && audioFeatures.tempo > 0) {
+          totalTraits++;
+          const targetTempo = traits.targetTempoBpm ?? traits.tempoPreference;
+          if (Math.abs(targetTempo - audioFeatures.tempo) <= 15) {
+            matchedTraits++;
+            traitsMatched.push('tempo flow');
+          }
+        }
+      }
+
+      if (totalTraits > 0 && matchedTraits > 0) {
+        behaviorMatchScore = this.clampScore(matchedTraits / totalTraits);
+      }
+    }
+
+    if (behaviorMatchScore === 0 && typeof componentScores.listeningBehaviorScore === 'number') {
+      behaviorMatchScore = this.clampScore(componentScores.listeningBehaviorScore);
+    }
+
+    if (behaviorMatchScore >= thresholds.minListeningBehaviorMatchThreshold) {
+      rawReasons.push({
+        type: 'MATCHES_LISTENING_BEHAVIOR',
+        label: 'Matches your current listening behavior',
+        message: `Matches your current listening behavior and sonic signature (${archetypeName || 'your listening profile'}).`,
+        supportingValue: behaviorMatchScore,
+        importanceScore: this.clampScore(Number((behaviorMatchScore * 0.86).toFixed(4))),
+        metadata: {
+          archetype: archetypeName,
+          traitsMatched,
+          behaviorMatchScore,
+          source: 'personal_music_twin',
+          signalSource: 'music_twin_behavior',
+        },
+      });
+    }
+
+    // 10G. Similar to Artists You Frequently Enjoy
+    let frequentArtistScore = 0;
+    let refFrequentArtist = '';
+
+    if (similarArtistName) {
+      frequentArtistScore = 0.85;
+      refFrequentArtist = similarArtistName;
+    } else if (tasteProfile?.combinedArtists && Array.isArray(tasteProfile.combinedArtists)) {
+      const topArtist = tasteProfile.combinedArtists.find(
+        (a: any) => (a.name || '').toLowerCase() !== artistName.toLowerCase() && (a.affinityScore ?? 0) >= 0.70
+      );
+      if (topArtist && (componentScores.collaborativeScore ?? 0) >= 0.60) {
+        frequentArtistScore = this.clampScore(componentScores.collaborativeScore ?? 0.75);
+        refFrequentArtist = topArtist.name || '';
+      }
+    }
+
+    if (frequentArtistScore === 0 && musicDna) {
+      const coreList = musicDna.tasteProfile?.coreArtists || musicDna.tasteProfile?.topArtists || musicDna.artistProfile?.strongestArtists;
+      if (Array.isArray(coreList)) {
+        const topArtist = coreList.find(
+          (a: any) => (a.name || a.id || '').toLowerCase() === artistName.toLowerCase() ||
+                      ((a.name || a.id || '').toLowerCase() !== artistName.toLowerCase() && (a.affinity ?? a.score ?? 0) >= 0.70)
+        );
+        if (topArtist) {
+          frequentArtistScore = this.clampScore(topArtist.affinity ?? topArtist.score ?? 0.85);
+          refFrequentArtist = topArtist.name || topArtist.id || artistName;
+        }
+      }
+    }
+
+    if (frequentArtistScore === 0 && typeof componentScores.frequentArtistSimilarity === 'number') {
+      frequentArtistScore = this.clampScore(componentScores.frequentArtistSimilarity);
+    }
+
+    if (frequentArtistScore >= thresholds.minFrequentArtistSimilarityThreshold && !isDirectArtistMatch) {
+      rawReasons.push({
+        type: 'SIMILAR_TO_FREQUENT_ARTISTS',
+        label: 'Similar to artists you frequently enjoy',
+        message: `Similar to artists you frequently enjoy${refFrequentArtist ? ` like ${refFrequentArtist}` : ''}.`,
+        supportingValue: frequentArtistScore,
+        importanceScore: this.clampScore(Number((frequentArtistScore * 0.88).toFixed(4))),
+        metadata: {
+          frequentArtist: refFrequentArtist,
+          similarityScore: frequentArtistScore,
+          source: 'music_dna_core',
+          signalSource: 'frequent_artist_rotation',
+        },
+      });
+    }
+
+    // 11. Contradiction Resolution & Filtering
     let filteredReasons = rawReasons;
     if (thresholds.contradictionSuppression) {
       filteredReasons = this.resolveContradictions(rawReasons, {
@@ -526,16 +1049,23 @@ export class RecommendationExplanationService {
     context: { artistAffinity: number; genreAffinity: number; audioEnergy?: number }
   ): ExplanationItem[] {
     const hasFamiliarArtist = context.artistAffinity >= 0.70;
-    const hasDiscovery = reasons.some((r) => r.type === 'DISCOVERY_OPPORTUNITY');
+    const hasDiscovery = reasons.some(
+      (r) => r.type === 'DISCOVERY_OPPORTUNITY' || r.type === 'FITS_DISCOVERY_PREFERENCE' || r.type === 'EXPANDS_BEYOND_USUAL'
+    );
     const hasNovelty = reasons.some((r) => r.type === 'NOVELTY');
+    const hasExpandsBeyond = reasons.some((r) => r.type === 'EXPANDS_BEYOND_USUAL');
 
     return reasons.filter((r) => {
-      // Contradiction 1: If it's a known heavy favorite artist, don't claim it's a "discovery opportunity in unfamiliar territory"
-      if (hasFamiliarArtist && r.type === 'DISCOVERY_OPPORTUNITY') {
+      // Contradiction 1: If it's a known heavy favorite artist, don't claim it's a discovery opportunity in unfamiliar territory or expands beyond usual
+      if (hasFamiliarArtist && (r.type === 'DISCOVERY_OPPORTUNITY' || r.type === 'EXPANDS_BEYOND_USUAL')) {
         return false;
       }
-      // Contradiction 2: If it's pure novel discovery with 0 familiarity, don't claim familiar artist affinity
+      // Contradiction 2: If it's pure novel discovery with 0 familiarity, don't claim familiar direct artist affinity
       if (!hasFamiliarArtist && hasDiscovery && hasNovelty && r.type === 'SIMILAR_ARTIST' && r.metadata?.isDirectArtist) {
+        return false;
+      }
+      // Contradiction 3: If it expands beyond usual artists, don't claim SIMILAR_ARTIST with direct familiar rotation
+      if (hasExpandsBeyond && r.type === 'SIMILAR_ARTIST' && r.metadata?.isDirectArtist) {
         return false;
       }
       return true;
@@ -561,6 +1091,16 @@ export class RecommendationExplanationService {
     const topPoints = reasons.slice(0, 2).map((e) => e.message);
     const summary = topPoints.join(' ');
 
+    const signalsUsed = Array.from(
+      new Set(
+        reasons.flatMap((r) => [
+          r.type,
+          ...(r.metadata?.source ? [r.metadata.source] : []),
+          ...(r.metadata?.signalSource ? [r.metadata.signalSource] : []),
+        ])
+      )
+    );
+
     return {
       songId,
       primaryExplanation,
@@ -568,6 +1108,7 @@ export class RecommendationExplanationService {
       reasons,
       summary,
       confidenceScore,
+      signalsUsed,
     };
   }
 

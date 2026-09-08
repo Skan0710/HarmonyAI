@@ -20,6 +20,11 @@ import { RecommendationAnalyticsService } from '../services/recommendationAnalyt
 import { validateAndSanitizeRecommendationContext } from '../schemas/recommendationContextSchema.js';
 import { ContextPreferenceMappingService } from '../services/contextPreferenceMappingService.js';
 import { PersonalizedDiscoveryModeService } from '../services/personalizedDiscoveryModeService.js';
+import { PersonalMusicTwinService } from '../services/personalMusicTwinService.js';
+import { LayeredTemporalTasteProfileService } from '../services/layeredTemporalTasteProfileService.js';
+import { ComfortDiscoveryScoringService } from '../services/comfortDiscoveryScoringService.js';
+import { TasteBoundaryDetectionService } from '../services/tasteBoundaryDetectionService.js';
+import { UnifiedMusicDNAService } from '../services/unifiedMusicDnaService.js';
 import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
 import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
 
@@ -539,7 +544,32 @@ export const getRecommendationExplanation = controllerWrapper(async (req: Reques
     // Continue safely
   }
 
-  // 6. Calculate or retrieve existing component scores from recommendation context
+  // 6. Fetch user intelligence layers (Personal Twin, Temporal Profile, Discovery Score, Boundaries, Music DNA)
+  let personalMusicTwin: any = null;
+  let temporalProfile: any = null;
+  let comfortDiscoveryScore: any = null;
+  let tasteBoundaries: any = null;
+  let musicDna: any = null;
+
+  try {
+    const results = await Promise.allSettled([
+      PersonalMusicTwinService.getOrGenerateTwin(userId),
+      LayeredTemporalTasteProfileService.generateLayeredTasteProfile(userId),
+      ComfortDiscoveryScoringService.getUserComfortDiscoveryScores(userId),
+      TasteBoundaryDetectionService.getUserTasteBoundaries(userId),
+      UnifiedMusicDNAService.getOrGenerateProfile(userId),
+    ]);
+
+    if (results[0].status === 'fulfilled') personalMusicTwin = results[0].value;
+    if (results[1].status === 'fulfilled') temporalProfile = results[1].value;
+    if (results[2].status === 'fulfilled') comfortDiscoveryScore = results[2].value;
+    if (results[3].status === 'fulfilled') tasteBoundaries = results[3].value;
+    if (results[4].status === 'fulfilled') musicDna = results[4].value;
+  } catch {
+    // Continue safely
+  }
+
+  // 7. Calculate or retrieve existing component scores from recommendation context
   const artistName = RecommendationExplanationService.extractArtistName(song.artist);
   const genreName = RecommendationExplanationService.extractGenreName(song.genre);
 
@@ -643,6 +673,11 @@ export const getRecommendationExplanation = controllerWrapper(async (req: Reques
     likedSongsSample,
     tasteProfile,
     sessionPreferences: activeSessionPreferences,
+    personalMusicTwin,
+    temporalProfile,
+    comfortDiscoveryScore,
+    tasteBoundaries,
+    musicDna,
   });
 
   res.status(200).json({
