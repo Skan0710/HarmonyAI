@@ -610,20 +610,35 @@ export class AdaptiveRecommendationRankingPipeline {
 
     let tieBreaksApplied = 0;
 
-    // Clone and ensure scores are bounded
-    const boundedResults: HybridRankedResult[] = results.map((res) => {
-      const score = res.finalScore ?? res.hybridScore ?? 0;
-      const normalizedScore = Number(Math.max(0, Math.min(1, score)).toFixed(4));
+    // 1. Deduplicate results by unique song ID (preserving the first/highest occurrence)
+    const seenSongIds = new Set<string>();
+    const uniqueResults: HybridRankedResult[] = [];
+    for (const res of results) {
+      const sId = res.song?._id?.toString() || res.song?.id?.toString();
+      if (sId) {
+        if (seenSongIds.has(sId)) continue;
+        seenSongIds.add(sId);
+      }
+      uniqueResults.push(res);
+    }
+
+    // 2. Clone and ensure scores are strictly finite and normalized
+    const boundedResults: HybridRankedResult[] = uniqueResults.map((res) => {
+      const rawScore = res.finalScore ?? res.hybridScore ?? 0;
+      const safeScore = Number.isFinite(rawScore) && !Number.isNaN(rawScore) ? rawScore : 0;
+      const normalizedScore = Number(Math.max(0, Math.min(1, safeScore)).toFixed(4));
       return {
         ...res,
         finalScore: normalizedScore,
       };
     });
 
-    // Deterministic sorting with stable tie-breaker
+    // 3. Deterministic sorting with stable tie-breaker
     boundedResults.sort((a, b) => {
-      const scoreA = a.finalScore ?? a.hybridScore ?? 0;
-      const scoreB = b.finalScore ?? b.hybridScore ?? 0;
+      const rawA = a.finalScore ?? a.hybridScore ?? 0;
+      const rawB = b.finalScore ?? b.hybridScore ?? 0;
+      const scoreA = Number.isFinite(rawA) ? rawA : 0;
+      const scoreB = Number.isFinite(rawB) ? rawB : 0;
       const scoreDiff = scoreB - scoreA;
 
       if (Math.abs(scoreDiff) > 1e-5) {

@@ -1092,7 +1092,8 @@ export class HybridRankingPipeline {
         blended += effectiveTwinInfluence * personalMusicTwinScore;
       }
 
-      const finalScore = Number(Math.max(0, Math.min(1, blended)).toFixed(4));
+      const safeBlended = Number.isFinite(blended) && !Number.isNaN(blended) ? blended : 0;
+      const finalScore = Number(Math.max(0, Math.min(1, safeBlended)).toFixed(4));
 
       return {
         song: cand.songDoc,
@@ -1176,11 +1177,31 @@ export class HybridRankingPipeline {
       };
     });
 
-    // 6. Sort candidates descending by final hybrid score
-    scoredItems.sort((a, b) => b.hybridScore - a.hybridScore);
+    // 6. Sort candidates descending with deterministic tie-breaker
+    scoredItems.sort((a, b) => {
+      const scoreA = Number.isFinite(a.hybridScore) ? a.hybridScore : 0;
+      const scoreB = Number.isFinite(b.hybridScore) ? b.hybridScore : 0;
+      const scoreDiff = scoreB - scoreA;
+      if (Math.abs(scoreDiff) > 1e-5) return scoreDiff;
+      const idA = a.song?._id?.toString() || a.song?.id?.toString() || a.song?.title || '';
+      const idB = b.song?._id?.toString() || b.song?.id?.toString() || b.song?.title || '';
+      return idA.localeCompare(idB);
+    });
 
-    // 7. Return top limit results
-    return scoredItems.slice(0, Math.max(1, limit));
+    // 7. Deduplicate candidates by unique song ID (preserving highest scored occurrence)
+    const seenSongIds = new Set<string>();
+    const uniqueItems: HybridRankedResult[] = [];
+    for (const item of scoredItems) {
+      const songId = item.song?._id?.toString() || item.song?.id?.toString();
+      if (songId) {
+        if (seenSongIds.has(songId)) continue;
+        seenSongIds.add(songId);
+      }
+      uniqueItems.push(item);
+    }
+
+    // 8. Return top limit results
+    return uniqueItems.slice(0, Math.max(1, limit));
   }
 }
 
