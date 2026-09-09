@@ -472,6 +472,15 @@ export async function runPersonalizedDiscoveryModeTests() {
   resetDiscoveryModeConfigs();
   const resetComfort = getDiscoveryModeConfig('COMFORT');
   assert.strictEqual(resetComfort.hybridWeights.userTasteAffinityWeight, originalComfortAffinity);
+
+  const externallyMutated = getDiscoveryModeConfig('COMFORT');
+  externallyMutated.hybridWeights.userTasteAffinityWeight = 0;
+  const currentComfort = getDiscoveryModeConfig('COMFORT');
+  assert.strictEqual(
+    currentComfort.hybridWeights.userTasteAffinityWeight,
+    originalComfortAffinity,
+    'Configuration snapshots must not expose mutable internal nested weights'
+  );
   console.log('✓ Test 9 Passed: Discovery mode configurations can be updated and reset dynamically.');
 
   // ---------------------------------------------------------------------------

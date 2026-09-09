@@ -427,6 +427,43 @@ export async function runComfortDiscoveryScoringServiceTests() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Test 9: Invalid Numeric Signals
+  // ---------------------------------------------------------------------------
+  console.log('\nTest 9: Non-finite and out-of-range signals are safely normalized');
+  {
+    const userId = new Types.ObjectId().toString();
+    const result = ComfortDiscoveryScoringService.calculateScores({
+      userId,
+      personalMusicTwin: {
+        userId,
+        isDataSufficient: true,
+        confidenceScore: Number.POSITIVE_INFINITY,
+        explorationTendency: Number.NaN,
+        diversityPreference: -1,
+        listeningBehavior: {
+          repeatListeningTendency: Number.NaN,
+          discoveryTendency: Number.POSITIVE_INFINITY,
+        },
+        tasteStability: { stabilityScore: Number.NEGATIVE_INFINITY },
+        tasteEvolution: { transformationIntensity: Number.NaN },
+      } as any,
+      feedbackProfile: { overallSkipRate: Number.NaN, overallLikeRate: Number.POSITIVE_INFINITY },
+      totalInteractionsCount: Number.POSITIVE_INFINITY,
+      configOverride: {
+        weights: { ...getComfortDiscoveryConfig().weights, feedback: Number.NaN },
+      },
+    });
+
+    for (const score of [result.comfortScore, result.discoveryScore, result.balanceRatio, result.confidenceScore]) {
+      assert.ok(Number.isFinite(score), `Expected finite score, got ${score}`);
+    }
+    assert.ok(result.comfortScore >= 0 && result.comfortScore <= 1);
+    assert.ok(result.discoveryScore >= 0 && result.discoveryScore <= 1);
+    assert.ok(result.confidenceScore >= 0 && result.confidenceScore <= 1);
+    console.log('✓ Test 9 Passed: Invalid numeric inputs cannot produce NaN or Infinity scores.');
+  }
+
   console.log('\n[Comfort vs Discovery Scoring Service Test Suite] All tests passed!\n');
   return true;
 }

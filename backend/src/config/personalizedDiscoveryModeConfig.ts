@@ -176,13 +176,32 @@ export const DEFAULT_PERSONALIZED_DISCOVERY_MODES: Record<
   },
 };
 
-let currentDiscoveryModes: Record<PersonalizedDiscoveryMode, PersonalizedDiscoveryModeConfig> = {
-  FOR_YOU: { ...DEFAULT_PERSONALIZED_DISCOVERY_MODES.FOR_YOU },
-  COMFORT: { ...DEFAULT_PERSONALIZED_DISCOVERY_MODES.COMFORT },
-  DISCOVER: { ...DEFAULT_PERSONALIZED_DISCOVERY_MODES.DISCOVER },
-  OUTSIDE_YOUR_TASTE: { ...DEFAULT_PERSONALIZED_DISCOVERY_MODES.OUTSIDE_YOUR_TASTE },
-  WHATS_NEW_FOR_YOU: { ...DEFAULT_PERSONALIZED_DISCOVERY_MODES.WHATS_NEW_FOR_YOU },
-};
+const cloneModeConfig = (
+  config: PersonalizedDiscoveryModeConfig
+): PersonalizedDiscoveryModeConfig => ({
+  ...config,
+  hybridWeights: { ...config.hybridWeights },
+  noveltyWeights: { ...config.noveltyWeights },
+  outsideComfortZoneOverrides: config.outsideComfortZoneOverrides
+    ? { ...config.outsideComfortZoneOverrides }
+    : undefined,
+  tasteEvolutionOverrides: config.tasteEvolutionOverrides
+    ? { ...config.tasteEvolutionOverrides }
+    : undefined,
+});
+
+const cloneAllModeConfigs = (): Record<
+  PersonalizedDiscoveryMode,
+  PersonalizedDiscoveryModeConfig
+> => ({
+  FOR_YOU: cloneModeConfig(DEFAULT_PERSONALIZED_DISCOVERY_MODES.FOR_YOU),
+  COMFORT: cloneModeConfig(DEFAULT_PERSONALIZED_DISCOVERY_MODES.COMFORT),
+  DISCOVER: cloneModeConfig(DEFAULT_PERSONALIZED_DISCOVERY_MODES.DISCOVER),
+  OUTSIDE_YOUR_TASTE: cloneModeConfig(DEFAULT_PERSONALIZED_DISCOVERY_MODES.OUTSIDE_YOUR_TASTE),
+  WHATS_NEW_FOR_YOU: cloneModeConfig(DEFAULT_PERSONALIZED_DISCOVERY_MODES.WHATS_NEW_FOR_YOU),
+});
+
+let currentDiscoveryModes = cloneAllModeConfigs();
 
 /**
  * Returns all configured discovery modes.
@@ -192,11 +211,11 @@ export const getAllDiscoveryModeConfigs = (): Record<
   PersonalizedDiscoveryModeConfig
 > => {
   return {
-    FOR_YOU: { ...currentDiscoveryModes.FOR_YOU },
-    COMFORT: { ...currentDiscoveryModes.COMFORT },
-    DISCOVER: { ...currentDiscoveryModes.DISCOVER },
-    OUTSIDE_YOUR_TASTE: { ...currentDiscoveryModes.OUTSIDE_YOUR_TASTE },
-    WHATS_NEW_FOR_YOU: { ...currentDiscoveryModes.WHATS_NEW_FOR_YOU },
+    FOR_YOU: cloneModeConfig(currentDiscoveryModes.FOR_YOU),
+    COMFORT: cloneModeConfig(currentDiscoveryModes.COMFORT),
+    DISCOVER: cloneModeConfig(currentDiscoveryModes.DISCOVER),
+    OUTSIDE_YOUR_TASTE: cloneModeConfig(currentDiscoveryModes.OUTSIDE_YOUR_TASTE),
+    WHATS_NEW_FOR_YOU: cloneModeConfig(currentDiscoveryModes.WHATS_NEW_FOR_YOU),
   };
 };
 
@@ -206,7 +225,7 @@ export const getAllDiscoveryModeConfigs = (): Record<
 export const getDiscoveryModeConfig = (
   mode: PersonalizedDiscoveryMode
 ): PersonalizedDiscoveryModeConfig => {
-  return { ...currentDiscoveryModes[mode] };
+  return cloneModeConfig(currentDiscoveryModes[mode]);
 };
 
 /**
@@ -236,20 +255,14 @@ export const updateDiscoveryModeConfig = (
       ...(overrides.tasteEvolutionOverrides || {}),
     },
   };
-  return { ...currentDiscoveryModes[mode] };
+  return cloneModeConfig(currentDiscoveryModes[mode]);
 };
 
 /**
  * Resets all discovery modes to their default weights.
  */
 export const resetDiscoveryModeConfigs = (): void => {
-  currentDiscoveryModes = {
-    FOR_YOU: { ...DEFAULT_PERSONALIZED_DISCOVERY_MODES.FOR_YOU },
-    COMFORT: { ...DEFAULT_PERSONALIZED_DISCOVERY_MODES.COMFORT },
-    DISCOVER: { ...DEFAULT_PERSONALIZED_DISCOVERY_MODES.DISCOVER },
-    OUTSIDE_YOUR_TASTE: { ...DEFAULT_PERSONALIZED_DISCOVERY_MODES.OUTSIDE_YOUR_TASTE },
-    WHATS_NEW_FOR_YOU: { ...DEFAULT_PERSONALIZED_DISCOVERY_MODES.WHATS_NEW_FOR_YOU },
-  };
+  currentDiscoveryModes = cloneAllModeConfigs();
 };
 
 /**

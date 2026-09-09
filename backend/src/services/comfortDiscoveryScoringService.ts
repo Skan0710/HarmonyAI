@@ -79,6 +79,11 @@ export class ComfortDiscoveryScoringService {
    * separate comfort and discovery preference scores.
    */
   static calculateScores(inputs: ComfortDiscoveryScoringInputs): ComfortDiscoveryScoreResult {
+    const finiteNumber = (value: unknown, fallback: number): number =>
+      typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+    const normalizedScore = (value: unknown, fallback = 0.5): number =>
+      Math.max(0, Math.min(1, finiteNumber(value, fallback)));
+
     const config: ComfortDiscoveryConfig = {
       ...getComfortDiscoveryConfig(),
       ...inputs.configOverride,
@@ -97,10 +102,12 @@ export class ComfortDiscoveryScoringService {
     const feedback = inputs.feedbackProfile;
 
     // 1. Data Sufficiency & Interaction Depth Assessment
-    const totalInteractions =
+    const totalInteractions = Math.max(0, finiteNumber(
       inputs.totalInteractionsCount ??
       dna?.interactionsCountAtLastRefresh ??
-      (twin?.isDataSufficient ? 20 : 0);
+      (twin?.isDataSufficient ? 20 : 0),
+      0
+    ));
 
     const hasAnyProfile = Boolean(dna || twin || temporal || feedback);
     const isDataSufficient =
@@ -136,12 +143,9 @@ export class ComfortDiscoveryScoringService {
     }
 
     // 2. Repeat Listening Signal (Bedrock Loyalty vs Novelty)
-    const repeatTendency =
-      typeof twin?.listeningBehavior?.repeatListeningTendency === 'number'
-        ? twin.listeningBehavior.repeatListeningTendency
-        : typeof dna?.listeningBehavior?.repeatListeningTendency === 'number'
-        ? dna.listeningBehavior.repeatListeningTendency
-        : 0.50;
+    const repeatTendency = normalizedScore(
+      twin?.listeningBehavior?.repeatListeningTendency ?? dna?.listeningBehavior?.repeatListeningTendency
+    );
 
     const repeatComfort = Number(Math.max(0.0, Math.min(1.0, repeatTendency)).toFixed(4));
     const repeatDiscovery = Number(Math.max(0.0, Math.min(1.0, 1.0 - repeatTendency)).toFixed(4));
@@ -153,14 +157,11 @@ export class ComfortDiscoveryScoringService {
     }
 
     // 3. Exploration Tendency Signal (Horizon Broadening)
-    const explorationTendency =
-      typeof twin?.explorationTendency === 'number'
-        ? twin.explorationTendency
-        : typeof dna?.tendencies?.explorationPreference === 'number'
-        ? dna.tendencies.explorationPreference
-        : typeof dna?.listeningBehavior?.explorationTendency === 'number'
-        ? dna.listeningBehavior.explorationTendency
-        : 0.50;
+    const explorationTendency = normalizedScore(
+      twin?.explorationTendency ??
+      dna?.tendencies?.explorationPreference ??
+      dna?.listeningBehavior?.explorationTendency
+    );
 
     const explorationComfort = Number(Math.max(0.0, Math.min(1.0, 1.0 - explorationTendency)).toFixed(4));
     const explorationDiscovery = Number(Math.max(0.0, Math.min(1.0, explorationTendency)).toFixed(4));
@@ -172,14 +173,11 @@ export class ComfortDiscoveryScoringService {
     }
 
     // 4. Novelty Interaction Signal (Actual Unfamiliar Exposure Engagement)
-    const noveltyInteraction =
-      typeof twin?.listeningBehavior?.discoveryTendency === 'number'
-        ? twin.listeningBehavior.discoveryTendency
-        : typeof dna?.tendencies?.discoveryTendency === 'number'
-        ? dna.tendencies.discoveryTendency
-        : typeof dna?.listeningBehavior?.discoveryTendency === 'number'
-        ? dna.listeningBehavior.discoveryTendency
-        : 0.50;
+    const noveltyInteraction = normalizedScore(
+      twin?.listeningBehavior?.discoveryTendency ??
+      dna?.tendencies?.discoveryTendency ??
+      dna?.listeningBehavior?.discoveryTendency
+    );
 
     const noveltyComfort = Number(Math.max(0.0, Math.min(1.0, 1.0 - noveltyInteraction)).toFixed(4));
     const noveltyDiscovery = Number(Math.max(0.0, Math.min(1.0, noveltyInteraction)).toFixed(4));
@@ -190,14 +188,14 @@ export class ComfortDiscoveryScoringService {
 
     if (feedback) {
       if (typeof feedback.overallSkipRate === 'number') {
-        skipRate = feedback.overallSkipRate;
+        skipRate = normalizedScore(feedback.overallSkipRate, skipRate);
       } else if (feedback.skippedSongIds && feedback.likedSongIds) {
         const totalFeedback = feedback.skippedSongIds.size + feedback.likedSongIds.size;
         skipRate = totalFeedback > 0 ? feedback.skippedSongIds.size / totalFeedback : 0.20;
       }
 
       if (typeof feedback.overallLikeRate === 'number') {
-        likeRate = feedback.overallLikeRate;
+        likeRate = normalizedScore(feedback.overallLikeRate, likeRate);
       } else if (feedback.skippedSongIds && feedback.likedSongIds) {
         const totalFeedback = feedback.skippedSongIds.size + feedback.likedSongIds.size;
         likeRate = totalFeedback > 0 ? feedback.likedSongIds.size / totalFeedback : 0.20;
@@ -220,21 +218,16 @@ export class ComfortDiscoveryScoringService {
     }
 
     // 6. Genre & Artist Diversity Signal
-    const genreDiversity =
-      typeof twin?.genreIdentity?.genreDiversityScore === 'number'
-        ? twin.genreIdentity.genreDiversityScore
-        : typeof dna?.genreProfile?.diversity === 'number'
-        ? dna.genreProfile.diversity
-        : typeof twin?.diversityPreference === 'number'
-        ? twin.diversityPreference
-        : 0.50;
+    const genreDiversity = normalizedScore(
+      twin?.genreIdentity?.genreDiversityScore ??
+      dna?.genreProfile?.diversity ??
+      twin?.diversityPreference
+    );
 
-    const artistDiversity =
-      typeof dna?.artistProfile?.diversity === 'number'
-        ? dna.artistProfile.diversity
-        : typeof twin?.diversityPreference === 'number'
-        ? twin.diversityPreference
-        : genreDiversity;
+    const artistDiversity = normalizedScore(
+      dna?.artistProfile?.diversity ?? twin?.diversityPreference,
+      genreDiversity
+    );
 
     const avgDiversity = (genreDiversity + artistDiversity) / 2;
     const diversityComfort = Number(Math.max(0.0, Math.min(1.0, 1.0 - avgDiversity)).toFixed(4));
@@ -247,14 +240,12 @@ export class ComfortDiscoveryScoringService {
     }
 
     // 7. Taste Stability Signal
-    const stabilityScore =
-      typeof twin?.tasteStability?.stabilityScore === 'number'
-        ? twin.tasteStability.stabilityScore
-        : typeof temporal?.tasteStabilityScore === 'number'
-        ? temporal.tasteStabilityScore
-        : typeof dna?.listeningBehavior?.preferenceStability === 'number'
-        ? dna.listeningBehavior.preferenceStability
-        : 0.60;
+    const stabilityScore = normalizedScore(
+      twin?.tasteStability?.stabilityScore ??
+      temporal?.tasteStabilityScore ??
+      dna?.listeningBehavior?.preferenceStability,
+      0.60
+    );
 
     const stabilityComfort = Number(Math.max(0.0, Math.min(1.0, stabilityScore)).toFixed(4));
     const stabilityDiscovery = Number(Math.max(0.0, Math.min(1.0, 1.0 - stabilityScore)).toFixed(4));
@@ -277,10 +268,7 @@ export class ComfortDiscoveryScoringService {
       [];
     const emergingCount = emergingGenres.length + emergingArtists.length;
 
-    const transformationIntensity =
-      typeof twin?.tasteEvolution?.transformationIntensity === 'number'
-        ? twin.tasteEvolution.transformationIntensity
-        : 0.0;
+    const transformationIntensity = normalizedScore(twin?.tasteEvolution?.transformationIntensity, 0);
 
     let emergingComfort = 0.50;
     let emergingDiscovery = 0.50;
@@ -312,7 +300,15 @@ export class ComfortDiscoveryScoringService {
     }
 
     // 10. Multi-Signal Fusion via Normalized Weights
-    const w = config.weights;
+    const w = {
+      repeatListening: Math.max(0, finiteNumber(config.weights.repeatListening, 0)),
+      explorationTendency: Math.max(0, finiteNumber(config.weights.explorationTendency, 0)),
+      noveltyInteraction: Math.max(0, finiteNumber(config.weights.noveltyInteraction, 0)),
+      feedback: Math.max(0, finiteNumber(config.weights.feedback, 0)),
+      diversity: Math.max(0, finiteNumber(config.weights.diversity, 0)),
+      tasteStability: Math.max(0, finiteNumber(config.weights.tasteStability, 0)),
+      emergingInterests: Math.max(0, finiteNumber(config.weights.emergingInterests, 0)),
+    };
     const totalWeight =
       w.repeatListening +
       w.explorationTendency +
@@ -361,12 +357,7 @@ export class ComfortDiscoveryScoringService {
     }
 
     // 12. Calibrated Confidence Score
-    const baseConfidence =
-      typeof twin?.confidenceScore === 'number'
-        ? twin.confidenceScore
-        : typeof dna?.confidenceScore === 'number'
-        ? dna.confidenceScore
-        : 0.60;
+    const baseConfidence = normalizedScore(twin?.confidenceScore ?? dna?.confidenceScore, 0.60);
 
     // Scale confidence with interaction depth
     const dataMultiplier = Math.min(1.0, totalInteractions / 25);
