@@ -44,8 +44,10 @@ import { runIntelligentRecommendationReasonsTests } from './src/__tests__/intell
 import { runAdvancedPersonalizationFullIntegrationTests } from './src/__tests__/advancedPersonalizationFullIntegration.test.js';
 import { runDatabaseIntegrityAndPerformanceTests } from './src/__tests__/databaseIntegrityAndPerformance.test.js';
 import { runRecommendationPipelineOptimizationTests } from './src/__tests__/recommendationPipelineOptimization.test.js';
+import { runFullRegressionIntegrationTests } from './src/__tests__/fullRegressionIntegration.test.js';
 
 const suites = [
+  { name: 'Full Regression Integration (21 Flows)', fn: runFullRegressionIntegrationTests },
   { name: 'Recommendation Pipeline Optimization', fn: runRecommendationPipelineOptimizationTests },
   { name: 'Database Integrity and Performance',   fn: runDatabaseIntegrityAndPerformanceTests },
   { name: 'Full Advanced Personalization Integration (Day 34)', fn: runAdvancedPersonalizationFullIntegrationTests },
