@@ -275,10 +275,14 @@ export class DedicatedPlaylistGenerationService {
     }
 
     // 5. Session Data: Look up session skipped tracks if sessionId is provided
+    // Security: verify the session belongs to the authenticated user
     const sessionSkippedIds = new Set<string>();
     if (sessionId && Types.ObjectId.isValid(sessionId)) {
       try {
-        const sessionDoc = await ListeningSession.findById(sessionId).lean();
+        const sessionDoc = await ListeningSession.findOne({
+          _id: sessionId,
+          user: new Types.ObjectId(userId),
+        }).lean();
         if (sessionDoc && Array.isArray((sessionDoc as any).skippedSongs)) {
           for (const skipId of (sessionDoc as any).skippedSongs) {
             sessionSkippedIds.add(String(skipId));

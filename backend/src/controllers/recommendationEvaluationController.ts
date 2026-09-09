@@ -18,16 +18,15 @@ export const evaluateRecommendationStrategy = controllerWrapper(async (req: Requ
   const user = ensureAuth(req, res);
   if (!user) return;
 
-  const q = extractQueryParams(req, { strategy: 'string', k: 'int', userId: 'string', seedSongId: 'string' });
+  const q = extractQueryParams(req, { strategy: 'string', k: 'int', seedSongId: 'string' });
 
   const validStrategies = ['content', 'collaborative', 'hybrid'];
   const strategy = validStrategies.includes(q.strategy) ? q.strategy : 'hybrid';
   const k = isNaN(q.k) || q.k < 1 ? 10 : q.k;
 
-  const targetUserId =
-    q.userId && isValidObjectId(q.userId)
-      ? q.userId
-      : user._id.toString();
+  // Security: always use the authenticated user's ID; never accept userId from query params
+  // to prevent one user from evaluating another user's recommendations
+  const targetUserId = user._id.toString();
 
   let seedSongId = q.seedSongId;
 
