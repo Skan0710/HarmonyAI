@@ -30,6 +30,7 @@ export const searchCatalog = async (
   // Execute concurrent searches across Songs, Artists, and Albums
   const [songs, artists, albums] = await Promise.all([
     Song.find({
+      isPublished: true,
       $or: [
         { title: searchRegex },
         { tags: searchRegex },

@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { ListeningHistory } from '../models/ListeningHistory.js';
 import { Song } from '../models/Song.js';
 
@@ -52,11 +53,24 @@ export class TrendingService {
       }
     }
 
-    // 3. Fetch all catalog songs to ensure full catalog coverage
-    const allSongs = await Song.find({})
+    // 3. Fetch candidate catalog songs (prioritizing recently played and top played songs)
+    const playedSongIds = Array.from(songScores.keys()).filter((id) => Types.ObjectId.isValid(id));
+    const songQuery: any = playedSongIds.length > 0
+      ? {
+          $or: [
+            { _id: { $in: playedSongIds.map((id) => new Types.ObjectId(id)) } },
+            { isPublished: true },
+          ],
+        }
+      : {};
+
+    const candidateLimit = Math.max(limit * 5, 100);
+    const allSongs = await Song.find(songQuery)
       .populate('artist', 'name profileImage avatar verified')
       .populate('album', 'title coverImage releaseYear')
       .populate('genre', 'name slug')
+      .sort({ playCount: -1 })
+      .limit(candidateLimit)
       .lean();
 
     // 4. Calculate final score combining recency score and overall playCount

@@ -611,35 +611,33 @@ export class TemporalPreferenceAggregationService {
     const maxLookbackMs = config.longTermDays * 24 * 60 * 60 * 1000;
     const earliestAllowedDate = new Date(refDate.getTime() - maxLookbackMs);
 
-    // 1. Fetch Listening History
-    const historyDocs = await ListeningHistory.find({
-      user: userId,
-      playedAt: { $gte: earliestAllowedDate },
-    })
-      .populate({
-        path: 'song',
-        select: 'genre artist mood title audioFeatures',
-        populate: [
-          { path: 'genre', select: 'name' },
-          { path: 'artist', select: 'name' },
-        ],
+    // 1. Concurrently fetch Listening History, User Favorites, and Session Events
+    const [historyDocs, userDoc, sessionDocs] = await Promise.all([
+      ListeningHistory.find({
+        user: userId,
+        playedAt: { $gte: earliestAllowedDate },
       })
-      .lean();
-
-    // 2. Fetch User Favorites (Long-term baseline signals)
-    const userDoc = await User.findById(userId)
-      .populate('favoriteGenres', 'name')
-      .populate('favoriteArtists', 'name')
-      .populate('likedSongs', 'genre artist mood')
-      .lean();
-
-    // 3. Fetch Session Events
-    const sessionDocs = await ListeningSession.find({
-      user: userId,
-      startTime: { $gte: earliestAllowedDate },
-    })
-      .select('sessionEvents tracksPlayed tracksSkipped tracksCompleted')
-      .lean();
+        .populate({
+          path: 'song',
+          select: 'genre artist mood title audioFeatures',
+          populate: [
+            { path: 'genre', select: 'name' },
+            { path: 'artist', select: 'name' },
+          ],
+        })
+        .lean(),
+      User.findById(userId)
+        .populate('favoriteGenres', 'name')
+        .populate('favoriteArtists', 'name')
+        .populate('likedSongs', 'genre artist mood')
+        .lean(),
+      ListeningSession.find({
+        user: userId,
+        startTime: { $gte: earliestAllowedDate },
+      })
+        .select('sessionEvents tracksPlayed tracksSkipped tracksCompleted')
+        .lean(),
+    ]);
 
     const rawEvents: RawTemporalInteractionEvent[] = [];
 

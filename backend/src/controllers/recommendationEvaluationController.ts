@@ -31,18 +31,19 @@ export const evaluateRecommendationStrategy = controllerWrapper(async (req: Requ
 
   let seedSongId = q.seedSongId;
 
-  // 1. Fetch User Liked Songs & History (Ground Truth Relevant Items)
-  const userDoc = await User.findById(targetUserId).select('likedSongs').lean();
-  const likedSongIds = (userDoc?.likedSongs || []).map((id) => id.toString());
+  // 1. Fetch User Liked Songs & History (Ground Truth Relevant Items) concurrently
+  const [userDoc, historyDocs] = await Promise.all([
+    User.findById(targetUserId).select('likedSongs').lean(),
+    ListeningHistory.find({
+      user: new Types.ObjectId(targetUserId),
+      completed: true,
+    })
+      .select('song')
+      .limit(50)
+      .lean(),
+  ]);
 
-  const historyDocs = await ListeningHistory.find({
-    user: new Types.ObjectId(targetUserId),
-    completed: true,
-  })
-    .select('song')
-    .limit(50)
-    .lean();
-
+  const likedSongIds = ((userDoc as any)?.likedSongs || []).map((id: any) => id.toString());
   const historySongIds = historyDocs.map((h) => h.song.toString());
   const relevantSet = new Set<string>([...likedSongIds, ...historySongIds]);
   const relevantSongIds = Array.from(relevantSet);
@@ -89,11 +90,13 @@ export const evaluateRecommendationStrategy = controllerWrapper(async (req: Requ
   );
 
   // 4. Compute Diversity, Novelty, and Catalog Coverage Metrics
-  const totalCatalogCount = await Song.countDocuments({ isPublished: true });
-  const topPopularSong = await Song.findOne({ isPublished: true })
-    .sort({ playCount: -1 })
-    .select('playCount')
-    .lean();
+  const [totalCatalogCount, topPopularSong] = await Promise.all([
+    Song.countDocuments({ isPublished: true }),
+    Song.findOne({ isPublished: true })
+      .sort({ playCount: -1 })
+      .select('playCount')
+      .lean(),
+  ]);
   const maxCatalogPlayCount = topPopularSong?.playCount || 1000;
 
   const diversityInputItems: DiversitySongItem[] = recommendedSongDocs.map((s) => ({

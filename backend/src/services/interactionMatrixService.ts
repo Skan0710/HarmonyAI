@@ -143,9 +143,16 @@ export class UserSongInteractionMatrixService {
 
     // 1. Fetch user IDs and song IDs if not explicitly provided
     let userIds = options.userIds;
+    let usersWithLikes: any[];
+
     if (!userIds || userIds.length === 0) {
-      const users = await User.find({}).select('_id').lean();
-      userIds = users.map((u) => u._id.toString());
+      // Single query fetches both user IDs and likedSongs simultaneously, eliminating repeated User collection scan
+      usersWithLikes = await User.find({}).select('_id likedSongs').lean();
+      userIds = usersWithLikes.map((u) => u._id.toString());
+    } else {
+      usersWithLikes = await User.find({ _id: { $in: userIds } })
+        .select('_id likedSongs')
+        .lean();
     }
 
     let songIds = options.songIds;
@@ -156,10 +163,7 @@ export class UserSongInteractionMatrixService {
 
     const sparseMatrix = new SparseInteractionMatrix(userIds, songIds);
 
-    // 2. Fetch User Liked Songs in bulk
-    const usersWithLikes = await User.find({ _id: { $in: userIds } })
-      .select('_id likedSongs')
-      .lean();
+    // 2. User liked songs already fetched in step 1 without redundant database round-trip
 
     // Intermediate tracking map: userIndex -> Map<songIndex, { count, isLiked, completed, partial, skips }>
     const rawAggregates = new Map<

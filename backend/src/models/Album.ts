@@ -75,5 +75,7 @@ const albumSchema = new Schema<IAlbum>(
 );
 
 albumSchema.index({ title: 'text', tags: 'text' });
+albumSchema.index({ releaseYear: -1, createdAt: -1 });
+albumSchema.index({ artist: 1, releaseYear: -1 });
 
 export const Album = model<IAlbum>('Album', albumSchema);

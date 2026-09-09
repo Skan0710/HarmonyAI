@@ -142,30 +142,30 @@ export class MusicDNAExtractionService {
 
     const userObjectId = new Types.ObjectId(userId);
 
-    // 1. Fetch User with populated preferences and liked songs
-    const userDoc = await User.findById(userObjectId)
-      .populate({
-        path: 'likedSongs',
-        populate: [
-          { path: 'genre', select: 'name' },
-          { path: 'artist', select: 'name' },
-        ],
-      })
-      .populate('favoriteGenres', 'name')
-      .populate('favoriteArtists', 'name')
-      .lean();
-
-    // 2. Fetch Listening History
-    const historyDocs = await ListeningHistory.find({ user: userObjectId })
-      .populate({
-        path: 'song',
-        populate: [
-          { path: 'genre', select: 'name' },
-          { path: 'artist', select: 'name' },
-        ],
-      })
-      .sort({ playedAt: -1 })
-      .lean();
+    // 1. Concurrently fetch User and Listening History
+    const [userDoc, historyDocs] = await Promise.all([
+      User.findById(userObjectId)
+        .populate({
+          path: 'likedSongs',
+          populate: [
+            { path: 'genre', select: 'name' },
+            { path: 'artist', select: 'name' },
+          ],
+        })
+        .populate('favoriteGenres', 'name')
+        .populate('favoriteArtists', 'name')
+        .lean(),
+      ListeningHistory.find({ user: userObjectId })
+        .populate({
+          path: 'song',
+          populate: [
+            { path: 'genre', select: 'name' },
+            { path: 'artist', select: 'name' },
+          ],
+        })
+        .sort({ playedAt: -1 })
+        .lean(),
+    ]);
 
     const rawInputs: ExtractionRawInputs = {
       userId,

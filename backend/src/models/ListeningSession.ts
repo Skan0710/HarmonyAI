@@ -262,6 +262,7 @@ ListeningSessionSchema.pre('save', function () {
 
 // Compound indexes for user active session lookups and historical analytics
 ListeningSessionSchema.index({ user: 1, status: 1 });
+ListeningSessionSchema.index({ user: 1, status: 1, lastActivityTime: -1 });
 ListeningSessionSchema.index({ user: 1, startTime: -1 });
 ListeningSessionSchema.index({ user: 1, lastActivityTime: -1 });
 ListeningSessionSchema.index({ status: 1, lastActivityTime: 1 });

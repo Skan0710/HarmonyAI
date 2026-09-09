@@ -93,9 +93,11 @@ const recommendationInteractionSchema = new Schema<IRecommendationInteraction>(
 );
 
 // Compound index for fast user analytics, feedback queries, and deduplication
+recommendationInteractionSchema.index({ user: 1, timestamp: -1 });
 recommendationInteractionSchema.index({ user: 1, action: 1, timestamp: -1 });
 recommendationInteractionSchema.index({ user: 1, song: 1, action: 1 });
 recommendationInteractionSchema.index({ user: 1, song: 1, explanationFeedback: 1 });
+recommendationInteractionSchema.index({ song: 1, action: 1, timestamp: -1 });
 
 export const RecommendationInteraction = model<IRecommendationInteraction>(
   'RecommendationInteraction',

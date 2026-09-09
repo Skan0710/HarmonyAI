@@ -69,5 +69,8 @@ const playlistSchema = new Schema<IPlaylist>(
 
 // Index for fetching user's playlists efficiently
 playlistSchema.index({ owner: 1, createdAt: -1 });
+playlistSchema.index({ owner: 1, updatedAt: -1 });
+playlistSchema.index({ collaborators: 1, updatedAt: -1 });
+playlistSchema.index({ visibility: 1, createdAt: -1 });
 
 export const Playlist = model<IPlaylist>('Playlist', playlistSchema);

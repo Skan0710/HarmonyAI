@@ -177,5 +177,10 @@ const songSchema = new Schema<ISong>(
 
 songSchema.index({ title: 'text', tags: 'text', mood: 'text' });
 songSchema.index({ genre: 1, playCount: -1 });
+songSchema.index({ isPublished: 1, playCount: -1 });
+songSchema.index({ isPublished: 1, createdAt: -1 });
+songSchema.index({ isPublished: 1, genre: 1, playCount: -1 });
+songSchema.index({ isPublished: 1, artist: 1 });
+songSchema.index({ releaseYear: -1, createdAt: -1 });
 
 export const Song = model<ISong>('Song', songSchema);

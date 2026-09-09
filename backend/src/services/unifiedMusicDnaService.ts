@@ -265,39 +265,38 @@ export class UnifiedMusicDNAService {
   ): Promise<BehaviorProfilingRawInputs> {
     const userObjectId = new Types.ObjectId(userId);
 
-    const userDoc = await User.findById(userObjectId)
-      .populate({
-        path: 'likedSongs',
-        populate: [
-          { path: 'genre', select: 'name' },
-          { path: 'artist', select: 'name' },
-        ],
-      })
-      .populate('favoriteGenres', 'name')
-      .populate('favoriteArtists', 'name')
-      .lean();
-
-    const historyDocs = await ListeningHistory.find({ user: userObjectId })
-      .populate({
-        path: 'song',
-        select: 'title genre artist mood duration audioFeatures',
-        populate: [
-          { path: 'genre', select: 'name' },
-          { path: 'artist', select: 'name' },
-        ],
-      })
-      .sort({ playedAt: -1 })
-      .lean();
-
-    const sessionDocs = await ListeningSession.find({ user: userObjectId })
-      .sort({ startTime: -1 })
-      .limit(50)
-      .lean();
-
-    const feedbackDocs = await RecommendationInteraction.find({ user: userObjectId })
-      .sort({ timestamp: -1 })
-      .limit(100)
-      .lean();
+    const [userDoc, historyDocs, sessionDocs, feedbackDocs] = await Promise.all([
+      User.findById(userObjectId)
+        .populate({
+          path: 'likedSongs',
+          populate: [
+            { path: 'genre', select: 'name' },
+            { path: 'artist', select: 'name' },
+          ],
+        })
+        .populate('favoriteGenres', 'name')
+        .populate('favoriteArtists', 'name')
+        .lean(),
+      ListeningHistory.find({ user: userObjectId })
+        .populate({
+          path: 'song',
+          select: 'title genre artist mood duration audioFeatures',
+          populate: [
+            { path: 'genre', select: 'name' },
+            { path: 'artist', select: 'name' },
+          ],
+        })
+        .sort({ playedAt: -1 })
+        .lean(),
+      ListeningSession.find({ user: userObjectId })
+        .sort({ startTime: -1 })
+        .limit(50)
+        .lean(),
+      RecommendationInteraction.find({ user: userObjectId })
+        .sort({ timestamp: -1 })
+        .limit(100)
+        .lean(),
+    ]);
 
     return {
       userId,

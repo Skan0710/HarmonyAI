@@ -135,28 +135,29 @@ export class MusicDNAProfilingService {
 
     const userObjectId = new Types.ObjectId(userId);
 
-    const userDoc = await User.findById(userObjectId)
-      .populate({
-        path: 'likedSongs',
-        populate: [
-          { path: 'genre', select: 'name' },
-          { path: 'artist', select: 'name' },
-        ],
-      })
-      .populate('favoriteGenres', 'name')
-      .populate('favoriteArtists', 'name')
-      .lean();
-
-    const historyDocs = await ListeningHistory.find({ user: userObjectId })
-      .populate({
-        path: 'song',
-        populate: [
-          { path: 'genre', select: 'name' },
-          { path: 'artist', select: 'name' },
-        ],
-      })
-      .sort({ playedAt: -1 })
-      .lean();
+    const [userDoc, historyDocs] = await Promise.all([
+      User.findById(userObjectId)
+        .populate({
+          path: 'likedSongs',
+          populate: [
+            { path: 'genre', select: 'name' },
+            { path: 'artist', select: 'name' },
+          ],
+        })
+        .populate('favoriteGenres', 'name')
+        .populate('favoriteArtists', 'name')
+        .lean(),
+      ListeningHistory.find({ user: userObjectId })
+        .populate({
+          path: 'song',
+          populate: [
+            { path: 'genre', select: 'name' },
+            { path: 'artist', select: 'name' },
+          ],
+        })
+        .sort({ playedAt: -1 })
+        .lean(),
+    ]);
 
     const inputs: ExtractionRawInputs = {
       userId,

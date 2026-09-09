@@ -50,5 +50,8 @@ const listeningHistorySchema = new Schema<IListeningHistory>(
 
 // Compound index for querying user history sorted by newest first
 listeningHistorySchema.index({ user: 1, playedAt: -1 });
+listeningHistorySchema.index({ user: 1, song: 1, playedAt: -1 });
+listeningHistorySchema.index({ user: 1, skipped: 1, playedAt: -1 });
+listeningHistorySchema.index({ song: 1, playedAt: -1 });
 
 export const ListeningHistory = model<IListeningHistory>('ListeningHistory', listeningHistorySchema);

@@ -195,35 +195,31 @@ export class MusicDNABehaviorProfilingService {
 
     const userObjectId = new Types.ObjectId(userId);
 
-    // 1. Fetch User
-    const userDoc = await User.findById(userObjectId)
-      .select('likedSongs favoriteGenres favoriteArtists')
-      .lean();
-
-    // 2. Fetch Listening History
-    const historyDocs = await ListeningHistory.find({ user: userObjectId })
-      .populate({
-        path: 'song',
-        select: 'title genre artist mood duration audioFeatures',
-        populate: [
-          { path: 'genre', select: 'name' },
-          { path: 'artist', select: 'name' },
-        ],
-      })
-      .sort({ playedAt: -1 })
-      .lean();
-
-    // 3. Fetch Listening Sessions
-    const sessionDocs = await ListeningSession.find({ user: userObjectId })
-      .sort({ startTime: -1 })
-      .limit(50)
-      .lean();
-
-    // 4. Fetch Recommendation Interactions / Feedback
-    const feedbackDocs = await RecommendationInteraction.find({ user: userObjectId })
-      .sort({ timestamp: -1 })
-      .limit(100)
-      .lean();
+    // 1. Concurrently fetch User, Listening History, Sessions, and Interactions
+    const [userDoc, historyDocs, sessionDocs, feedbackDocs] = await Promise.all([
+      User.findById(userObjectId)
+        .select('likedSongs favoriteGenres favoriteArtists')
+        .lean(),
+      ListeningHistory.find({ user: userObjectId })
+        .populate({
+          path: 'song',
+          select: 'title genre artist mood duration audioFeatures',
+          populate: [
+            { path: 'genre', select: 'name' },
+            { path: 'artist', select: 'name' },
+          ],
+        })
+        .sort({ playedAt: -1 })
+        .lean(),
+      ListeningSession.find({ user: userObjectId })
+        .sort({ startTime: -1 })
+        .limit(50)
+        .lean(),
+      RecommendationInteraction.find({ user: userObjectId })
+        .sort({ timestamp: -1 })
+        .limit(100)
+        .lean(),
+    ]);
 
     const rawInputs: BehaviorProfilingRawInputs = {
       userId,

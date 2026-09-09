@@ -376,36 +376,22 @@ export class PersonalMusicTwinService {
     // 1. Fetch Unified Music DNA
     const dna = await UnifiedMusicDNAService.getOrGenerateProfile(userIdStr);
 
-    // 2. Fetch Snapshots
-    const snapshots = await MusicDNASnapshotService.getSnapshots(userIdStr, {
-      limit: 10,
-      sortAsc: false,
-    }).catch(() => []);
-
-    // 3. Fetch Taste Stability & Transformation Metrics safely
-    const stabilityMetrics = await TasteStabilityTransformationService.calculateUserStabilityMetrics(
-      userIdStr
-    ).catch(() => null);
-
-    // 4. Fetch Emerging Taste Report safely
-    const emergingReport = await EmergingTasteDetectionService.detectUserEmergingTastes(
-      userIdStr
-    ).catch(() => null);
-
-    // 5. Fetch Taste Evolution Timeline safely
-    const timelineReport = await TasteEvolutionTimelineService.getUserEvolutionTimeline(
-      userIdStr
-    ).catch(() => null);
-
-    // 6. Determine Listener Archetype
-    const archetypeResult = await ListenerArchetypeEngine.determineUserArchetype(
-      userIdStr
-    ).catch(() => null);
-
-    // 7. Generate Musical Personality Profile
-    const personalityProfile = await MusicalPersonalityProfileService.getUserPersonalityProfile(
-      userIdStr
-    ).catch(() => null);
+    // 2-7. Concurrently fetch all upstream intelligence signals
+    const [
+      snapshots,
+      stabilityMetrics,
+      emergingReport,
+      timelineReport,
+      archetypeResult,
+      personalityProfile,
+    ] = await Promise.all([
+      MusicDNASnapshotService.getSnapshots(userIdStr, { limit: 10, sortAsc: false }).catch(() => []),
+      TasteStabilityTransformationService.calculateUserStabilityMetrics(userIdStr).catch(() => null),
+      EmergingTasteDetectionService.detectUserEmergingTastes(userIdStr).catch(() => null),
+      TasteEvolutionTimelineService.getUserEvolutionTimeline(userIdStr).catch(() => null),
+      ListenerArchetypeEngine.determineUserArchetype(userIdStr).catch(() => null),
+      MusicalPersonalityProfileService.getUserPersonalityProfile(userIdStr).catch(() => null),
+    ]);
 
     // Synthesize the coherent twin attributes
     const twinAttributes = this.synthesizeTwinFromSignals({

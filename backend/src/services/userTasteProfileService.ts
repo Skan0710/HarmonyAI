@@ -81,37 +81,37 @@ export class UserTasteProfileService {
     const shortTermCutoff = new Date(now.getTime() - shortTermDays * 24 * 60 * 60 * 1000);
     const longTermCutoff = new Date(now.getTime() - longTermDays * 24 * 60 * 60 * 1000);
 
-    // 1. Fetch User Document with populated liked songs & preferences
-    const userDoc = await User.findById(userObjectId)
-      .populate({
-        path: 'likedSongs',
-        populate: [
-          { path: 'genre', select: 'name slug' },
-          { path: 'artist', select: 'name' },
-        ],
+    // 1. Concurrently fetch User Document and User Listening History
+    const [userDoc, historyRecords] = await Promise.all([
+      User.findById(userObjectId)
+        .populate({
+          path: 'likedSongs',
+          populate: [
+            { path: 'genre', select: 'name slug' },
+            { path: 'artist', select: 'name' },
+          ],
+        })
+        .populate('favoriteGenres', 'name slug')
+        .populate('favoriteArtists', 'name')
+        .lean(),
+      ListeningHistory.find({
+        user: userObjectId,
+        playedAt: { $gte: longTermCutoff },
       })
-      .populate('favoriteGenres', 'name slug')
-      .populate('favoriteArtists', 'name')
-      .lean();
+        .populate({
+          path: 'song',
+          populate: [
+            { path: 'genre', select: 'name slug' },
+            { path: 'artist', select: 'name' },
+          ],
+        })
+        .sort({ playedAt: -1 })
+        .lean(),
+    ]);
 
     if (!userDoc) {
       throw new Error('User not found');
     }
-
-    // 2. Fetch User Listening History
-    const historyRecords = await ListeningHistory.find({
-      user: userObjectId,
-      playedAt: { $gte: longTermCutoff },
-    })
-      .populate({
-        path: 'song',
-        populate: [
-          { path: 'genre', select: 'name slug' },
-          { path: 'artist', select: 'name' },
-        ],
-      })
-      .sort({ playedAt: -1 })
-      .lean();
 
     // Intermediate accumulation maps: ID -> { shortTerm: number, longTerm: number, name?: string }
     const genreRawScores = new Map<string, { shortTerm: number; longTerm: number; name?: string }>();

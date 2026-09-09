@@ -72,6 +72,8 @@ const userSchema = new Schema<IUser>(
   }
 );
 
+userSchema.index({ createdAt: -1 });
+
 // Pre-save hook to hash password
 userSchema.pre('save', async function () {
   if (!this.isModified('password') || !this.password) {

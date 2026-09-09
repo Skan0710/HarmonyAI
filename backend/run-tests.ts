@@ -42,8 +42,10 @@ import { runTasteEvolutionDiscoveryTests } from './src/__tests__/tasteEvolutionD
 import { runPersonalizedDiscoveryModeTests } from './src/__tests__/personalizedDiscoveryModeService.test.js';
 import { runIntelligentRecommendationReasonsTests } from './src/__tests__/intelligentRecommendationReasons.test.js';
 import { runAdvancedPersonalizationFullIntegrationTests } from './src/__tests__/advancedPersonalizationFullIntegration.test.js';
+import { runDatabaseIntegrityAndPerformanceTests } from './src/__tests__/databaseIntegrityAndPerformance.test.js';
 
 const suites = [
+  { name: 'Database Integrity and Performance',   fn: runDatabaseIntegrityAndPerformanceTests },
   { name: 'Full Advanced Personalization Integration (Day 34)', fn: runAdvancedPersonalizationFullIntegrationTests },
   { name: 'Intelligent Recommendation Reasons',   fn: runIntelligentRecommendationReasonsTests },
   { name: 'Personalized Discovery Modes',         fn: runPersonalizedDiscoveryModeTests },
