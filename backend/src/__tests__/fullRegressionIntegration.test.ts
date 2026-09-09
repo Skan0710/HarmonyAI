@@ -387,7 +387,7 @@ export async function runFullRegressionIntegrationTests() {
       personalMusicTwin: null,
       sessionProfile: null,
       context: { mood: 'Chill', situation: 'workout', desiredEnergy: 0.9 },
-      userClassification: 'RETURNING',
+      userClassification: 'ACTIVE',
     };
 
     const result = await AdaptiveRecommendationRankingPipeline.executePipeline(options);
@@ -640,12 +640,12 @@ export async function runFullRegressionIntegrationTests() {
           sources: ['popularity'],
         },
       ],
-      userClassification: 'RETURNING',
+      userClassification: 'ACTIVE',
     };
 
     const multiResult = await AdaptiveRecommendationRankingPipeline.executePipeline(multiOptions);
     check('Multi-candidate pipeline returns all candidates', multiResult.recommendations.length === 3);
-    check('Multi-candidate pipeline sorts by score', multiResult.recommendations[0].finalScore >= multiResult.recommendations[1].finalScore);
+    check('Multi-candidate pipeline sorts by score', multiResult.recommendations.length >= 2 && (multiResult.recommendations[0]?.finalScore ?? 0) >= (multiResult.recommendations[1]?.finalScore ?? 0));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
