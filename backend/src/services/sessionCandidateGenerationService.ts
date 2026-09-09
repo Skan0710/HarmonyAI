@@ -1,8 +1,7 @@
-import { Types } from 'mongoose';
 import { ISong, Song } from '../models/Song.js';
 import { IListeningSession } from '../models/ListeningSession.js';
 import { ListeningSessionService } from './listeningSessionService.js';
-import { SessionProfileService, TemporarySessionProfile } from './sessionProfileService.js';
+import { SessionProfileService } from './sessionProfileService.js';
 import { ContentRecommendationService } from './recommendationService.js';
 import { AdaptiveSessionScoringService } from './adaptiveSessionScoringService.js';
 import { AdaptiveSessionScoringWeights } from '../config/recommendationConfig.js';

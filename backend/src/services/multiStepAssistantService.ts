@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import { ToolRegistry } from '../tools/toolRegistry.js';
 import { AssistantToolContext, ToolExecutionResult } from '../tools/toolTypes.js';
-import { AssistantIntentService, ToolCallIntent } from './assistantIntentService.js';
+import { AssistantIntentService } from './assistantIntentService.js';
 
 dotenv.config();
 

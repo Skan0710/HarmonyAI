@@ -45,6 +45,23 @@ app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/admin/recommendations', adminRecommendationRoutes);
 app.use('/api/assistant', assistantRoutes);
 
+// 404 handler for undefined API routes
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    message: `Cannot ${req.method} ${req.originalUrl} - Resource not found`,
+  });
+});
+
+// Centralized error handling middleware
+app.use((err: any, _req: Request, res: Response, _next: any) => {
+  const statusCode = err.statusCode || err.status || 500;
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || 'Internal server error',
+  });
+});
+
 const startServer = async (): Promise<void> => {
   await connectDB();
   app.listen(PORT, () => {

@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { IMusicDNASnapshot, ISnapshotTasteItem, ISnapshotMoodItem } from '../models/MusicDNASnapshot.js';
+import { IMusicDNASnapshot } from '../models/MusicDNASnapshot.js';
 import { MusicDNASnapshotService } from './musicDnaSnapshotService.js';
 import { UnifiedMusicDNAService } from './unifiedMusicDnaService.js';
 import { UnifiedMusicDNA } from '../schemas/musicDnaSchema.js';

@@ -1,6 +1,5 @@
 import { Types } from 'mongoose';
 import { IListeningSession, SessionActionType } from '../models/ListeningSession.js';
-import { ListeningSessionService } from './listeningSessionService.js';
 import { SessionProfileService, TemporarySessionProfile } from './sessionProfileService.js';
 import { Song } from '../models/Song.js';
 
@@ -170,6 +169,7 @@ export class SessionPreferenceUpdateService {
   static async updateActiveSessionPreferences(userId: string): Promise<TemporarySessionProfile | null> {
     if (!userId || !Types.ObjectId.isValid(userId)) return null;
 
+    const { ListeningSessionService } = await import('./listeningSessionService.js');
     const activeSession = await ListeningSessionService.getActiveSession(userId);
     if (!activeSession) return null;
 

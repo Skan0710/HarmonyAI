@@ -1,6 +1,5 @@
 import { Types } from 'mongoose';
 import { IListeningSession } from '../models/ListeningSession.js';
-import { ListeningSessionService } from './listeningSessionService.js';
 import { Song } from '../models/Song.js';
 
 export interface TemporarySessionProfile {
@@ -167,6 +166,7 @@ export class SessionProfileService {
       return null;
     }
 
+    const { ListeningSessionService } = await import('./listeningSessionService.js');
     const activeSession = await ListeningSessionService.getActiveSession(userId);
     if (!activeSession) {
       return null;

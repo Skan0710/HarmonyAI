@@ -1,5 +1,4 @@
 import mongoose, { Types } from 'mongoose';
-import { ISong, Song } from '../models/Song.js';
 import { IListeningSession } from '../models/ListeningSession.js';
 import { ListeningSessionService } from './listeningSessionService.js';
 import {

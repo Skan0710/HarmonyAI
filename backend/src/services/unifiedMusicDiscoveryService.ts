@@ -4,9 +4,7 @@ import { SemanticSearchService, SemanticSearchResult } from './semanticSearchSer
 import { HybridRecommendationService } from './hybridRecommendationService.js';
 import { ContentRecommendationService } from './recommendationService.js';
 import { TrendingService } from './trendingService.js';
-import { ColdStartRecommendationService } from './coldStartRecommendationService.js';
 import { UserTasteProfileService } from './userTasteProfileService.js';
-import { ListeningSessionService } from './listeningSessionService.js';
 import { CandidateGenerationService } from './candidateGenerationService.js';
 import { RecommendationPostRankingPipeline } from './recommendationPostRankingPipeline.js';
 import { Artist } from '../models/Artist.js';

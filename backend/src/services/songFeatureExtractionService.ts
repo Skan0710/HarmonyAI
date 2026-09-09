@@ -1,5 +1,3 @@
-import { ISong } from '../models/Song.js';
-
 export interface NormalizedSongFeatures {
   songId: string;
   artistId: string;

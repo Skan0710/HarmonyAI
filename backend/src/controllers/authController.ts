@@ -56,11 +56,11 @@ export const login = controllerWrapper(async (req: Request, res: Response) => {
   });
 });
 
-export const getMe = async (req: Request, res: Response): Promise<void> => {
+export const getMe = controllerWrapper(async (req: Request, res: Response) => {
   res.status(200).json({
     success: true,
     data: {
       user: req.user,
     },
   });
-};
+});

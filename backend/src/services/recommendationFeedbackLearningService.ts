@@ -6,7 +6,7 @@ import {
 import { RecommendationInteraction } from '../models/RecommendationInteraction.js';
 import { TemporalPreferenceAggregationService } from './temporalPreferenceAggregationService.js';
 import { ListeningSessionService } from './listeningSessionService.js';
-import { RecommendationScoreCalibrationService, UserFeedbackProfile } from './recommendationScoreCalibrationService.js';
+import { type UserFeedbackProfile } from './recommendationScoreCalibrationService.js';
 
 export interface RecommendationFeedbackEvent {
   userId: string;

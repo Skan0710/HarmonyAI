@@ -10,7 +10,6 @@ import {
   TemporalPreferenceAggregationConfig,
 } from '../config/recommendationConfig.js';
 import { ListeningHistory } from '../models/ListeningHistory.js';
-import { User } from '../models/User.js';
 
 export interface TasteAffinityItem {
   id?: string;

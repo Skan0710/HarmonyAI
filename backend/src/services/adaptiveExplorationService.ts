@@ -1,4 +1,3 @@
-import { Types } from 'mongoose';
 import {
   ExplorationExploitationConfig,
   getExplorationExploitationConfig,

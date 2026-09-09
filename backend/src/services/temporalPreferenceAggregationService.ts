@@ -7,7 +7,6 @@ import {
 import { ListeningHistory } from '../models/ListeningHistory.js';
 import { ListeningSession } from '../models/ListeningSession.js';
 import { User } from '../models/User.js';
-import { Song } from '../models/Song.js';
 import {
   TemporalPreferenceAggregationConfig,
   getTemporalAggregationConfig,

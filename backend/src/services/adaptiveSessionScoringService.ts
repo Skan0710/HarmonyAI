@@ -1,4 +1,3 @@
-import { ISong } from '../models/Song.js';
 import { ISessionEvent } from '../models/ListeningSession.js';
 import { TemporarySessionProfile } from './sessionProfileService.js';
 import {

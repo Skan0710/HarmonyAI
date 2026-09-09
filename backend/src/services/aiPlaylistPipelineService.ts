@@ -1,7 +1,7 @@
 import { ISong, Song } from '../models/Song.js';
 import { AIPlaylistPreference } from '../schemas/aiPlaylistPreferenceSchema.js';
 import { AIPlaylistGenerationService } from './aiPlaylistGenerationService.js';
-import { PlaylistCandidateGenerationService, PlaylistCandidateItem } from './playlistCandidateGenerationService.js';
+import { PlaylistCandidateGenerationService } from './playlistCandidateGenerationService.js';
 import { PlaylistDiversityFilteringService } from './playlistDiversityFilteringService.js';
 
 export interface AIPlaylistGenerationResponse {

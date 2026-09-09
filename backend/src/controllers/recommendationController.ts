@@ -26,7 +26,7 @@ import { ComfortDiscoveryScoringService } from '../services/comfortDiscoveryScor
 import { TasteBoundaryDetectionService } from '../services/tasteBoundaryDetectionService.js';
 import { UnifiedMusicDNAService } from '../services/unifiedMusicDnaService.js';
 import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
-import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
+import { extractQueryParams } from '../utils/validators.js';
 
 export const getSimilarSongs = controllerWrapper(async (req: Request, res: Response) => {
   const { songId } = req.params;
