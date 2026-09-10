@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Home,
+  Compass,
   Search,
   LayoutGrid,
   Library,
@@ -33,6 +34,7 @@ const sections: NavSection[] = [
     title: 'Listen',
     items: [
       { to: '/', label: 'Home', icon: Home, end: true },
+      { to: '/discover', label: 'Discover', icon: Compass },
       { to: '/search', label: 'Search', icon: Search },
       { to: '/genres', label: 'Browse Genres', icon: LayoutGrid },
     ],

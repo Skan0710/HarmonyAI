@@ -226,18 +226,15 @@ export const ListeningContextSelector: React.FC<ListeningContextSelectorProps> =
     <div className={`space-y-3 ${className}`}>
       {title && (
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🎧</span>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">{title}</h3>
-          </div>
-          {description && <span className="text-xs text-slate-400 hidden sm:inline">{description}</span>}
+          <h3 className="text-2xs font-semibold uppercase tracking-[0.1em] text-text-tertiary">{title}</h3>
+          {description && <span className="text-xs text-text-tertiary hidden sm:inline">{description}</span>}
         </div>
       )}
 
       <div
         role="radiogroup"
         aria-label="Listening context selector"
-        className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-700/50 -mx-1 px-1"
+        className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1"
       >
         {LISTENING_CONTEXTS.map((item) => {
           const isSelected = currentSelected === item.id;
@@ -248,17 +245,13 @@ export const ListeningContextSelector: React.FC<ListeningContextSelectorProps> =
               aria-checked={isSelected}
               onClick={() => onSelectContext(item.id)}
               type="button"
-              className={`flex-shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium border transition-all duration-200 cursor-pointer select-none group ${
+              className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-pill)] text-xs font-medium transition-colors duration-[var(--duration-fast)] cursor-pointer select-none ${
                 isSelected
-                  ? `${item.activeBorder} border shadow-md font-semibold ring-1 ring-white/10 scale-[1.02]`
-                  : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 hover:bg-slate-800/60'
+                  ? 'bg-accent text-text-on-accent font-semibold'
+                  : 'bg-surface-2 text-text-secondary hover:text-text-primary'
               }`}
             >
-              <span className="text-base group-hover:scale-110 transition-transform">{item.emoji}</span>
               <span className="whitespace-nowrap">{item.label}</span>
-              {isSelected && (
-                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 animate-pulse ml-0.5" />
-              )}
             </button>
           );
         })}

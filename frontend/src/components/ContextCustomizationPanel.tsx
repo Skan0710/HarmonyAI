@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronDown, ChevronRight, Zap, Timer, Compass } from 'lucide-react';
 import type { ListeningContextId } from './ListeningContextSelector';
 
 export interface ContextCustomizationValues {
@@ -155,18 +156,18 @@ export const ContextCustomizationPanel: React.FC<ContextCustomizationPanelProps>
     (values.genres && values.genres.length > 0);
 
   return (
-    <div className="rounded-2xl border border-slate-700/60 bg-slate-900/60 overflow-hidden transition-all duration-200">
+    <div className="rounded-[var(--radius-md)] bg-surface-1 overflow-hidden">
       {/* Header Toggle Bar */}
-      <div className="flex items-center justify-between p-3.5 sm:p-4 bg-slate-900/80">
+      <div className="flex items-center justify-between p-3.5 sm:p-4">
         <button
           type="button"
           onClick={onToggleOpen}
-          className="flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer select-none"
+          className="flex items-center gap-2 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors cursor-pointer select-none"
         >
-          <span className="text-base">{isOpen ? '▼' : '▶'}</span>
-          <span className="uppercase tracking-wider">Fine-Tune Acoustic Parameters</span>
+          {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <span className="uppercase tracking-wide">Fine-tune acoustic parameters</span>
           {hasOverrides && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+            <span className="px-2 py-0.5 rounded-[var(--radius-pill)] text-2xs font-semibold bg-accent-wash text-accent">
               Customized
             </span>
           )}
@@ -176,24 +177,25 @@ export const ContextCustomizationPanel: React.FC<ContextCustomizationPanelProps>
           <button
             type="button"
             onClick={onReset}
-            className="text-[11px] font-medium text-slate-400 hover:text-rose-300 underline cursor-pointer transition-colors"
+            className="text-2xs font-medium text-text-tertiary hover:text-accent cursor-pointer transition-colors"
           >
-            Reset to Context Defaults
+            Reset
           </button>
         )}
       </div>
 
       {/* Expandable Controls Body */}
       {isOpen && (
-        <div className="p-4 sm:p-5 space-y-5 border-t border-slate-800 bg-slate-950/40 backdrop-blur-sm">
+        <div className="p-4 sm:p-5 space-y-5 border-t border-border-subtle">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* 1. Energy Slider */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300">
-                  ⚡ Desired Energy:
+                <label className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
+                  <Zap size={12} className="text-accent" />
+                  Desired Energy
                 </label>
-                <span className="text-xs font-mono font-bold text-rose-400">
+                <span className="text-xs font-mono font-semibold text-accent tabular-nums">
                   {Math.round(currentEnergy * 100)}%
                 </span>
               </div>
@@ -204,22 +206,23 @@ export const ContextCustomizationPanel: React.FC<ContextCustomizationPanelProps>
                 step="0.05"
                 value={currentEnergy}
                 onChange={handleEnergyChange}
-                className="w-full accent-rose-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer"
+                className="w-full accent-[var(--accent)] bg-surface-2 rounded-full h-1 cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-slate-500">
-                <span>Calm (0%)</span>
-                <span>Moderate (50%)</span>
-                <span>Intense (100%)</span>
+              <div className="flex justify-between text-2xs text-text-tertiary">
+                <span>Calm</span>
+                <span>Moderate</span>
+                <span>Intense</span>
               </div>
             </div>
 
             {/* 2. Tempo Slider */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300">
-                  🥁 Target Pace (BPM):
+                <label className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
+                  <Timer size={12} className="text-accent" />
+                  Target Pace
                 </label>
-                <span className="text-xs font-mono font-bold text-cyan-400">
+                <span className="text-xs font-mono font-semibold text-accent tabular-nums">
                   {currentTempo} BPM
                 </span>
               </div>
@@ -230,22 +233,23 @@ export const ContextCustomizationPanel: React.FC<ContextCustomizationPanelProps>
                 step="2"
                 value={currentTempo}
                 onChange={handleTempoChange}
-                className="w-full accent-cyan-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer"
+                className="w-full accent-[var(--accent)] bg-surface-2 rounded-full h-1 cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-slate-500">
-                <span>Slow (60)</span>
-                <span>Medium (115)</span>
-                <span>Fast (170)</span>
+              <div className="flex justify-between text-2xs text-text-tertiary">
+                <span>Slow</span>
+                <span>Medium</span>
+                <span>Fast</span>
               </div>
             </div>
 
             {/* 3. Discovery / Novelty Slider */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300">
-                  🧭 Discovery Level:
+                <label className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
+                  <Compass size={12} className="text-gold" />
+                  Discovery Level
                 </label>
-                <span className="text-xs font-mono font-bold text-amber-400">
+                <span className="text-xs font-mono font-semibold text-gold tabular-nums">
                   {Math.round(currentDiscovery * 100)}%
                 </span>
               </div>
@@ -256,27 +260,25 @@ export const ContextCustomizationPanel: React.FC<ContextCustomizationPanelProps>
                 step="0.05"
                 value={currentDiscovery}
                 onChange={handleDiscoveryChange}
-                className="w-full accent-amber-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer"
+                className="w-full accent-[var(--gold)] bg-surface-2 rounded-full h-1 cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-slate-500">
-                <span>Familiar Favorites</span>
+              <div className="flex justify-between text-2xs text-text-tertiary">
+                <span>Familiar</span>
                 <span>Balanced</span>
-                <span>Fresh Discovery</span>
+                <span>Fresh</span>
               </div>
             </div>
           </div>
 
           {/* 4. Preferred Genre Filter Chips */}
-          <div className="space-y-2 pt-2 border-t border-slate-800/80">
+          <div className="space-y-2 pt-4 border-t border-border-subtle">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-300">
-                🎸 Genre Preferences (Optional Filter):
-              </label>
+              <label className="text-xs font-medium text-text-secondary">Genre preferences (optional)</label>
               {currentGenres.length > 0 && (
                 <button
                   type="button"
                   onClick={() => onChange({ ...values, genres: [] })}
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300"
+                  className="text-2xs text-accent hover:text-accent-strong cursor-pointer"
                 >
                   Clear genres
                 </button>
@@ -290,10 +292,8 @@ export const ContextCustomizationPanel: React.FC<ContextCustomizationPanelProps>
                     key={genre}
                     type="button"
                     onClick={() => handleGenreToggle(genre)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-indigo-500 bg-indigo-600/30 text-indigo-200 font-semibold shadow-sm ring-1 ring-indigo-400/30'
-                        : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                    className={`px-2.5 py-1 rounded-[var(--radius-pill)] text-2xs font-medium transition-colors cursor-pointer ${
+                      isSelected ? 'bg-accent text-text-on-accent font-semibold' : 'bg-surface-2 text-text-secondary hover:text-text-primary'
                     }`}
                   >
                     {genre}

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MainLayout } from './components/MainLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
+import { DiscoverPage } from './pages/DiscoverPage';
 import { MusicLibraryPage } from './pages/MusicLibraryPage';
 import { SearchPage } from './pages/SearchPage';
 import { GenresPage } from './pages/GenresPage';
@@ -51,6 +52,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/" element={<HomePage />} />
+            <Route path="/discover" element={<DiscoverPage />} />
             <Route path="/assistant" element={<AssistantPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/genres" element={<GenresPage />} />
