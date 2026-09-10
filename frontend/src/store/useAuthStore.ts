@@ -11,16 +11,22 @@ export interface User {
 }
 
 interface AuthResponseData {
-  user: User;
-  token: string;
+  success: boolean;
+  data: {
+    user: User;
+    token: string;
+  };
 }
 
 interface UserProfileResponseData {
-  id: string;
-  name: string;
-  email: string;
-  profilePicture?: string;
-  createdAt: string;
+  success: boolean;
+  data: {
+    id: string;
+    name: string;
+    email: string;
+    profilePicture?: string;
+    createdAt: string;
+  };
 }
 
 interface AuthState {
@@ -52,7 +58,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       body: JSON.stringify(credentials),
     });
 
-    if (response.error || !response.data) {
+    if (response.error || !response.data?.data) {
       set({
         isLoading: false,
         error: response.error || 'Failed to authenticate.',
@@ -61,7 +67,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       return false;
     }
 
-    const { user, token } = response.data;
+    const { user, token } = response.data.data;
     setToken(token);
 
     set({
@@ -82,7 +88,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       body: JSON.stringify(userData),
     });
 
-    if (response.error || !response.data) {
+    if (response.error || !response.data?.data) {
       set({
         isLoading: false,
         error: response.error || 'Failed to create account.',
@@ -91,7 +97,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       return false;
     }
 
-    const { user, token } = response.data;
+    const { user, token } = response.data.data;
     setToken(token);
 
     set({
@@ -133,7 +139,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     const response = await apiClient<UserProfileResponseData>('/users/me');
 
-    if (response.error || !response.data) {
+    if (response.error || !response.data?.data) {
       // Invalid/expired token -> clear auth state
       removeToken();
       set({
@@ -145,7 +151,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
     } else {
       set({
-        user: response.data,
+        user: response.data.data,
         isAuthenticated: true,
         isLoading: false,
         isInitializing: false,

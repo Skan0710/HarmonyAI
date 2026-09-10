@@ -1,7 +1,8 @@
 const TOKEN_KEY = 'harmonyai_token';
 
 export const getToken = (): string | null => {
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  return token && token !== 'undefined' && token !== 'null' ? token : null;
 };
 
 export const setToken = (token: string): void => {
