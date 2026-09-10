@@ -1,8 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import type { Song } from '../types/music';
+import { AnimatePresence, motion } from 'motion/react';
 import {
-  fetchRecommendationExplanationApi,
-} from '../services/recommendationService';
+  Sparkles,
+  X,
+  Fingerprint,
+  Mic2,
+  AudioLines,
+  Users,
+  Zap,
+  Heart,
+  Compass,
+  Star,
+  TrendingUp,
+  RefreshCw,
+  ThumbsUp,
+  Target,
+  Repeat,
+  Ban,
+} from 'lucide-react';
+import type { Song } from '../types/music';
+import { fetchRecommendationExplanationApi } from '../services/recommendationService';
 import type { RecommendationExplanationResponse } from '../services/recommendationService';
 import { submitRecommendationFeedbackApi } from '../services/recommendationTrackingService';
 
@@ -10,8 +27,8 @@ export interface ExplanationFactor {
   label: string;
   scorePercent: number;
   description: string;
-  badgeColor: string;
-  icon: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  tone: 'accent' | 'gold';
 }
 
 export interface RecommendationExplanationModalProps {
@@ -19,6 +36,32 @@ export interface RecommendationExplanationModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+const REASON_META: Record<string, { icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; label: string; tone: 'accent' | 'gold' }> = {
+  PREFERRED_GENRE: { icon: Fingerprint, label: 'Genre match', tone: 'accent' },
+  GENRE_PREFERENCE: { icon: Fingerprint, label: 'Genre match', tone: 'accent' },
+  SIMILAR_ARTIST: { icon: Mic2, label: 'Artist alignment', tone: 'accent' },
+  ARTIST_PREFERENCE: { icon: Mic2, label: 'Artist alignment', tone: 'accent' },
+  SIMILAR_TO_LIKED_SONGS: { icon: AudioLines, label: 'Acoustic similarity', tone: 'accent' },
+  CONTENT_SIMILARITY: { icon: AudioLines, label: 'Acoustic similarity', tone: 'accent' },
+  COLLABORATIVE_SIMILARITY: { icon: Users, label: 'Listeners like you', tone: 'gold' },
+  COLLABORATIVE_FILTERING: { icon: Users, label: 'Listeners like you', tone: 'gold' },
+  SESSION_PREFERENCE: { icon: Zap, label: 'Session flow', tone: 'accent' },
+  PREFERRED_MOOD: { icon: Heart, label: 'Mood match', tone: 'accent' },
+  MOOD_MATCH: { icon: Heart, label: 'Mood match', tone: 'accent' },
+  PREFERRED_ENERGY: { icon: Zap, label: 'Energy pace', tone: 'accent' },
+  ENERGY_MATCH: { icon: Zap, label: 'Energy pace', tone: 'accent' },
+  DISCOVERY_OPPORTUNITY: { icon: Compass, label: 'Discovery opportunity', tone: 'gold' },
+  NOVELTY: { icon: Star, label: 'Fresh novelty', tone: 'gold' },
+  POPULARITY: { icon: TrendingUp, label: 'Community popularity', tone: 'gold' },
+};
+
+const DEFAULT_META = { icon: Sparkles, label: 'Taste profile match', tone: 'accent' as const };
+
+const toneClasses: Record<'accent' | 'gold', { badge: string; bar: string; text: string }> = {
+  accent: { badge: 'bg-accent-wash text-accent', bar: 'bg-accent', text: 'text-accent' },
+  gold: { badge: 'bg-gold-wash text-gold', bar: 'bg-gold', text: 'text-gold' },
+};
 
 export const RecommendationExplanationModal: React.FC<RecommendationExplanationModalProps> = ({
   song,
@@ -50,14 +93,10 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
         }
       })
       .catch((err) => {
-        if (isMounted) {
-          setError(err?.message || 'Failed to load recommendation explanation');
-        }
+        if (isMounted) setError(err?.message || 'Failed to load recommendation explanation');
       })
       .finally(() => {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       });
 
     return () => {
@@ -67,15 +106,11 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
+      if (e.key === 'Escape' && isOpen) onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
 
   const rawComponentScores = (song as any).componentScores;
   const rawSources: string[] = (song as any).sources || (explanationData?.contributingSignals?.sources as string[]) || [];
@@ -83,9 +118,7 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
 
   const getArtistName = (): string => {
     if (!song.artist) return 'Artist';
-    if (typeof song.artist === 'object' && 'name' in song.artist) {
-      return song.artist.name;
-    }
+    if (typeof song.artist === 'object' && 'name' in song.artist) return song.artist.name;
     return String(song.artist);
   };
 
@@ -103,95 +136,6 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
     setSubmitting(false);
   };
 
-  const getReasonBadgeInfo = (type: string) => {
-    switch (type) {
-      case 'PREFERRED_GENRE':
-      case 'GENRE_PREFERENCE':
-        return {
-          icon: '🎸',
-          label: 'Genre Match',
-          badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-          gradient: 'from-indigo-500 to-indigo-400',
-        };
-      case 'SIMILAR_ARTIST':
-      case 'ARTIST_PREFERENCE':
-        return {
-          icon: '🎤',
-          label: 'Artist Alignment',
-          badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-          gradient: 'from-purple-500 to-purple-400',
-        };
-      case 'SIMILAR_TO_LIKED_SONGS':
-      case 'CONTENT_SIMILARITY':
-        return {
-          icon: '🎵',
-          label: 'Acoustic Similarity',
-          badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-          gradient: 'from-cyan-500 to-blue-400',
-        };
-      case 'COLLABORATIVE_SIMILARITY':
-      case 'COLLABORATIVE_FILTERING':
-        return {
-          icon: '👥',
-          label: 'Listeners Like You',
-          badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-          gradient: 'from-amber-500 to-yellow-400',
-        };
-      case 'SESSION_PREFERENCE':
-        return {
-          icon: '⚡',
-          label: 'Session Flow',
-          badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-          gradient: 'from-emerald-500 to-teal-400',
-        };
-      case 'PREFERRED_MOOD':
-      case 'MOOD_MATCH':
-        return {
-          icon: '✨',
-          label: 'Mood Match',
-          badgeColor: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
-          gradient: 'from-teal-500 to-emerald-400',
-        };
-      case 'PREFERRED_ENERGY':
-      case 'ENERGY_MATCH':
-        return {
-          icon: '🔥',
-          label: 'Energy Pace',
-          badgeColor: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-          gradient: 'from-orange-500 to-amber-400',
-        };
-      case 'DISCOVERY_OPPORTUNITY':
-        return {
-          icon: '🧭',
-          label: 'Discovery Opportunity',
-          badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
-          gradient: 'from-rose-500 to-pink-400',
-        };
-      case 'NOVELTY':
-        return {
-          icon: '🌟',
-          label: 'Fresh Novelty',
-          badgeColor: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
-          gradient: 'from-fuchsia-500 to-purple-400',
-        };
-      case 'POPULARITY':
-        return {
-          icon: '📈',
-          label: 'Community Popularity',
-          badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-          gradient: 'from-blue-500 to-sky-400',
-        };
-      default:
-        return {
-          icon: '✨',
-          label: 'Taste Profile Match',
-          badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-          gradient: 'from-indigo-500 to-purple-400',
-        };
-    }
-  };
-
-  // Build fallback factors if API response not yet loaded or returned empty
   const getFallbackFactors = (): ExplanationFactor[] => {
     const factors: ExplanationFactor[] = [];
     if (rawComponentScores) {
@@ -199,38 +143,38 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
 
       if (contentScore > 0) {
         factors.push({
-          icon: '🎵',
-          label: 'Acoustic & Metadata Similarity',
+          icon: AudioLines,
+          label: 'Acoustic & metadata similarity',
           scorePercent: Math.round(contentScore * 100),
           description: 'Matches the tempo, mood, genre, and acoustic signature of songs you love.',
-          badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+          tone: 'accent',
         });
       }
       if (collaborativeScore > 0) {
         factors.push({
-          icon: '👥',
-          label: 'Listeners Like You',
+          icon: Users,
+          label: 'Listeners like you',
           scorePercent: Math.round(collaborativeScore * 100),
-          description: 'Listeners with similar music tastes frequently play and replay this track.',
-          badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+          description: 'Listeners with similar taste frequently play and replay this track.',
+          tone: 'gold',
         });
       }
       if (popularityScore > 0) {
         factors.push({
-          icon: '📈',
-          label: 'Community Popularity',
+          icon: TrendingUp,
+          label: 'Community popularity',
           scorePercent: Math.round(popularityScore * 100),
-          description: 'High play count and active engagement across the HarmonyAI network.',
-          badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+          description: 'High play count and active engagement across HarmonyAI.',
+          tone: 'gold',
         });
       }
       if (recencyScore > 0) {
         factors.push({
-          icon: '🌟',
-          label: 'Catalog Recency',
+          icon: Star,
+          label: 'Catalog recency',
           scorePercent: Math.round(recencyScore * 100),
-          description: 'Fresh release or recent addition to our catalog.',
-          badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+          description: 'A fresh release or recent addition to the catalog.',
+          tone: 'gold',
         });
       }
     }
@@ -240,263 +184,185 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
   const fallbackFactors = getFallbackFactors();
   const hasApiReasons = explanationData && Array.isArray(explanationData.topReasons) && explanationData.topReasons.length > 0;
 
+  const FEEDBACK_OPTIONS: { id: typeof activeFeedback; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
+    { id: 'helpful', label: 'Helpful', icon: ThumbsUp },
+    { id: 'not_relevant', label: 'Not relevant', icon: Target },
+    { id: 'too_similar', label: 'Too similar', icon: Repeat },
+    { id: 'not_my_style', label: 'Not my style', icon: Ban },
+  ];
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-3xl p-6 shadow-2xl space-y-5 text-slate-100 overflow-hidden max-h-[90vh] overflow-y-auto"
-      >
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Modal Header */}
-        <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-          <div className="space-y-1.5 pr-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-semibold">
-              <span>💡 Why this song?</span>
-            </div>
-            <h2 className="text-xl font-bold text-white tracking-tight line-clamp-1">{song.title}</h2>
-            <p className="text-xs text-slate-400 font-medium">by {getArtistName()}</p>
-
-            {rawSources.length > 0 && (
-              <div className="flex flex-wrap gap-1 pt-1">
-                {rawSources.map((src, i) => (
-                  <span key={i} className="px-2 py-0.5 text-[10px] font-mono font-medium rounded-md bg-slate-800 text-slate-300 border border-slate-700">
-                    Source: {src}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-full bg-slate-800/80 hover:bg-slate-800 transition-colors flex-shrink-0"
-            aria-label="Close modal"
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-lg bg-surface-1 rounded-[var(--radius-lg)] p-6 space-y-5 text-text-primary max-h-[90vh] overflow-y-auto"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="space-y-3 py-4 animate-pulse">
-            <div className="h-4 bg-slate-800 rounded w-1/3 mb-2" />
-            <div className="h-16 bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4" />
-            <div className="h-16 bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4" />
-            <div className="h-16 bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4" />
-          </div>
-        )}
-
-        {/* Error State with Retry */}
-        {!loading && error && (
-          <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 text-center space-y-2">
-            <p className="text-xs text-rose-300 font-medium">{error}</p>
-            <button
-              onClick={() => {
-                if (song._id) {
-                  setLoading(true);
-                  setError(null);
-                  fetchRecommendationExplanationApi(song._id)
-                    .then((res) => {
-                      if (res.error) setError(res.error);
-                      else if (res.data) setExplanationData(res.data);
-                    })
-                    .finally(() => setLoading(false));
-                }
-              }}
-              className="px-3 py-1 text-xs rounded-xl bg-slate-800 text-slate-200 hover:text-white border border-slate-700 hover:border-slate-600 transition-colors"
-            >
-              🔄 Retry
-            </button>
-          </div>
-        )}
-
-        {/* Main Explanation Reasons Content */}
-        {!loading && (
-          <div className="space-y-4">
-            {/* Top Summary Banner */}
-            {explanationData?.summary && (
-              <div className="bg-indigo-950/40 border border-indigo-500/20 rounded-2xl p-3.5 flex items-start gap-2.5">
-                <span className="text-lg">✨</span>
-                <p className="text-xs text-indigo-200 leading-relaxed font-medium">
-                  {explanationData.summary}
+            <div className="flex items-start justify-between">
+              <div className="space-y-1.5 pr-2">
+                <p className="text-2xs font-semibold uppercase tracking-[0.1em] text-accent flex items-center gap-1.5">
+                  <Sparkles size={12} />
+                  Why this song?
                 </p>
+                <h2 className="font-display text-xl text-text-primary line-clamp-1">{song.title}</h2>
+                <p className="text-xs text-text-tertiary">by {getArtistName()}</p>
+              </div>
+
+              <button
+                onClick={onClose}
+                className="p-1.5 text-text-tertiary hover:text-text-primary rounded-full hover:bg-surface-2 transition-colors cursor-pointer shrink-0"
+                aria-label="Close modal"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            {loading && (
+              <div className="space-y-2.5 py-2 animate-pulse">
+                <div className="h-14 bg-surface-2 rounded-[var(--radius-md)]" />
+                <div className="h-14 bg-surface-2 rounded-[var(--radius-md)]" />
+                <div className="h-14 bg-surface-2 rounded-[var(--radius-md)]" />
               </div>
             )}
 
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Strongest Recommendation Factors
-            </p>
+            {!loading && error && (
+              <div className="bg-danger-wash rounded-[var(--radius-md)] p-4 text-center space-y-2">
+                <p className="text-xs text-danger font-medium">{error}</p>
+                <button
+                  onClick={() => {
+                    if (song._id) {
+                      setLoading(true);
+                      setError(null);
+                      fetchRecommendationExplanationApi(song._id)
+                        .then((res) => {
+                          if (res.error) setError(res.error);
+                          else if (res.data) setExplanationData(res.data);
+                        })
+                        .finally(() => setLoading(false));
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-[var(--radius-pill)] bg-surface-2 text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                >
+                  <RefreshCw size={12} />
+                  Retry
+                </button>
+              </div>
+            )}
 
-            {/* Render dynamically fetched structured reasons */}
-            {hasApiReasons ? (
-              <div className="space-y-3">
-                {explanationData.topReasons.map((reason, index) => {
-                  const badge = getReasonBadgeInfo(reason.type);
-                  const scorePercent = Math.round((reason.importanceScore || 0.8) * 100);
+            {!loading && (
+              <div className="space-y-4">
+                {explanationData?.summary && (
+                  <p className="text-sm text-text-secondary leading-relaxed">{explanationData.summary}</p>
+                )}
 
+                <p className="text-2xs font-semibold uppercase tracking-[0.1em] text-text-tertiary">
+                  Strongest factors
+                </p>
+
+                {hasApiReasons ? (
+                  <div className="space-y-2.5">
+                    {explanationData.topReasons.map((reason, index) => {
+                      const meta = REASON_META[reason.type] || DEFAULT_META;
+                      const tone = toneClasses[meta.tone];
+                      const scorePercent = Math.round((reason.importanceScore || 0.8) * 100);
+                      const Icon = meta.icon;
+
+                      return (
+                        <div key={index} className="bg-surface-2 rounded-[var(--radius-md)] p-3.5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-2xs font-semibold rounded-[var(--radius-pill)] ${tone.badge}`}>
+                              <Icon size={12} />
+                              {meta.label}
+                            </span>
+                            <span className={`text-xs font-mono font-semibold tabular-nums ${tone.text}`}>{scorePercent}%</span>
+                          </div>
+                          <p className="text-xs text-text-secondary leading-relaxed">{reason.message}</p>
+                          <div className="w-full h-1 bg-surface-3 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${Math.min(100, Math.max(15, scorePercent))}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : fallbackFactors.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {fallbackFactors.map((factor, index) => {
+                      const tone = toneClasses[factor.tone];
+                      const Icon = factor.icon;
+                      return (
+                        <div key={index} className="bg-surface-2 rounded-[var(--radius-md)] p-3.5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-2xs font-semibold rounded-[var(--radius-pill)] ${tone.badge}`}>
+                              <Icon size={12} />
+                              {factor.label}
+                            </span>
+                            <span className={`text-xs font-mono font-semibold tabular-nums ${tone.text}`}>{factor.scorePercent}%</span>
+                          </div>
+                          <p className="text-xs text-text-secondary leading-relaxed">{factor.description}</p>
+                          <div className="w-full h-1 bg-surface-3 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${Math.min(100, Math.max(15, factor.scorePercent))}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-surface-2 rounded-[var(--radius-md)] p-4 text-center space-y-1.5">
+                    <p className="text-xs text-text-secondary font-medium">Curated for your general listening profile</p>
+                    <p className="text-2xs text-text-tertiary">
+                      Based on catalog popularity and genre discovery patterns while we learn your taste.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="bg-surface-2 rounded-[var(--radius-md)] p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-text-secondary">How did we do with this recommendation?</span>
+                {submitting && <span className="text-2xs text-accent font-medium">Saving…</span>}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {FEEDBACK_OPTIONS.map(({ id, label, icon: Icon }) => {
+                  const isActive = activeFeedback === id || (id === 'helpful' && activeFeedback === 'thumbs_up') || (id === 'not_my_style' && activeFeedback === 'thumbs_down');
+                  const activeTone = id === 'helpful' ? 'bg-success/15 text-success' : id === 'not_my_style' ? 'bg-danger-wash text-danger' : 'bg-accent-wash text-accent';
                   return (
-                    <div
-                      key={index}
-                      className="bg-slate-800/70 border border-slate-700/60 rounded-2xl p-3.5 space-y-2 hover:border-slate-600 transition-colors shadow-sm"
+                    <button
+                      key={id}
+                      onClick={() => handleFeedback(id!)}
+                      disabled={submitting}
+                      className={`px-2 py-2 rounded-[var(--radius-sm)] text-2xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 ${
+                        isActive ? activeTone : 'bg-surface-3 text-text-tertiary hover:text-text-secondary'
+                      }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full border ${badge.badgeColor}`}>
-                          <span>{badge.icon}</span>
-                          <span>{badge.label}</span>
-                        </span>
-                        <span className="text-xs font-bold text-indigo-300 font-mono">
-                          {scorePercent}% Match
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-slate-200 leading-relaxed">{reason.message}</p>
-
-                      {/* Visual Match Bar */}
-                      <div className="w-full h-1.5 bg-slate-700/60 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full bg-gradient-to-r ${badge.gradient} rounded-full transition-all duration-500`}
-                          style={{ width: `${Math.min(100, Math.max(15, scorePercent))}%` }}
-                        />
-                      </div>
-                    </div>
+                      <Icon size={12} />
+                      {label}
+                    </button>
                   );
                 })}
               </div>
-            ) : fallbackFactors.length > 0 ? (
-              /* Fallback to local component scores */
-              <div className="space-y-3">
-                {fallbackFactors.map((factor, index) => (
-                  <div
-                    key={index}
-                    className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-3.5 space-y-2 hover:border-slate-600 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full border ${factor.badgeColor}`}>
-                        <span>{factor.icon}</span>
-                        <span>{factor.label}</span>
-                      </span>
-                      <span className="text-xs font-bold text-indigo-300 font-mono">
-                        {factor.scorePercent}% Match
-                      </span>
-                    </div>
 
-                    <p className="text-xs text-slate-300 leading-relaxed">{factor.description}</p>
-
-                    <div className="w-full h-1.5 bg-slate-700/60 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-indigo-500 via-purple-400 to-pink-400 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, Math.max(15, factor.scorePercent))}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              /* Fallback State for minimal metadata */
-              <div className="bg-slate-800/40 border border-slate-800 rounded-2xl p-4 text-center space-y-2">
-                <div className="text-2xl">🎵</div>
-                <p className="text-xs text-slate-300 font-medium">Curated for your general listening profile</p>
-                <p className="text-[11px] text-slate-400">
-                  Recommended based on global catalog popularity and genre discovery patterns.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Recommendation Feedback Section */}
-        <div className="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-200">How did we do with this recommendation?</span>
-            {submitting && (
-              <span className="text-[11px] text-indigo-400 font-medium animate-pulse">Saving feedback...</span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <button
-              onClick={() => handleFeedback('helpful')}
-              disabled={submitting}
-              className={`px-2.5 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                activeFeedback === 'helpful' || activeFeedback === 'thumbs_up'
-                  ? 'bg-emerald-500/25 text-emerald-300 border-emerald-500/50 shadow-md shadow-emerald-500/10 scale-[1.02]'
-                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-emerald-500/40 hover:text-white'
-              }`}
-              title="Helpful & spot on"
-            >
-              <span>🌟</span>
-              <span>Helpful</span>
-            </button>
-
-            <button
-              onClick={() => handleFeedback('not_relevant')}
-              disabled={submitting}
-              className={`px-2.5 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                activeFeedback === 'not_relevant'
-                  ? 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-md shadow-amber-500/10 scale-[1.02]'
-                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-amber-500/40 hover:text-white'
-              }`}
-              title="Not relevant right now"
-            >
-              <span>🎯</span>
-              <span>Not Relevant</span>
-            </button>
-
-            <button
-              onClick={() => handleFeedback('too_similar')}
-              disabled={submitting}
-              className={`px-2.5 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                activeFeedback === 'too_similar'
-                  ? 'bg-cyan-500/25 text-cyan-300 border-cyan-500/50 shadow-md shadow-cyan-500/10 scale-[1.02]'
-                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-cyan-500/40 hover:text-white'
-              }`}
-              title="Too similar or repetitive"
-            >
-              <span>🔁</span>
-              <span>Too Similar</span>
-            </button>
-
-            <button
-              onClick={() => handleFeedback('not_my_style')}
-              disabled={submitting}
-              className={`px-2.5 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                activeFeedback === 'not_my_style' || activeFeedback === 'thumbs_down'
-                  ? 'bg-rose-500/25 text-rose-300 border-rose-500/50 shadow-md shadow-rose-500/10 scale-[1.02]'
-                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-rose-500/40 hover:text-white'
-              }`}
-              title="Not my style"
-            >
-              <span>🚫</span>
-              <span>Not My Style</span>
-            </button>
-          </div>
-
-          {activeFeedback && (
-            <p className="text-[11px] text-emerald-400/90 font-medium text-center pt-1 animate-in fade-in">
-              ✓ Thank you! Your feedback helps HarmonyAI tune your recommendations.
-            </p>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Engine: Hybrid AI Recommendation Engine</span>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors"
-          >
-            Got it
-          </button>
-        </div>
-      </div>
-    </div>
+              {activeFeedback && (
+                <p className="text-2xs text-success text-center pt-1">Thanks — this helps tune your recommendations.</p>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 
