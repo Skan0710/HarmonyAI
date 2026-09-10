@@ -5,6 +5,8 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { MusicDnaPage } from './pages/MusicDnaPage';
+import { MusicTwinPage } from './pages/MusicTwinPage';
+import { TasteEvolutionPage } from './pages/TasteEvolutionPage';
 import { MusicLibraryPage } from './pages/MusicLibraryPage';
 import { SearchPage } from './pages/SearchPage';
 import { GenresPage } from './pages/GenresPage';
@@ -55,6 +57,8 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/discover" element={<DiscoverPage />} />
             <Route path="/music-dna" element={<MusicDnaPage />} />
+            <Route path="/music-twin" element={<MusicTwinPage />} />
+            <Route path="/taste-evolution" element={<TasteEvolutionPage />} />
             <Route path="/assistant" element={<AssistantPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/genres" element={<GenresPage />} />

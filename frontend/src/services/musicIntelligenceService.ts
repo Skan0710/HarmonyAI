@@ -110,6 +110,17 @@ export const fetchMusicDnaEvolutionOverviewApi = async (
   return { overview: result.data, error: result.error };
 };
 
+export interface AffinityItem {
+  name: string;
+  affinityScore: number;
+  isPrimary?: boolean;
+}
+
+export interface MoodAffinityItem {
+  mood: string;
+  affinityScore: number;
+}
+
 export interface PersonalMusicTwin {
   userId: string;
   isDataSufficient: boolean;
@@ -117,8 +128,8 @@ export interface PersonalMusicTwin {
   archetypeDescription: string;
   confidence: number;
   personalityTraits: { id: string; trait: string; category: string; confidence: number }[];
-  dominantGenres: string[];
-  dominantMoods: string[];
+  dominantGenres: AffinityItem[];
+  dominantMoods: MoodAffinityItem[];
   importantArtists: string[];
   explorationTendency: number;
   familiarityPreference: number;

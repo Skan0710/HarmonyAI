@@ -14,6 +14,8 @@ import {
   Sparkles,
   SlidersHorizontal,
   Fingerprint,
+  Sparkle,
+  History as HistoryIcon,
   X,
 } from 'lucide-react';
 
@@ -42,7 +44,11 @@ const sections: NavSection[] = [
   },
   {
     title: 'Your Sound',
-    items: [{ to: '/music-dna', label: 'Music DNA', icon: Fingerprint }],
+    items: [
+      { to: '/music-dna', label: 'Music DNA', icon: Fingerprint },
+      { to: '/music-twin', label: 'Music Twin', icon: Sparkle },
+      { to: '/taste-evolution', label: 'Taste Evolution', icon: HistoryIcon },
+    ],
   },
   {
     title: 'Your Library',
