@@ -47,6 +47,17 @@
   --font-body: var(--font-body);
   --font-mono: var(--font-mono);
 
+  --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+  --text-3xl: var(--text-3xl);
+  --text-4xl: var(--text-4xl);
+
   --radius-sharp: var(--radius-sharp);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);

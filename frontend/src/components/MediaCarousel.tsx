@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import type { Song, Artist, Album } from '../types/music';
 import { SongCard } from './SongCard';
 import { ArtistCard } from './ArtistCard';
@@ -112,46 +113,39 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = ({
       {/* Header Row */}
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight flex items-center gap-2">
+          <h2 className="text-lg sm:text-xl font-semibold text-text-primary tracking-tight font-body">
             {title}
           </h2>
-          {subtitle && <p className="text-xs sm:text-sm text-slate-400 mt-0.5">{subtitle}</p>}
+          {subtitle && <p className="text-xs sm:text-sm text-text-tertiary mt-0.5">{subtitle}</p>}
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Left/Right Navigation Buttons */}
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="hidden sm:flex items-center gap-1">
             <button
               onClick={() => handleScroll('left')}
               disabled={!canScrollLeft}
-              className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 hover:text-white border border-slate-700/60 transition-all shadow-sm"
+              className="p-1.5 rounded-full disabled:opacity-25 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
               aria-label="Scroll Carousel Left"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <ChevronLeft size={16} strokeWidth={1.75} />
             </button>
             <button
               onClick={() => handleScroll('right')}
               disabled={!canScrollRight}
-              className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 hover:text-white border border-slate-700/60 transition-all shadow-sm"
+              className="p-1.5 rounded-full disabled:opacity-25 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
               aria-label="Scroll Carousel Right"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+              <ChevronRight size={16} strokeWidth={1.75} />
             </button>
           </div>
 
           {seeAllLink && (
             <Link
               to={seeAllLink}
-              className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 pl-1"
+              className="text-xs font-medium text-text-secondary hover:text-accent transition-colors flex items-center gap-1"
             >
-              See All
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+              See all
+              <ArrowRight size={13} strokeWidth={1.75} />
             </Link>
           )}
         </div>
@@ -160,18 +154,18 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = ({
       {/* Horizontal Scroll Track */}
       <div
         ref={scrollRef}
-        className="flex items-stretch gap-4 overflow-x-auto pb-3 scrollbar-none scroll-smooth -mx-1 px-1 touch-pan-x"
+        className="flex items-stretch gap-3 overflow-x-auto pb-3 scrollbar-none scroll-smooth -mx-1 px-1 touch-pan-x"
       >
         {loading ? (
           Array.from({ length: 6 }).map((_, idx) => (
             <div
               key={idx}
-              className="w-40 sm:w-44 md:w-48 h-64 bg-slate-800/50 border border-slate-700/40 rounded-2xl p-4 animate-pulse shrink-0 flex flex-col justify-between"
+              className="w-40 sm:w-44 md:w-48 h-64 bg-surface-1 rounded-[var(--radius-md)] p-3 animate-pulse shrink-0 flex flex-col justify-between"
             >
-              <div className="w-full aspect-square bg-slate-700/50 rounded-xl" />
+              <div className="w-full aspect-square bg-surface-2 rounded-[var(--radius-artwork)]" />
               <div className="space-y-2 mt-3">
-                <div className="h-4 bg-slate-700/60 rounded w-3/4" />
-                <div className="h-3 bg-slate-700/40 rounded w-1/2" />
+                <div className="h-3 bg-surface-2 rounded w-3/4" />
+                <div className="h-2.5 bg-surface-2 rounded w-1/2" />
               </div>
             </div>
           ))
@@ -182,7 +176,7 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = ({
             </div>
           ))
         ) : (
-          <div className="w-full py-8 text-center text-xs text-slate-400 bg-slate-800/30 rounded-xl border border-slate-700/40">
+          <div className="w-full py-8 text-center text-xs text-text-tertiary bg-surface-1 rounded-[var(--radius-md)]">
             {emptyMessage}
           </div>
         )}

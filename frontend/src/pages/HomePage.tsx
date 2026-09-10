@@ -1,275 +1,314 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'motion/react';
+import { Fingerprint, TrendingUp, Compass, Sparkles } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import type { Song, Artist, Album } from '../types/music';
-import {
-  fetchArtists,
-  fetchTrendingSongsApi,
-  fetchNewReleasesApi,
-} from '../services/songService';
+import type { Song } from '../types/music';
+import { fetchTrendingSongsApi } from '../services/songService';
 import { fetchRecentlyPlayedApi } from '../services/historyService';
 import { fetchPersonalizedFeedApi } from '../services/personalizedFeedService';
+import { fetchHybridRecommendationsApi } from '../services/recommendationService';
 import {
-  fetchCollaborativeRecommendationsApi,
-  fetchHybridRecommendationsApi,
-} from '../services/recommendationService';
+  fetchMusicDnaEvolutionOverviewApi,
+  fetchPersonalMusicTwinApi,
+  fetchModeRecommendationsApi,
+  type MusicDnaEvolutionOverview,
+  type PersonalMusicTwin,
+} from '../services/musicIntelligenceService';
 import { MediaCarousel } from '../components/MediaCarousel';
-import { MoodActivityDiscoverySection } from '../components/MoodActivityDiscoverySection';
+import { SongRow } from '../components/SongRow';
 import { usePlayerStore } from '../store/usePlayerStore';
+
+const getTimeGreeting = (): string => {
+  const hour = new Date().getHours();
+  if (hour < 5) return 'Still up';
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  if (hour < 21) return 'Good evening';
+  return 'Good evening';
+};
+
+const formatTasteName = (name: string): string =>
+  name.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+const WaveformMark: React.FC = () => (
+  <svg viewBox="0 0 240 48" className="w-full h-auto" aria-hidden="true">
+    {Array.from({ length: 48 }).map((_, i) => {
+      const heights = [10, 22, 14, 34, 18, 44, 26, 16, 30, 12, 38, 20];
+      const h = heights[i % heights.length];
+      return (
+        <rect
+          key={i}
+          x={i * 5}
+          y={(48 - h) / 2}
+          width={2.4}
+          height={h}
+          rx={1.2}
+          fill="currentColor"
+          opacity={0.15 + (i % 5) * 0.06}
+        />
+      );
+    })}
+  </svg>
+);
 
 export const HomePage: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const playSong = usePlayerStore((state) => state.playSong);
 
   const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
-  const [hybridSongs, setHybridSongs] = useState<Song[]>([]);
-  const [collaborativeSongs, setCollaborativeSongs] = useState<Song[]>([]);
-  const [favoriteGenreTracks, setFavoriteGenreTracks] = useState<Song[]>([]);
-  const [suggestedArtists, setSuggestedArtists] = useState<Artist[]>([]);
+  const [madeForYou, setMadeForYou] = useState<Song[]>([]);
+  const [trendingFallback, setTrendingFallback] = useState<Song[]>([]);
+  const [continuationTracks, setContinuationTracks] = useState<Song[]>([]);
+  const [comfortZoneSongs, setComfortZoneSongs] = useState<Song[]>([]);
+  const [comfortZoneNote, setComfortZoneNote] = useState<string>('');
+  const [evolution, setEvolution] = useState<MusicDnaEvolutionOverview | null>(null);
+  const [twin, setTwin] = useState<PersonalMusicTwin | null>(null);
 
-  const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
-  const [newReleaseSongs, setNewReleaseSongs] = useState<Song[]>([]);
-  const [newReleaseAlbums, setNewReleaseAlbums] = useState<Album[]>([]);
-  const [featuredArtists, setFeaturedArtists] = useState<Artist[]>([]);
-
-  const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState<boolean>(false);
-  const [loadingHybrid, setLoadingHybrid] = useState<boolean>(false);
-  const [loadingCollaborative, setLoadingCollaborative] = useState<boolean>(false);
-  const [loadingPersonalized, setLoadingPersonalized] = useState<boolean>(false);
-  const [loadingTrending, setLoadingTrending] = useState<boolean>(true);
-  const [loadingNewReleases, setLoadingNewReleases] = useState<boolean>(true);
-  const [loadingArtists, setLoadingArtists] = useState<boolean>(true);
+  const [loadingMadeForYou, setLoadingMadeForYou] = useState(true);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+  const [loadingComfortZone, setLoadingComfortZone] = useState(true);
 
   useEffect(() => {
-    const loadRecentlyPlayed = async () => {
-      if (!isAuthenticated) return;
-      setLoadingRecentlyPlayed(true);
-      const res = await fetchRecentlyPlayedApi(10);
-      if (res.songs && res.songs.length > 0) {
-        setRecentlyPlayed(res.songs);
+    if (!isAuthenticated) return;
+
+    (async () => {
+      setLoadingRecent(true);
+      const res = await fetchRecentlyPlayedApi(6);
+      setRecentlyPlayed(res.songs || []);
+      setLoadingRecent(false);
+    })();
+
+    (async () => {
+      setLoadingMadeForYou(true);
+      const hybrid = await fetchHybridRecommendationsApi(10);
+      if (hybrid.songs.length > 0) {
+        setMadeForYou(hybrid.songs);
+      } else {
+        const trending = await fetchTrendingSongsApi(10);
+        setTrendingFallback(trending.songs || []);
       }
-      setLoadingRecentlyPlayed(false);
-    };
+      setLoadingMadeForYou(false);
+    })();
 
-    const loadHybridRecommendations = async () => {
-      if (!isAuthenticated) return;
-      setLoadingHybrid(true);
-      const res = await fetchHybridRecommendationsApi(10);
-      if (res.songs && res.songs.length > 0) {
-        setHybridSongs(res.songs);
-      }
-      setLoadingHybrid(false);
-    };
+    (async () => {
+      const feed = await fetchPersonalizedFeedApi();
+      setContinuationTracks(feed.feed?.favoriteGenreTracks?.slice(0, 5) || []);
+    })();
 
-    const loadCollaborativeRecommendations = async () => {
-      if (!isAuthenticated) return;
-      setLoadingCollaborative(true);
-      const res = await fetchCollaborativeRecommendationsApi(10);
-      if (res.songs && res.songs.length > 0) {
-        setCollaborativeSongs(res.songs);
-      }
-      setLoadingCollaborative(false);
-    };
+    (async () => {
+      const { overview } = await fetchMusicDnaEvolutionOverviewApi(6);
+      setEvolution(overview);
+    })();
 
-    const loadPersonalizedFeed = async () => {
-      if (!isAuthenticated) return;
-      setLoadingPersonalized(true);
-      const res = await fetchPersonalizedFeedApi();
-      if (res.feed) {
-        setFavoriteGenreTracks(res.feed.favoriteGenreTracks || []);
-        setSuggestedArtists(res.feed.suggestedArtists || []);
-      }
-      setLoadingPersonalized(false);
-    };
+    (async () => {
+      const { twin } = await fetchPersonalMusicTwinApi(8);
+      setTwin(twin);
+    })();
 
-    const loadTrending = async () => {
-      setLoadingTrending(true);
-      const res = await fetchTrendingSongsApi(10);
-      if (res.songs) setTrendingSongs(res.songs);
-      setLoadingTrending(false);
-    };
-
-    const loadNewReleases = async () => {
-      setLoadingNewReleases(true);
-      const res = await fetchNewReleasesApi(1, 10);
-      if (res.songs) setNewReleaseSongs(res.songs);
-      if (res.albums) setNewReleaseAlbums(res.albums);
-      setLoadingNewReleases(false);
-    };
-
-    const loadArtists = async () => {
-      setLoadingArtists(true);
-      const res = await fetchArtists();
-      if (res.artists) setFeaturedArtists(res.artists);
-      setLoadingArtists(false);
-    };
-
-    loadRecentlyPlayed();
-    loadHybridRecommendations();
-    loadCollaborativeRecommendations();
-    loadPersonalizedFeed();
-    loadTrending();
-    loadNewReleases();
-    loadArtists();
+    (async () => {
+      setLoadingComfortZone(true);
+      const res = await fetchModeRecommendationsApi('OUTSIDE_YOUR_TASTE', 8);
+      setComfortZoneSongs(res.songs);
+      setComfortZoneNote(res.description || '');
+      setLoadingComfortZone(false);
+    })();
   }, [isAuthenticated]);
 
-  const handlePlaySong = (song: Song, queueList: Song[]) => {
-    playSong(song, queueList);
-  };
+  const currentDna = evolution?.currentMusicDna;
+  const topGenreName = currentDna?.topGenres?.[0]?.name;
+  const archetype = currentDna?.listenerArchetype;
+
+  const heroLine = archetype && topGenreName
+    ? `Your sound right now leans ${formatTasteName(archetype)}, anchored in ${formatTasteName(topGenreName)}.`
+    : "Play a few tracks and I'll start learning what your sound actually is.";
+
+  const madeForYouSongs = madeForYou.length > 0 ? madeForYou : trendingFallback;
+  const madeForYouSubtitle =
+    madeForYou.length > 0
+      ? 'Ranked from your acoustic taste, community signal, and recency'
+      : 'Trending across HarmonyAI while we learn your taste';
 
   return (
-    <div className="space-y-10 pb-16">
-      {/* Hero Banner Section */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900/90 via-purple-900/80 to-slate-900 border border-indigo-500/30 p-6 sm:p-10 lg:p-12 shadow-2xl shadow-indigo-950/50">
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 max-w-3xl space-y-5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold backdrop-blur-md">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            Welcome back, {user?.name || 'Music Explorer'}!
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-            Discover Music Tailored to Your{' '}
-            <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
-              AI Sonic Signature
-            </span>
-          </h1>
-
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl">
-            HarmonyAI analyzes acoustics, mood vectors, and listening habits to generate seamless music recommendations and personalized catalog discovery.
+    <div className="pb-16">
+      {/* Hero — personalized statement, not a marketing banner */}
+      <section className="relative overflow-hidden border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-6">
+        <div className="relative max-w-2xl">
+          <p className="text-xs font-medium text-text-tertiary uppercase tracking-[0.14em]">
+            {getTimeGreeting()}, {user?.name?.split(' ')[0] || 'there'}
           </p>
-
-          <div className="flex flex-wrap items-center gap-4 pt-2">
+          <motion.h1
+            key={heroLine}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="font-display text-2xl sm:text-3xl lg:text-4xl text-text-primary leading-snug mt-3"
+          >
+            {heroLine}
+          </motion.h1>
+          {archetype && (
             <Link
-              to="/library"
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-indigo-600/40 hover:shadow-indigo-600/60 flex items-center gap-2"
+              to="/music-dna"
+              className="inline-flex items-center gap-1.5 mt-5 text-sm font-medium text-accent hover:text-accent-strong transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-              </svg>
-              Explore Music Library
+              <Fingerprint size={15} strokeWidth={1.75} />
+              See your full Music DNA
             </Link>
-
-            <Link
-              to="/preferences"
-              className="px-6 py-3 bg-slate-800/80 hover:bg-slate-800 text-slate-200 hover:text-white font-semibold text-sm rounded-xl border border-slate-700/80 transition-colors flex items-center gap-2 backdrop-blur-md"
-            >
-              ⚡ Set Music Preferences
-            </Link>
-          </div>
+          )}
+        </div>
+        <div className="relative h-10 mt-8 -mx-5 sm:-mx-8 lg:-mx-12 text-accent pointer-events-none">
+          <WaveformMark />
         </div>
       </section>
 
-      {/* Dedicated Mood & Activity Discovery Section */}
-      <MoodActivityDiscoverySection onPlaySong={handlePlaySong} />
-
-      {/* 1. Recently Played Carousel (Rendered if user has playback history) */}
-      {(recentlyPlayed.length > 0 || loadingRecentlyPlayed) && (
+      <div className="px-5 sm:px-8 lg:px-12 pt-9 space-y-11">
+        {/* Made For You */}
         <MediaCarousel
-          title="Recently Played"
-          subtitle="Pick up right where you left off"
-          seeAllLink="/history"
-          type="song"
-          items={recentlyPlayed}
-          loading={loadingRecentlyPlayed}
-          onPlaySong={(song) => handlePlaySong(song, recentlyPlayed)}
-        />
-      )}
-
-      {/* 2. Hybrid Personalized Recommendations ("Recommended For You") */}
-      {(hybridSongs.length > 0 || loadingHybrid) && (
-        <MediaCarousel
-          title="Recommended For You"
-          subtitle="AI-curated hybrid recommendations combining acoustics, community taste, and recency"
+          title="Made for you"
+          subtitle={madeForYouSubtitle}
           seeAllLink="/library"
           type="song"
-          items={hybridSongs}
-          loading={loadingHybrid}
-          onPlaySong={(song) => handlePlaySong(song, hybridSongs)}
+          items={madeForYouSongs}
+          loading={loadingMadeForYou}
+          onPlaySong={(song) => playSong(song, madeForYouSongs)}
         />
-      )}
 
-      {/* 3. Collaborative Recommendations Carousel ("Listeners Like You Enjoy") */}
-      {(collaborativeSongs.length > 0 || loadingCollaborative) && (
-        <MediaCarousel
-          title="Listeners Like You Enjoy"
-          subtitle="Collaborative recommendations based on community listening habits and similar taste"
-          seeAllLink="/library"
-          type="song"
-          items={collaborativeSongs}
-          loading={loadingCollaborative}
-          onPlaySong={(song) => handlePlaySong(song, collaborativeSongs)}
-        />
-      )}
+        {/* Because you've been listening to... */}
+        {(recentlyPlayed.length > 0 || continuationTracks.length > 0 || loadingRecent) && (
+          <section className="grid md:grid-cols-2 gap-x-10 gap-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary font-body flex items-center gap-2">
+                <TrendingUp size={16} className="text-accent" strokeWidth={1.75} />
+                Because you've been listening
+              </h2>
+              <p className="text-xs text-text-tertiary mt-0.5 mb-3">Pick up right where you left off</p>
+              <div className="divide-y divide-border-subtle">
+                {loadingRecent
+                  ? Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-3.5 py-2.5 animate-pulse">
+                        <div className="w-10 h-10 rounded-[var(--radius-artwork)] bg-surface-2 shrink-0" />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="h-3 bg-surface-2 rounded w-1/2" />
+                          <div className="h-2.5 bg-surface-2 rounded w-1/3" />
+                        </div>
+                      </div>
+                    ))
+                  : recentlyPlayed
+                      .slice(0, 5)
+                      .map((song, i) => (
+                        <SongRow key={song._id} song={song} index={i} onPlay={() => playSong(song, recentlyPlayed)} />
+                      ))}
+                {!loadingRecent && recentlyPlayed.length === 0 && (
+                  <p className="text-xs text-text-tertiary py-4">Nothing played yet this week.</p>
+                )}
+              </div>
+            </div>
 
-      {/* 4. "Your Favorite Genres" Carousel (Personalized Feed) */}
-      {(favoriteGenreTracks.length > 0 || loadingPersonalized) && (
-        <MediaCarousel
-          title="Your Favorite Genres"
-          subtitle="Top tracks from your preferred musical genres"
-          seeAllLink="/genres"
-          type="song"
-          items={favoriteGenreTracks}
-          loading={loadingPersonalized}
-          onPlaySong={(song) => handlePlaySong(song, favoriteGenreTracks)}
-        />
-      )}
+            {continuationTracks.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold text-text-primary font-body">More in that vein</h2>
+                <p className="text-xs text-text-tertiary mt-0.5 mb-3">From the genres you keep returning to</p>
+                <div className="divide-y divide-border-subtle">
+                  {continuationTracks.map((song, i) => (
+                    <SongRow key={song._id} song={song} index={i} onPlay={() => playSong(song, continuationTracks)} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
-      {/* 5. "Artists You May Like" Carousel (Personalized Feed) */}
-      {(suggestedArtists.length > 0 || loadingPersonalized) && (
-        <MediaCarousel
-          title="Artists You May Like"
-          subtitle="Recommended creators matching your acoustic preferences"
-          seeAllLink="/preferences"
-          type="artist"
-          items={suggestedArtists}
-          loading={loadingPersonalized}
-        />
-      )}
+        {/* Your taste is changing — narrative panel, deliberately not a card grid */}
+        {evolution?.isDataSufficient && (
+          <section className="border-l-2 border-gold pl-5 sm:pl-7 py-1">
+            <h2 className="text-lg font-semibold text-text-primary font-body flex items-center gap-2">
+              <Sparkles size={16} className="text-gold" strokeWidth={1.75} />
+              Your taste is changing
+            </h2>
+            <p className="font-display text-lg sm:text-xl text-text-primary leading-relaxed mt-3 max-w-2xl">
+              {evolution.recentChanges.summary}
+            </p>
+            {evolution.emergingTastes.hasEmergingPreferences && (
+              <p className="text-sm text-text-secondary mt-3 max-w-2xl">{evolution.emergingTastes.summary}</p>
+            )}
+            <div className="flex flex-wrap items-center gap-2 mt-4">
+              {evolution.emergingTastes.emergingGenres.slice(0, 5).map((g) => (
+                <span key={g.name} className="text-xs font-medium px-2.5 py-1 rounded-[var(--radius-pill)] bg-gold-wash text-gold">
+                  {formatTasteName(g.name)}
+                </span>
+              ))}
+            </div>
+            <Link
+              to="/taste-evolution"
+              className="inline-flex items-center gap-1.5 mt-5 text-sm font-medium text-gold hover:text-gold-strong transition-colors"
+            >
+              Explore your full evolution timeline →
+            </Link>
+          </section>
+        )}
 
-      {/* 6. Trending Songs Carousel (Dynamic recency-weighted scoring) */}
-      <MediaCarousel
-        title="Trending Songs"
-        subtitle="Dynamic real-time trending songs calculated from play recency & history"
-        seeAllLink="/library?sort=playCount"
-        type="song"
-        items={trendingSongs}
-        loading={loadingTrending}
-        onPlaySong={(song) => handlePlaySong(song, trendingSongs)}
-      />
+        {/* Outside your comfort zone */}
+        {(comfortZoneSongs.length > 0 || loadingComfortZone) && (
+          <MediaCarousel
+            title="Outside your comfort zone"
+            subtitle={comfortZoneNote || 'A deliberate step past what you usually play'}
+            seeAllLink="/discover"
+            type="song"
+            items={comfortZoneSongs}
+            loading={loadingComfortZone}
+            onPlaySong={(song) => playSong(song, comfortZoneSongs)}
+          />
+        )}
 
-      {/* 7. New Releases Tracks Carousel */}
-      <MediaCarousel
-        title="New Release Tracks"
-        subtitle="Freshly uploaded original tracks and singles"
-        seeAllLink="/library?sort=releaseYear"
-        type="song"
-        items={newReleaseSongs}
-        loading={loadingNewReleases}
-        onPlaySong={(song) => handlePlaySong(song, newReleaseSongs)}
-      />
+        {/* Your Music Twin today — identity panel, not a song grid */}
+        {twin?.isDataSufficient && (
+          <section className="bg-surface-1 rounded-[var(--radius-lg)] p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-medium text-accent uppercase tracking-[0.12em] flex items-center gap-1.5">
+                  <Compass size={13} strokeWidth={1.75} />
+                  Your Music Twin today
+                </p>
+                <h2 className="font-display italic text-2xl sm:text-3xl text-text-primary mt-2">
+                  {twin.currentMusicalIdentity.personaName}
+                </h2>
+                {twin.currentMusicalIdentity.tagline && (
+                  <p className="text-sm text-text-secondary mt-1.5 max-w-xl">{twin.currentMusicalIdentity.tagline}</p>
+                )}
+              </div>
+              <Link
+                to="/music-twin"
+                className="text-sm font-medium text-accent hover:text-accent-strong transition-colors shrink-0"
+              >
+                Meet your twin →
+              </Link>
+            </div>
 
-      {/* 8. New Release Albums Carousel */}
-      <MediaCarousel
-        title="New Release Albums"
-        subtitle="Recently published albums, EPs, and compilations"
-        seeAllLink="/library"
-        type="album"
-        items={newReleaseAlbums}
-        loading={loadingNewReleases}
-      />
+            <div className="flex flex-wrap items-center gap-2 mt-5">
+              {twin.currentMusicalIdentity.vibeKeywords.slice(0, 6).map((kw) => (
+                <span key={kw} className="text-xs font-medium px-2.5 py-1 rounded-[var(--radius-pill)] bg-surface-2 text-text-secondary">
+                  {kw}
+                </span>
+              ))}
+            </div>
 
-      {/* 9. Featured Artists Carousel */}
-      <MediaCarousel
-        title="Featured Artists"
-        subtitle="Top verified performers and independent creators on HarmonyAI"
-        seeAllLink="/library"
-        type="artist"
-        items={featuredArtists}
-        loading={loadingArtists}
-      />
+            <div className="grid grid-cols-3 gap-4 mt-6 max-w-md">
+              <div>
+                <p className="text-2xl font-display text-text-primary tabular-nums">{Math.round(twin.confidence * 100)}%</p>
+                <p className="text-2xs text-text-tertiary mt-0.5">Confidence</p>
+              </div>
+              <div>
+                <p className="text-2xl font-display text-text-primary tabular-nums">{Math.round(twin.explorationTendency * 100)}%</p>
+                <p className="text-2xs text-text-tertiary mt-0.5">Exploration</p>
+              </div>
+              <div>
+                <p className="text-2xl font-display text-text-primary tabular-nums">{Math.round(twin.tasteStability.stabilityScore * 100)}%</p>
+                <p className="text-2xs text-text-tertiary mt-0.5">Stability</p>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 };
