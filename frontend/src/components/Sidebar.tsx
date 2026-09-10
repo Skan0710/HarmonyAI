@@ -13,6 +13,7 @@ import {
   Wand2,
   Sparkles,
   SlidersHorizontal,
+  Fingerprint,
   X,
 } from 'lucide-react';
 
@@ -38,6 +39,10 @@ const sections: NavSection[] = [
       { to: '/search', label: 'Search', icon: Search },
       { to: '/genres', label: 'Browse Genres', icon: LayoutGrid },
     ],
+  },
+  {
+    title: 'Your Sound',
+    items: [{ to: '/music-dna', label: 'Music DNA', icon: Fingerprint }],
   },
   {
     title: 'Your Library',
