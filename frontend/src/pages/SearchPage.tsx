@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Search as SearchIcon, X, Mic2, Disc3, Music, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react';
 import {
   searchUnifiedDiscovery,
   getSearchSuggestions,
@@ -15,21 +16,26 @@ import type { Song, Artist, Album } from '../types/music';
 import { MusicGrid } from '../components/MusicGrid';
 import { ArtistCard } from '../components/ArtistCard';
 import { AlbumCard } from '../components/AlbumCard';
-import { Breadcrumbs } from '../components/Breadcrumbs';
-import { SearchSkeletonLoader } from '../components/SearchSkeletonLoader';
 import { TrendingSearches } from '../components/TrendingSearches';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useRecentSearchesStore } from '../store/useRecentSearchesStore';
 
 type DiscoveryMode = 'all' | 'keyword' | 'semantic' | 'recommendations' | 'hybrid';
 
+const MODE_TABS: { id: DiscoveryMode; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'keyword', label: 'Keyword' },
+  { id: 'semantic', label: 'Semantic vibe' },
+  { id: 'recommendations', label: 'For you' },
+];
+
 const VIBE_QUICK_SEARCHES = [
-  { label: 'Synthwave Night Drive', icon: '🌆' },
-  { label: 'Lo-Fi Chill Study', icon: '☕' },
-  { label: 'Late Night R&B', icon: '🌙' },
-  { label: 'High Energy Workout', icon: '⚡' },
-  { label: 'Acoustic Morning Coffee', icon: '☀️' },
-  { label: 'Deep Focus Ambient', icon: '🧘' },
+  'Synthwave night drive',
+  'Lo-fi chill study',
+  'Late night R&B',
+  'High energy workout',
+  'Acoustic morning coffee',
+  'Deep focus ambient',
 ];
 
 export const SearchPage: React.FC = () => {
@@ -52,7 +58,6 @@ export const SearchPage: React.FC = () => {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync state if URL search parameters change
   useEffect(() => {
     const q = searchParams.get('q') || '';
     const mode = (searchParams.get('mode') as DiscoveryMode) || 'all';
@@ -60,7 +65,6 @@ export const SearchPage: React.FC = () => {
     setActiveMode(mode);
   }, [searchParams]);
 
-  // Execute unified discovery request
   const executeDiscovery = useCallback(
     async (searchQuery: string, searchMode: DiscoveryMode) => {
       setLoading(true);
@@ -89,7 +93,6 @@ export const SearchPage: React.FC = () => {
     [addSearch]
   );
 
-  // Debounced search trigger for main discovery results
   useEffect(() => {
     const handler = setTimeout(() => {
       const currentQuery = searchParams.get('q') || '';
@@ -108,7 +111,6 @@ export const SearchPage: React.FC = () => {
     return () => clearTimeout(handler);
   }, [queryInput, activeMode, searchParams, setSearchParams, executeDiscovery]);
 
-  // Fetch lightweight autocomplete suggestions while typing
   useEffect(() => {
     const trimmed = queryInput.trim();
     if (!trimmed || !isFocused) {
@@ -127,7 +129,6 @@ export const SearchPage: React.FC = () => {
     return () => clearTimeout(suggestionHandler);
   }, [queryInput, isFocused]);
 
-  // Dismiss dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -167,7 +168,6 @@ export const SearchPage: React.FC = () => {
     }
   };
 
-  // Convert Normalized items to standard model DTOs for reusable components
   const mapToSong = (item: NormalizedSongItem): Song =>
     ({
       _id: item.id,
@@ -176,28 +176,12 @@ export const SearchPage: React.FC = () => {
       audioUrl: item.audioUrl || '',
       coverImage: item.coverImage,
       artist: item.artist
-        ? ({
-            _id: item.artist.id,
-            name: item.artist.name,
-            profileImage: item.artist.profileImage,
-            verified: item.artist.verified,
-          } as any)
+        ? ({ _id: item.artist.id, name: item.artist.name, profileImage: item.artist.profileImage, verified: item.artist.verified } as any)
         : undefined,
       album: item.album
-        ? ({
-            _id: item.album.id,
-            title: item.album.title,
-            coverImage: item.album.coverImage,
-            releaseYear: item.album.releaseYear,
-          } as any)
+        ? ({ _id: item.album.id, title: item.album.title, coverImage: item.album.coverImage, releaseYear: item.album.releaseYear } as any)
         : undefined,
-      genre: item.genre
-        ? ({
-            _id: item.genre.id,
-            name: item.genre.name,
-            slug: item.genre.slug,
-          } as any)
-        : undefined,
+      genre: item.genre ? ({ _id: item.genre.id, name: item.genre.name, slug: item.genre.slug } as any) : undefined,
       recommendationScore: item.score,
       matchReason: item.matchReason,
       sources: item.sources,
@@ -246,36 +230,73 @@ export const SearchPage: React.FC = () => {
     albumsList.length > 0 ||
     recommendedList.length > 0;
 
-  return (
-    <div className="space-y-8 pb-16">
-      {/* Breadcrumbs */}
-      <Breadcrumbs items={[{ label: 'Discovery' }]} />
+  const suggestionIcon = (type: string) => {
+    if (type === 'artist') return Mic2;
+    if (type === 'album') return Disc3;
+    return Music;
+  };
 
-      {/* Header & Unified Search Box */}
-      <div ref={containerRef} className="max-w-4xl space-y-4 relative">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-xs font-semibold mb-2">
-              <span>✨ Unified Discovery Hub</span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-100 tracking-tight">
-              Music Discovery
-            </h1>
-            <p className="text-slate-400 text-sm mt-1">
-              Search across songs, artists, albums, and AI-personalized recommendations in real-time.
-            </p>
+  return (
+    <div className="pb-16">
+      <section className="border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-8">
+        <p className="text-xs font-medium text-text-tertiary uppercase tracking-[0.14em]">Search</p>
+        <h1 className="font-display text-2xl sm:text-3xl text-text-primary leading-snug mt-3">
+          What are you in the mood for?
+        </h1>
+
+        <div ref={containerRef} className="relative max-w-2xl mt-6">
+          <div className="relative flex items-center">
+            <SearchIcon size={17} className="absolute left-4 text-text-tertiary pointer-events-none" strokeWidth={1.75} />
+            <input
+              type="text"
+              value={queryInput}
+              onChange={(e) => setQueryInput(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              placeholder="Try 'something like Arctic Monkeys but dreamier'…"
+              className="w-full pl-11 pr-11 py-3.5 bg-surface-1 rounded-[var(--radius-md)] text-text-primary placeholder-text-tertiary text-sm focus:outline-none focus:ring-1 focus:ring-border-strong transition-shadow"
+              autoFocus
+            />
+            {queryInput && (
+              <button
+                onClick={handleClear}
+                className="absolute right-3.5 p-1.5 rounded-full text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
+                title="Clear search"
+              >
+                <X size={15} />
+              </button>
+            )}
+
+            {isFocused && queryInput.trim() && liveSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 z-30 mt-2 bg-surface-1 rounded-[var(--radius-md)] shadow-[var(--shadow-md)] p-2 space-y-0.5">
+                <div className="text-2xs font-semibold text-text-tertiary uppercase tracking-wide px-2.5 py-1 flex items-center justify-between">
+                  <span>Suggestions</span>
+                  {suggestionsLoading && <div className="w-3 h-3 border border-accent/40 border-t-accent rounded-full animate-spin" />}
+                </div>
+                {liveSuggestions.map((item) => {
+                  const Icon = suggestionIcon(item.type);
+                  return (
+                    <div
+                      key={`${item.type}-${item.id}`}
+                      onClick={() => handleSuggestionClick(item)}
+                      className="flex items-center justify-between px-2.5 py-2 rounded-[var(--radius-sm)] hover:bg-surface-2 cursor-pointer text-xs transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Icon size={14} className="text-text-tertiary shrink-0" strokeWidth={1.75} />
+                        <div className="min-w-0">
+                          <p className="font-medium text-text-primary truncate">{item.title}</p>
+                          {item.subtitle && <p className="text-2xs text-text-tertiary truncate">{item.subtitle}</p>}
+                        </div>
+                      </div>
+                      <span className="text-2xs font-mono text-text-tertiary uppercase shrink-0">{item.type}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Discovery Mode Selector Tabs */}
-          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shrink-0 shadow-inner">
-            {(
-              [
-                { id: 'all', label: 'All', icon: '🌐' },
-                { id: 'keyword', label: 'Keyword', icon: '🔍' },
-                { id: 'semantic', label: 'Semantic Vibe', icon: '🧠' },
-                { id: 'recommendations', label: 'For You', icon: '✨' },
-              ] as const
-            ).map((tab) => (
+          <div className="flex items-center gap-1.5 mt-4">
+            {MODE_TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => {
@@ -285,280 +306,163 @@ export const SearchPage: React.FC = () => {
                   if (tab.id !== 'all') params.mode = tab.id;
                   setSearchParams(params, { replace: true });
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeMode === tab.id
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                className={`px-3 py-1.5 rounded-[var(--radius-pill)] text-xs font-medium transition-colors cursor-pointer ${
+                  activeMode === tab.id ? 'bg-accent text-text-on-accent font-semibold' : 'bg-surface-2 text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 mt-4 -mx-1 px-1">
+            <span className="text-2xs text-text-tertiary font-medium shrink-0">Quick vibes</span>
+            {VIBE_QUICK_SEARCHES.map((vibe) => (
+              <button
+                key={vibe}
+                onClick={() => handleSelectSearchTerm(vibe)}
+                className="px-3 py-1 bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary rounded-[var(--radius-pill)] text-xs font-medium transition-colors shrink-0 cursor-pointer"
+              >
+                {vibe}
               </button>
             ))}
           </div>
         </div>
+      </section>
 
-        {/* Search Input with Live Autocomplete */}
-        <div className="relative flex items-center">
-          <div className="absolute left-4 text-indigo-400 pointer-events-none">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
-
-          <input
-            type="text"
-            value={queryInput}
-            onChange={(e) => setQueryInput(e.target.value)}
-            onFocus={() => setIsFocused(true)}
-            placeholder="Search songs, artists, albums, or describe a musical vibe..."
-            className="w-full pl-12 pr-12 py-4 bg-slate-900/95 border border-slate-700/80 focus:border-indigo-500 rounded-2xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-sm sm:text-base shadow-2xl transition-all"
-            autoFocus
-          />
-
-          {queryInput && (
-            <button
-              onClick={handleClear}
-              className="absolute right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Clear Search"
-            >
-              ✕
-            </button>
-          )}
-
-          {/* Autocomplete Suggestions Dropdown */}
-          {isFocused && queryInput.trim() && liveSuggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-slate-900/95 border border-slate-700/80 rounded-2xl shadow-2xl backdrop-blur-xl p-2.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 py-1 flex items-center justify-between">
-                <span>Suggestions</span>
-                {suggestionsLoading && (
-                  <div className="w-3 h-3 border border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                )}
+      <div className="px-5 sm:px-8 lg:px-12 pt-9 space-y-11">
+        {loading && !discoveryData && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="bg-surface-1 rounded-[var(--radius-md)] p-3 animate-pulse">
+                <div className="w-full aspect-square bg-surface-2 rounded-[var(--radius-artwork)] mb-3" />
+                <div className="h-3 bg-surface-2 rounded w-3/4 mb-2" />
+                <div className="h-2.5 bg-surface-2 rounded w-1/2" />
               </div>
+            ))}
+          </div>
+        )}
 
-              {liveSuggestions.map((item) => (
-                <div
-                  key={`${item.type}-${item.id}`}
-                  onClick={() => handleSuggestionClick(item)}
-                  className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-slate-800/90 cursor-pointer text-xs transition-colors group"
+        {error && !loading && (
+          <div className="p-6 bg-danger-wash rounded-[var(--radius-md)] text-center max-w-lg space-y-3">
+            <AlertTriangle size={22} className="text-danger mx-auto" strokeWidth={1.5} />
+            <p className="text-danger text-xs">{error}</p>
+            <button
+              onClick={() => executeDiscovery(queryInput, activeMode)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-danger text-text-on-accent rounded-[var(--radius-pill)] text-xs font-semibold transition-opacity hover:opacity-90 cursor-pointer"
+            >
+              <RefreshCw size={13} />
+              Retry
+            </button>
+          </div>
+        )}
+
+        {hasQuery && !hasAnyResults && !loading && !error && (
+          <div className="py-16 text-center max-w-md mx-auto space-y-4">
+            <SearchIcon size={28} className="text-text-tertiary mx-auto" strokeWidth={1.5} />
+            <h3 className="font-display text-lg text-text-primary">No matches for "{queryInput}"</h3>
+            <p className="text-text-tertiary text-xs leading-relaxed">
+              Try a different keyword, genre, or describe the vibe you're after.
+            </p>
+            <div className="flex flex-wrap justify-center gap-1.5 pt-2">
+              {VIBE_QUICK_SEARCHES.slice(0, 3).map((vibe) => (
+                <button
+                  key={vibe}
+                  onClick={() => handleSelectSearchTerm(vibe)}
+                  className="px-3 py-1.5 bg-surface-2 text-text-secondary hover:text-text-primary rounded-[var(--radius-pill)] text-xs font-medium transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-slate-400 group-hover:text-indigo-400 text-sm shrink-0">
-                      {item.type === 'artist' ? '🎤' : item.type === 'album' ? '💿' : '🎵'}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-200 group-hover:text-white truncate">
-                        {item.title}
-                      </p>
-                      {item.subtitle && (
-                        <p className="text-[11px] text-slate-400 truncate">{item.subtitle}</p>
-                      )}
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-500 group-hover:text-indigo-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60 uppercase">
-                    {item.type}
-                  </span>
-                </div>
+                  {vibe}
+                </button>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Quick Vibe Discovery Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <span className="text-xs text-slate-500 font-medium shrink-0">Quick Vibes:</span>
-          {VIBE_QUICK_SEARCHES.map((vibe) => (
-            <button
-              key={vibe.label}
-              onClick={() => handleSelectSearchTerm(vibe.label)}
-              className="px-3 py-1 bg-slate-800/70 hover:bg-indigo-600/20 text-slate-300 hover:text-indigo-200 border border-slate-700/60 hover:border-indigo-500/40 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
-            >
-              <span>{vibe.icon}</span>
-              <span>{vibe.label}</span>
-            </button>
-          ))}
-        </div>
+        {!hasQuery && !loading && (
+          <div className="space-y-11">
+            <TrendingSearches onSelectTrending={handleSelectSearchTerm} />
+
+            {recommendedList.length > 0 && (
+              <section className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-text-primary font-body flex items-center gap-2">
+                    <Sparkles size={16} className="text-accent" strokeWidth={1.75} />
+                    Recommended for you
+                  </h2>
+                  <p className="text-xs text-text-tertiary mt-0.5">Handcrafted picks tailored to your taste</p>
+                </div>
+                <MusicGrid songs={recommendedList} onPlaySong={handleSongPlay} />
+              </section>
+            )}
+          </div>
+        )}
+
+        {hasQuery && hasAnyResults && (
+          <div className="space-y-11">
+            {artistsList.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="text-lg font-semibold text-text-primary font-body">
+                  Artists <span className="text-text-tertiary font-normal text-sm">· {artistsList.length}</span>
+                </h2>
+                <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+                  {artistsList.map((artist) => (
+                    <ArtistCard key={artist._id} artist={artist} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {similarArtistsList.length > 0 && (
+              <section className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-text-primary font-body">Similar artists</h2>
+                  <p className="text-xs text-text-tertiary mt-0.5">Discovered from genre alignment and your taste profile</p>
+                </div>
+                <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+                  {similarArtistsList.map((artist) => (
+                    <ArtistCard key={artist._id} artist={artist} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {albumsList.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="text-lg font-semibold text-text-primary font-body">
+                  Albums <span className="text-text-tertiary font-normal text-sm">· {albumsList.length}</span>
+                </h2>
+                <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+                  {albumsList.map((album) => (
+                    <AlbumCard key={album._id} album={album} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {songsList.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="text-lg font-semibold text-text-primary font-body">
+                  Songs <span className="text-text-tertiary font-normal text-sm">· {songsList.length}</span>
+                </h2>
+                <MusicGrid songs={songsList} onPlaySong={handleSongPlay} />
+              </section>
+            )}
+
+            {recommendedList.length > 0 && (
+              <section className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-text-primary font-body flex items-center gap-2">
+                    <Sparkles size={16} className="text-accent" strokeWidth={1.75} />
+                    Recommended for you
+                  </h2>
+                  <p className="text-xs text-text-tertiary mt-0.5">Based on your query context and taste profile</p>
+                </div>
+                <MusicGrid songs={recommendedList} onPlaySong={handleSongPlay} />
+              </section>
+            )}
+          </div>
+        )}
       </div>
-
-      {/* 1. Loading Skeleton */}
-      {loading && !discoveryData && <SearchSkeletonLoader />}
-
-      {/* 2. Error State */}
-      {error && !loading && (
-        <div className="p-6 bg-slate-900 border border-rose-500/40 rounded-2xl text-center max-w-lg mx-auto space-y-3 shadow-2xl">
-          <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto text-xl font-bold">
-            !
-          </div>
-          <h3 className="text-base font-bold text-rose-300">Discovery Error</h3>
-          <p className="text-rose-400/90 text-xs">{error}</p>
-          <button
-            onClick={() => executeDiscovery(queryInput, activeMode)}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-          >
-            Retry Search
-          </button>
-        </div>
-      )}
-
-      {/* 3. Empty Results State */}
-      {hasQuery && !hasAnyResults && !loading && !error && (
-        <div className="py-16 text-center max-w-md mx-auto space-y-4">
-          <div className="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center mx-auto shadow-inner text-2xl">
-            🔍
-          </div>
-          <h3 className="text-lg font-bold text-slate-200">No matches found for "{queryInput}"</h3>
-          <p className="text-slate-400 text-xs leading-relaxed">
-            We couldn't find any songs, artists, or albums matching your query. Try a different keyword, genre, or mood description!
-          </p>
-          <div className="flex flex-wrap justify-center gap-2 pt-2">
-            {VIBE_QUICK_SEARCHES.slice(0, 3).map((vibe) => (
-              <button
-                key={vibe.label}
-                onClick={() => handleSelectSearchTerm(vibe.label)}
-                className="px-3 py-1.5 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
-              >
-                {vibe.icon} {vibe.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 4. Initial Screen (When no search query is active) */}
-      {!hasQuery && !loading && (
-        <div className="space-y-12">
-          {/* Trending Searches */}
-          <TrendingSearches onSelectTrending={handleSelectSearchTerm} />
-
-          {/* Recommended for You in Cold-Start / Initial View */}
-          {recommendedList.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xl">✨</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-100">Recommended for You</h2>
-                    <p className="text-xs text-slate-400">Handcrafted recommendations tailored to your taste</p>
-                  </div>
-                </div>
-              </div>
-              <MusicGrid songs={recommendedList} onPlaySong={handleSongPlay} />
-            </section>
-          )}
-        </div>
-      )}
-
-      {/* 5. Grouped Unified Discovery Results */}
-      {hasQuery && hasAnyResults && (
-        <div className="space-y-12">
-          {/* Section A: Artists */}
-          {artistsList.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xl text-purple-400">🎤</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-100">Artists</h2>
-                    <p className="text-xs text-slate-400">
-                      {artistsList.length} {artistsList.length === 1 ? 'artist' : 'artists'} matching your discovery query
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700">
-                {artistsList.map((artist) => (
-                  <ArtistCard key={artist._id} artist={artist} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Section A.2: Similar & Related Artists */}
-          {similarArtistsList.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xl text-indigo-400">✨</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-100">Similar Artists You Might Like</h2>
-                    <p className="text-xs text-slate-400">
-                      Discovered based on genre alignment and your taste profile
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700">
-                {similarArtistsList.map((artist) => (
-                  <ArtistCard key={artist._id} artist={artist} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Section B: Albums */}
-          {albumsList.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xl text-emerald-400">💿</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-100">Albums</h2>
-                    <p className="text-xs text-slate-400">
-                      {albumsList.length} {albumsList.length === 1 ? 'album' : 'albums'} found
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700">
-                {albumsList.map((album) => (
-                  <AlbumCard key={album._id} album={album} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Section C: Matching Songs */}
-          {songsList.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xl text-indigo-400">🎵</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-100">Songs</h2>
-                    <p className="text-xs text-slate-400">
-                      {songsList.length} {songsList.length === 1 ? 'song' : 'songs'} matched across title, artist, and acoustic features
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <MusicGrid songs={songsList} onPlaySong={handleSongPlay} />
-            </section>
-          )}
-
-          {/* Section D: Recommended for You (AI & Contextual Similarity) */}
-          {recommendedList.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xl text-amber-400">✨</span>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-100">Recommended for You</h2>
-                    <p className="text-xs text-slate-400">
-                      Intelligent recommendations based on your query context and taste profile
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <MusicGrid songs={recommendedList} onPlaySong={handleSongPlay} />
-            </section>
-          )}
-        </div>
-      )}
     </div>
   );
 };

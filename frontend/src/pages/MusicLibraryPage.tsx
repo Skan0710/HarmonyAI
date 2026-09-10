@@ -5,7 +5,6 @@ import { fetchSongs, fetchGenres, fetchArtists, fetchAlbums } from '../services/
 import { MusicFilters } from '../components/MusicFilters';
 import { MusicGrid } from '../components/MusicGrid';
 import { Pagination } from '../components/Pagination';
-import { Breadcrumbs } from '../components/Breadcrumbs';
 import { usePlayerStore } from '../store/usePlayerStore';
 
 export const MusicLibraryPage: React.FC = () => {
@@ -136,21 +135,16 @@ export const MusicLibraryPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-16">
-      {/* Breadcrumbs Navigation */}
-      <Breadcrumbs items={[{ label: 'Music Library' }]} />
+    <div className="pb-16">
+      <section className="border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-8">
+        <p className="text-xs font-medium text-text-tertiary uppercase tracking-[0.14em]">Your library</p>
+        <h1 className="font-display text-2xl sm:text-3xl text-text-primary leading-snug mt-3">Music Library</h1>
+        <p className="text-text-tertiary text-sm mt-2">
+          Browse tracks across artists, albums, and genres.
+        </p>
+      </section>
 
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-100 tracking-tight">Music Library</h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Browse and discover tracks across artists, albums, and genres with HarmonyAI.
-          </p>
-        </div>
-      </div>
-
-      {/* Reusable Filters Bar */}
+      <div className="px-5 sm:px-8 lg:px-12 pt-8 space-y-6">
       <MusicFilters
         searchQuery={searchQuery}
         onSearchChange={handleSearchChange}
@@ -194,6 +188,7 @@ export const MusicLibraryPage: React.FC = () => {
           onLimitChange={handleLimitChange}
         />
       )}
+      </div>
     </div>
   );
 };

@@ -18,7 +18,11 @@ import { usePlayerKeyboardShortcuts } from '../hooks/usePlayerKeyboardShortcuts'
 import { formatTime } from '../utils/formatters';
 import { IconButton } from './ui/IconButton';
 
-export const MiniPlayer: React.FC = () => {
+interface MiniPlayerProps {
+  onExpand?: () => void;
+}
+
+export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
@@ -161,7 +165,11 @@ export const MiniPlayer: React.FC = () => {
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-6">
         {/* Metadata */}
         <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-1/4 min-w-0">
-          <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={onExpand}
+            className="flex items-center gap-3 min-w-0 cursor-pointer text-left"
+            aria-label="Expand player"
+          >
             <div className="w-11 h-11 rounded-[var(--radius-artwork)] overflow-hidden bg-surface-2 shrink-0 relative">
               <img src={currentSong.coverImage || fallbackCover} alt={currentSong.title} className="w-full h-full object-cover" />
               {isLoadingAudio && (
@@ -175,7 +183,7 @@ export const MiniPlayer: React.FC = () => {
               <p className="text-xs text-text-tertiary truncate mt-0.5">{getArtistName()}</p>
               {audioError && <p className="text-[10px] text-danger truncate mt-0.5 font-medium">{audioError}</p>}
             </div>
-          </div>
+          </button>
 
           <button onClick={stop} className="sm:hidden text-text-tertiary hover:text-text-primary p-1" aria-label="Close Player">
             <X size={16} />

@@ -4,9 +4,11 @@ import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { MiniPlayer } from './MiniPlayer';
 import { QueueDrawer } from './QueueDrawer';
+import { FullPlayer } from './FullPlayer';
 
 export const MainLayout: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [fullPlayerOpen, setFullPlayerOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-screen bg-surface-0 text-text-primary">
@@ -17,8 +19,9 @@ export const MainLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
-      <MiniPlayer />
+      <MiniPlayer onExpand={() => setFullPlayerOpen(true)} />
       <QueueDrawer />
+      <FullPlayer isOpen={fullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
     </div>
   );
 };

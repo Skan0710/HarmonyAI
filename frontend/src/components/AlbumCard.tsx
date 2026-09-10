@@ -19,7 +19,7 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
   };
 
   const fallbackCover =
-    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 24 24" fill="none" stroke="%23818cf8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231e293b;"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg>';
+    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 24 24" fill="none" stroke="%23d9a15b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231b1815;"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg>';
 
   const coverUrl = imgError || !album.coverImage ? fallbackCover : album.coverImage;
 
@@ -32,11 +32,10 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
   return (
     <div
       onClick={handleClick}
-      className="group relative cursor-pointer w-40 sm:w-44 md:w-48 bg-slate-800/60 hover:bg-slate-800/90 border border-slate-700/50 hover:border-indigo-500/50 rounded-2xl p-3.5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/15 flex flex-col justify-between shrink-0"
+      className="group relative cursor-pointer w-40 sm:w-44 md:w-48 bg-surface-1 hover:bg-surface-2 rounded-[var(--radius-md)] p-3 transition-colors duration-[var(--duration-base)] flex flex-col justify-between shrink-0"
     >
       <div>
-        {/* Cover Container */}
-        <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-900 mb-3 shadow-md">
+        <div className="relative aspect-square w-full rounded-[var(--radius-artwork)] overflow-hidden bg-surface-2 mb-3">
           <img
             src={coverUrl}
             alt={album.title}
@@ -47,21 +46,20 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
 
           {album.albumType && (
             <div className="absolute top-2 right-2">
-              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-slate-900/85 backdrop-blur-md text-slate-200 rounded-md border border-slate-700">
+              <span className="px-2 py-0.5 text-2xs font-medium uppercase tracking-wide bg-surface-0/80 backdrop-blur-md text-text-secondary rounded-[var(--radius-sharp)]">
                 {album.albumType}
               </span>
             </div>
           )}
         </div>
 
-        {/* Details */}
-        <h3 className="font-semibold text-slate-100 text-sm line-clamp-1 group-hover:text-indigo-300 transition-colors">
+        <h3 className="font-semibold text-text-primary text-sm line-clamp-1 group-hover:text-accent transition-colors">
           {album.title}
         </h3>
-        <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{getArtistName()}</p>
+        <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">{getArtistName()}</p>
       </div>
 
-      <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-center justify-between text-[11px] text-slate-400">
+      <div className="mt-3 pt-2.5 border-t border-border-subtle flex items-center justify-between text-2xs text-text-tertiary">
         <span>{album.releaseYear || 'Album'}</span>
         {album.totalTracks && <span>{album.totalTracks} tracks</span>}
       </div>
