@@ -111,7 +111,7 @@ export const PlaylistDetailPage: React.FC = () => {
   };
 
   const fallbackCover =
-    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 24 24" fill="none" stroke="%23818cf8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231e293b;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 24 24" fill="none" stroke="%23d9a15b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231b1815;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
 
   return (
     <div className="space-y-8 pb-16">
@@ -125,23 +125,23 @@ export const PlaylistDetailPage: React.FC = () => {
       {loading && <PlaylistSkeletonLoader />}
 
       {error && !loading && (
-        <div className="p-8 bg-slate-900/80 border border-rose-500/30 rounded-3xl text-center max-w-lg mx-auto space-y-4 shadow-xl">
-          <div className="w-14 h-14 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto">
+        <div className="p-8 bg-surface-1 border border-danger/30 rounded-[var(--radius-lg)] text-center max-w-lg mx-auto space-y-4">
+          <div className="w-14 h-14 rounded-full bg-danger-wash text-danger flex items-center justify-center mx-auto">
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <p className="text-rose-400 font-semibold text-sm">{error}</p>
+          <p className="text-danger font-semibold text-sm">{error}</p>
           <div className="flex items-center justify-center gap-3 pt-2">
             <button
               onClick={loadPlaylist}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md"
+              className="px-4 py-2 bg-accent hover:bg-accent-strong text-text-on-accent text-xs font-bold rounded-[var(--radius-pill)] transition-colors cursor-pointer"
             >
               Retry
             </button>
             <button
               onClick={() => navigate('/playlists')}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl"
+              className="px-4 py-2 bg-surface-2 hover:bg-surface-3 text-text-secondary text-xs font-semibold rounded-[var(--radius-pill)] transition-colors cursor-pointer"
             >
               Back to Playlists
             </button>
@@ -152,42 +152,42 @@ export const PlaylistDetailPage: React.FC = () => {
       {!loading && !error && playlist && (
         <>
           {/* Header Banner */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/80 to-slate-900 border border-indigo-500/20 p-6 sm:p-10 shadow-2xl backdrop-blur-xl">
+          <div className="relative overflow-hidden rounded-[var(--radius-lg)] bg-surface-1 border border-border-subtle p-6 sm:p-10">
             <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-end gap-6">
               <img
                 src={playlist.coverImage || fallbackCover}
                 alt={playlist.name}
-                className="w-36 h-36 sm:w-44 sm:h-44 rounded-2xl object-cover bg-slate-800 shrink-0 border border-slate-700/60 shadow-2xl"
+                className="w-36 h-36 sm:w-44 sm:h-44 rounded-[var(--radius-artwork)] object-cover bg-surface-2 shrink-0 border border-border-subtle shadow-2xl"
               />
 
               <div className="flex-1 text-center sm:text-left space-y-2 min-w-0">
-                <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-wider rounded-full border border-indigo-500/30">
+                <span className="px-3 py-1 bg-accent-wash text-accent text-xs font-bold uppercase tracking-wider rounded-[var(--radius-pill)] border border-accent/30">
                   {playlist.visibility || 'Public'} Playlist
                 </span>
 
-                <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight truncate">
+                <h1 className="font-display text-3xl sm:text-5xl text-text-primary tracking-tight truncate">
                   {playlist.name}
                 </h1>
 
                 {playlist.description && (
-                  <p className="text-slate-300 text-sm max-w-2xl line-clamp-2">
+                  <p className="text-text-secondary text-sm max-w-2xl line-clamp-2">
                     {playlist.description}
                   </p>
                 )}
 
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-1 text-xs text-slate-400">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-1 text-xs text-text-tertiary">
                   <span>
                     Created by{' '}
-                    <strong className="text-slate-200">
+                    <strong className="text-text-secondary">
                       {typeof playlist.owner === 'object' ? playlist.owner.name : 'User'}
                     </strong>
                   </span>
                   <span>•</span>
-                  <span className="font-mono text-indigo-400 font-semibold">
+                  <span className="font-mono text-accent font-semibold">
                     {playlist.songs ? playlist.songs.length : 0} {playlist.songs?.length === 1 ? 'song' : 'songs'}
                   </span>
                   <span>•</span>
-                  <span className="font-mono text-emerald-400 font-semibold">
+                  <span className="font-mono text-success font-semibold">
                     {formatTotalDuration(totalDurationSecs)}
                   </span>
                 </div>
@@ -198,7 +198,7 @@ export const PlaylistDetailPage: React.FC = () => {
                 {playlist.songs && playlist.songs.length > 0 && (
                   <button
                     onClick={handlePlayAll}
-                    className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-2xl shadow-xl shadow-indigo-600/30 hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5"
+                    className="px-6 py-3.5 bg-accent hover:bg-accent-strong text-text-on-accent font-bold text-sm rounded-[var(--radius-pill)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 cursor-pointer"
                   >
                     <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z" />
@@ -210,7 +210,7 @@ export const PlaylistDetailPage: React.FC = () => {
                 {/* Edit Playlist Button */}
                 <button
                   onClick={() => setIsEditModalOpen(true)}
-                  className="p-3.5 bg-slate-800/80 hover:bg-indigo-600/80 text-slate-300 hover:text-white rounded-2xl border border-slate-700/80 transition-colors"
+                  className="p-3.5 bg-surface-2 hover:bg-accent/80 text-text-secondary hover:text-text-on-accent rounded-[var(--radius-lg)] border border-border-default transition-colors cursor-pointer"
                   title="Edit Playlist Details"
                   aria-label="Edit Playlist Details"
                 >
@@ -222,7 +222,7 @@ export const PlaylistDetailPage: React.FC = () => {
                 {/* Delete Playlist Button */}
                 <button
                   onClick={() => setIsDeleteModalOpen(true)}
-                  className="p-3.5 bg-slate-800/80 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 rounded-2xl border border-slate-700/80 transition-colors"
+                  className="p-3.5 bg-surface-2 hover:bg-danger-wash text-text-tertiary hover:text-danger rounded-[var(--radius-lg)] border border-border-default transition-colors cursor-pointer"
                   title="Delete Playlist"
                   aria-label="Delete Playlist"
                 >
@@ -237,19 +237,19 @@ export const PlaylistDetailPage: React.FC = () => {
           {/* Playlist Track List */}
           {!playlist.songs || playlist.songs.length === 0 ? (
             <div className="py-16 text-center max-w-md mx-auto space-y-3">
-              <div className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-700 text-indigo-400 flex items-center justify-center mx-auto">
+              <div className="w-16 h-16 rounded-full bg-surface-1 border border-border-default text-accent flex items-center justify-center mx-auto">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-slate-200">This playlist is empty</h3>
-              <p className="text-slate-400 text-xs">
+              <h3 className="text-lg font-semibold text-text-primary">This playlist is empty</h3>
+              <p className="text-text-tertiary text-xs">
                 Add songs from the Music Library or Search page to build your playlist.
               </p>
             </div>
           ) : (
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-2">
-              <div className="hidden sm:grid grid-cols-12 text-xs font-semibold text-slate-400 px-4 py-2 border-b border-slate-800 uppercase tracking-wider">
+            <div className="bg-surface-1 border border-border-subtle rounded-[var(--radius-lg)] p-4 sm:p-6 space-y-2">
+              <div className="hidden sm:grid grid-cols-12 text-xs font-semibold text-text-tertiary px-4 py-2 border-b border-border-subtle uppercase tracking-wider">
                 <span className="col-span-1">#</span>
                 <span className="col-span-6">Title</span>
                 <span className="col-span-3">Artist</span>
@@ -261,9 +261,9 @@ export const PlaylistDetailPage: React.FC = () => {
                 <div
                   key={song._id || idx}
                   onClick={() => handlePlaySong(song)}
-                  className="group cursor-pointer rounded-xl p-3 sm:px-4 sm:py-3 bg-slate-800/40 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700/80 transition-all flex sm:grid sm:grid-cols-12 items-center justify-between gap-3"
+                  className="group cursor-pointer rounded-[var(--radius-md)] p-3 sm:px-4 sm:py-3 bg-surface-0/40 hover:bg-surface-2 border border-border-subtle hover:border-border-default transition-all flex sm:grid sm:grid-cols-12 items-center justify-between gap-3"
                 >
-                  <span className="hidden sm:inline col-span-1 text-xs font-mono text-slate-500 group-hover:text-indigo-400">
+                  <span className="hidden sm:inline col-span-1 text-xs font-mono text-text-tertiary group-hover:text-accent">
                     {idx + 1}
                   </span>
 
@@ -271,30 +271,30 @@ export const PlaylistDetailPage: React.FC = () => {
                     <img
                       src={song.coverImage || fallbackCover}
                       alt={song.title}
-                      className="w-10 h-10 rounded-lg object-cover bg-slate-800 shrink-0 border border-slate-700/60"
+                      className="w-10 h-10 rounded-[var(--radius-sm)] object-cover bg-surface-2 shrink-0 border border-border-subtle"
                     />
                     <div className="min-w-0">
-                      <h4 className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-indigo-300 truncate">
+                      <h4 className="text-xs sm:text-sm font-semibold text-text-primary group-hover:text-accent truncate">
                         {song.title}
                       </h4>
-                      <p className="text-[11px] text-slate-400 truncate sm:hidden">
+                      <p className="text-[11px] text-text-tertiary truncate sm:hidden">
                         {getArtistName(song.artist)}
                       </p>
                     </div>
                   </div>
 
-                  <div className="hidden sm:block col-span-3 text-xs text-slate-300 truncate">
+                  <div className="hidden sm:block col-span-3 text-xs text-text-secondary truncate">
                     {getArtistName(song.artist)}
                   </div>
 
-                  <div className="col-span-1 text-right text-xs font-mono text-slate-400">
+                  <div className="col-span-1 text-right text-xs font-mono text-text-tertiary">
                     {formatTime(song.duration)}
                   </div>
 
                   <div className="col-span-1 text-right">
                     <button
                       onClick={(e) => handleRemoveSong(song._id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-400 rounded transition-opacity"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-text-tertiary hover:text-danger rounded-[var(--radius-sm)] transition-opacity cursor-pointer"
                       title="Remove from Playlist"
                       aria-label="Remove from Playlist"
                     >

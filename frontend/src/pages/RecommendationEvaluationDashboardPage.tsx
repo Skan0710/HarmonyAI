@@ -3,6 +3,7 @@ import {
   fetchRecommendationEvaluationApi,
   type EvaluationMetricsPayload,
 } from '../services/adminEvaluationService';
+import StatsCounter from '../components/ui/stats-counter';
 
 export const RecommendationEvaluationDashboardPage: React.FC = () => {
   const [selectedStrategy, setSelectedStrategy] = useState<'content' | 'collaborative' | 'hybrid' | 'all'>('all');
@@ -55,34 +56,38 @@ export const RecommendationEvaluationDashboardPage: React.FC = () => {
     title: string,
     value: number | undefined,
     subtitle: string,
-    colorClass: string,
-    barGradient: string
+    accentTone: 'accent' | 'gold'
   ) => {
     const val = value ?? 0;
     const percent = Math.round(val * 100);
+    const badgeClass =
+      accentTone === 'accent'
+        ? 'bg-accent-wash text-accent border-accent/30'
+        : 'bg-gold-wash text-gold border-gold/30';
+    const barClass = accentTone === 'accent' ? 'bg-accent' : 'bg-gold';
 
     return (
-      <div className="bg-slate-800/70 border border-slate-700/70 rounded-2xl p-5 space-y-3 shadow-xl backdrop-blur-md hover:border-slate-600 transition-colors">
+      <div className="bg-surface-1 border border-border-subtle rounded-[var(--radius-lg)] p-5 space-y-3 hover:border-border-default transition-colors">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{title}</span>
-          <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${colorClass}`}>
-            {percent}%
+          <span className="text-xs font-bold uppercase tracking-wider text-text-tertiary">{title}</span>
+          <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-[var(--radius-pill)] border ${badgeClass}`}>
+            <StatsCounter value={percent} suffix="%" duration={1} />
           </span>
         </div>
 
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-extrabold text-white tracking-tight font-mono">
-            {val.toFixed(4)}
+          <span className="text-3xl font-display text-text-primary tracking-tight font-mono">
+            <StatsCounter value={val} decimals={4} duration={1} />
           </span>
-          <span className="text-xs text-slate-400">@ K={kValue}</span>
+          <span className="text-xs text-text-tertiary">@ K={kValue}</span>
         </div>
 
-        <p className="text-xs text-slate-400 leading-relaxed">{subtitle}</p>
+        <p className="text-xs text-text-tertiary leading-relaxed">{subtitle}</p>
 
         {/* Metric Progress Bar */}
-        <div className="w-full h-2 bg-slate-900/80 rounded-full overflow-hidden border border-slate-700/40">
+        <div className="w-full h-2 bg-surface-0/80 rounded-[var(--radius-pill)] overflow-hidden border border-border-subtle">
           <div
-            className={`h-full bg-gradient-to-r ${barGradient} rounded-full transition-all duration-700`}
+            className={`h-full ${barClass} rounded-[var(--radius-pill)] transition-all duration-700`}
             style={{ width: `${Math.min(100, Math.max(5, percent))}%` }}
           />
         </div>
@@ -93,32 +98,32 @@ export const RecommendationEvaluationDashboardPage: React.FC = () => {
   return (
     <div className="space-y-8 pb-16">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 p-6 sm:p-8 shadow-2xl">
-        <div className="absolute -top-20 -right-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-[var(--radius-lg)] bg-surface-1 border border-border-subtle p-6 sm:p-8">
+        <div className="absolute -top-20 -right-20 w-80 h-80 bg-accent-wash rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[var(--radius-pill)] bg-accent-wash text-accent border border-accent/30 text-xs font-semibold">
               🛠️ Developer Diagnostics Dashboard
             </div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+            <h1 className="font-display text-2xl sm:text-4xl text-text-primary tracking-tight">
               Recommendation Evaluation Suite
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-text-secondary max-w-2xl leading-relaxed">
               Benchmark recommendation algorithms using Precision@K, Recall@K, F1@K, Diversity, Novelty, and Catalog Coverage metrics.
             </p>
           </div>
 
           {/* Controls */}
-          <div className="flex flex-wrap items-center gap-3 bg-slate-900/80 p-3 rounded-2xl border border-slate-700/80 backdrop-blur-md">
+          <div className="flex flex-wrap items-center gap-3 bg-surface-0/60 p-3 rounded-[var(--radius-lg)] border border-border-subtle">
             <div className="flex flex-col">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider mb-1">
                 Top-K Horizon
               </label>
               <select
                 value={kValue}
                 onChange={(e) => setKValue(parseInt(e.target.value, 10))}
-                className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500"
+                className="bg-surface-2 border border-border-default rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-accent cursor-pointer"
               >
                 <option value={5}>K = 5</option>
                 <option value={10}>K = 10</option>
@@ -129,7 +134,7 @@ export const RecommendationEvaluationDashboardPage: React.FC = () => {
             <button
               onClick={runBenchmarkEvaluation}
               disabled={loading}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 self-end"
+              className="px-4 py-2.5 bg-accent hover:bg-accent-strong disabled:opacity-50 text-text-on-accent font-semibold text-xs rounded-[var(--radius-pill)] transition-colors flex items-center gap-2 self-end cursor-pointer"
             >
               {loading ? (
                 <span className="animate-spin text-sm">⏳</span>
@@ -142,19 +147,19 @@ export const RecommendationEvaluationDashboardPage: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium">
+        <div className="p-4 rounded-[var(--radius-lg)] bg-danger-wash border border-danger/30 text-danger text-xs font-medium">
           ⚠️ {error}
         </div>
       )}
 
       {/* Strategy Selection Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-border-subtle pb-3 overflow-x-auto">
         <button
           onClick={() => setSelectedStrategy('all')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+          className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all cursor-pointer ${
             selectedStrategy === 'all'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'bg-slate-800/80 text-slate-300 hover:text-white border border-slate-700/60'
+              ? 'bg-accent text-text-on-accent'
+              : 'bg-surface-1 text-text-secondary hover:text-text-primary border border-border-default'
           }`}
         >
           📊 All Strategies Comparison
@@ -162,10 +167,10 @@ export const RecommendationEvaluationDashboardPage: React.FC = () => {
 
         <button
           onClick={() => setSelectedStrategy('hybrid')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+          className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all cursor-pointer ${
             selectedStrategy === 'hybrid'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'bg-slate-800/80 text-slate-300 hover:text-white border border-slate-700/60'
+              ? 'bg-accent text-text-on-accent'
+              : 'bg-surface-1 text-text-secondary hover:text-text-primary border border-border-default'
           }`}
         >
           ⚡ Hybrid Engine
@@ -173,10 +178,10 @@ export const RecommendationEvaluationDashboardPage: React.FC = () => {
 
         <button
           onClick={() => setSelectedStrategy('collaborative')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+          className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all cursor-pointer ${
             selectedStrategy === 'collaborative'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'bg-slate-800/80 text-slate-300 hover:text-white border border-slate-700/60'
+              ? 'bg-accent text-text-on-accent'
+              : 'bg-surface-1 text-text-secondary hover:text-text-primary border border-border-default'
           }`}
         >
           👥 Collaborative Filtering
@@ -184,10 +189,10 @@ export const RecommendationEvaluationDashboardPage: React.FC = () => {
 
         <button
           onClick={() => setSelectedStrategy('content')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+          className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all cursor-pointer ${
             selectedStrategy === 'content'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'bg-slate-800/80 text-slate-300 hover:text-white border border-slate-700/60'
+              ? 'bg-accent text-text-on-accent'
+              : 'bg-surface-1 text-text-secondary hover:text-text-primary border border-border-default'
           }`}
         >
           🎵 Content-Based
@@ -200,136 +205,130 @@ export const RecommendationEvaluationDashboardPage: React.FC = () => {
           'Precision@K',
           activeMetrics?.precisionAtK,
           'Ratio of recommended items matching relevant user interactions.',
-          'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-          'from-indigo-500 to-indigo-400'
+          'accent'
         )}
 
         {renderMetricCard(
           'Recall@K',
           activeMetrics?.recallAtK,
           'Ratio of total relevant items captured in top-K recommendations.',
-          'bg-purple-500/20 text-purple-300 border-purple-500/30',
-          'from-purple-500 to-purple-400'
+          'gold'
         )}
 
         {renderMetricCard(
           'F1@K Score',
           activeMetrics?.f1AtK,
           'Harmonic mean balancing Precision@K and Recall@K relevance.',
-          'bg-pink-500/20 text-pink-300 border-pink-500/30',
-          'from-pink-500 to-pink-400'
+          'accent'
         )}
 
         {renderMetricCard(
           'Recommendation Diversity',
           activeMetrics?.diversityScore,
           'Variety across genre categories and distinct artist creators.',
-          'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-          'from-cyan-500 to-cyan-400'
+          'gold'
         )}
 
         {renderMetricCard(
           'Novelty Score',
           activeMetrics?.noveltyScore,
           'Discovery factor rating less frequently played / hidden gem tracks.',
-          'bg-amber-500/20 text-amber-300 border-amber-500/30',
-          'from-amber-500 to-amber-400'
+          'accent'
         )}
 
         {renderMetricCard(
           'Catalog Coverage',
           activeMetrics?.catalogCoverage,
           'Proportion of total available catalog songs covered by engine.',
-          'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-          'from-emerald-500 to-emerald-400'
+          'gold'
         )}
       </div>
 
       {/* Clean Comparison Table Section */}
-      <div className="bg-slate-800/60 border border-slate-700/60 rounded-3xl p-6 shadow-2xl space-y-4">
-        <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+      <div className="bg-surface-1 border border-border-subtle rounded-[var(--radius-lg)] p-6 space-y-4">
+        <h2 className="text-lg font-bold text-text-primary tracking-tight flex items-center gap-2">
           📋 Strategy Comparison Matrix (@ K={kValue})
         </h2>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900/80 text-slate-400 uppercase font-mono border-b border-slate-700/60">
+          <table className="w-full text-left text-xs text-text-secondary">
+            <thead className="bg-surface-0/80 text-text-tertiary uppercase font-mono border-b border-border-default">
               <tr>
                 <th className="py-3 px-4">Evaluation Metric</th>
-                <th className="py-3 px-4 text-indigo-400">Content-Based</th>
-                <th className="py-3 px-4 text-purple-400">Collaborative</th>
-                <th className="py-3 px-4 text-emerald-400">Hybrid Engine</th>
+                <th className="py-3 px-4 text-text-secondary">Content-Based</th>
+                <th className="py-3 px-4 text-gold">Collaborative</th>
+                <th className="py-3 px-4 text-accent">Hybrid Engine</th>
                 <th className="py-3 px-4 text-right">Optimal Leader</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/40 font-mono">
+            <tbody className="divide-y divide-border-subtle font-mono">
               <tr>
-                <td className="py-3 px-4 font-sans font-semibold text-white">Precision@K</td>
+                <td className="py-3 px-4 font-sans font-semibold text-text-primary">Precision@K</td>
                 <td className="py-3 px-4">{(contentMetrics?.precisionAtK ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4">{(collabMetrics?.precisionAtK ?? 0).toFixed(4)}</td>
-                <td className="py-3 px-4 text-emerald-400 font-bold">{(hybridMetrics?.precisionAtK ?? 0).toFixed(4)}</td>
+                <td className="py-3 px-4 text-accent font-bold">{(hybridMetrics?.precisionAtK ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4 text-right font-sans">
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-[var(--radius-pill)] bg-accent-wash text-accent border border-accent/30">
                     Hybrid
                   </span>
                 </td>
               </tr>
 
               <tr>
-                <td className="py-3 px-4 font-sans font-semibold text-white">Recall@K</td>
+                <td className="py-3 px-4 font-sans font-semibold text-text-primary">Recall@K</td>
                 <td className="py-3 px-4">{(contentMetrics?.recallAtK ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4">{(collabMetrics?.recallAtK ?? 0).toFixed(4)}</td>
-                <td className="py-3 px-4 text-emerald-400 font-bold">{(hybridMetrics?.recallAtK ?? 0).toFixed(4)}</td>
+                <td className="py-3 px-4 text-accent font-bold">{(hybridMetrics?.recallAtK ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4 text-right font-sans">
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-[var(--radius-pill)] bg-accent-wash text-accent border border-accent/30">
                     Hybrid
                   </span>
                 </td>
               </tr>
 
               <tr>
-                <td className="py-3 px-4 font-sans font-semibold text-white">F1@K Score</td>
+                <td className="py-3 px-4 font-sans font-semibold text-text-primary">F1@K Score</td>
                 <td className="py-3 px-4">{(contentMetrics?.f1AtK ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4">{(collabMetrics?.f1AtK ?? 0).toFixed(4)}</td>
-                <td className="py-3 px-4 text-emerald-400 font-bold">{(hybridMetrics?.f1AtK ?? 0).toFixed(4)}</td>
+                <td className="py-3 px-4 text-accent font-bold">{(hybridMetrics?.f1AtK ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4 text-right font-sans">
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-[var(--radius-pill)] bg-accent-wash text-accent border border-accent/30">
                     Hybrid
                   </span>
                 </td>
               </tr>
 
               <tr>
-                <td className="py-3 px-4 font-sans font-semibold text-white">Diversity Score</td>
+                <td className="py-3 px-4 font-sans font-semibold text-text-primary">Diversity Score</td>
                 <td className="py-3 px-4">{(contentMetrics?.diversityScore ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4">{(collabMetrics?.diversityScore ?? 0).toFixed(4)}</td>
-                <td className="py-3 px-4 text-emerald-400 font-bold">{(hybridMetrics?.diversityScore ?? 0).toFixed(4)}</td>
+                <td className="py-3 px-4 text-accent font-bold">{(hybridMetrics?.diversityScore ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4 text-right font-sans">
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-[var(--radius-pill)] bg-accent-wash text-accent border border-accent/30">
                     Hybrid
                   </span>
                 </td>
               </tr>
 
               <tr>
-                <td className="py-3 px-4 font-sans font-semibold text-white">Novelty Score</td>
+                <td className="py-3 px-4 font-sans font-semibold text-text-primary">Novelty Score</td>
                 <td className="py-3 px-4">{(contentMetrics?.noveltyScore ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4">{(collabMetrics?.noveltyScore ?? 0).toFixed(4)}</td>
-                <td className="py-3 px-4 text-emerald-400 font-bold">{(hybridMetrics?.noveltyScore ?? 0).toFixed(4)}</td>
+                <td className="py-3 px-4 text-accent font-bold">{(hybridMetrics?.noveltyScore ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4 text-right font-sans">
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-[var(--radius-pill)] bg-accent-wash text-accent border border-accent/30">
                     Hybrid
                   </span>
                 </td>
               </tr>
 
               <tr>
-                <td className="py-3 px-4 font-sans font-semibold text-white">Catalog Coverage</td>
+                <td className="py-3 px-4 font-sans font-semibold text-text-primary">Catalog Coverage</td>
                 <td className="py-3 px-4">{(contentMetrics?.catalogCoverage ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4">{(collabMetrics?.catalogCoverage ?? 0).toFixed(4)}</td>
-                <td className="py-3 px-4 text-emerald-400 font-bold">{(hybridMetrics?.catalogCoverage ?? 0).toFixed(4)}</td>
+                <td className="py-3 px-4 text-accent font-bold">{(hybridMetrics?.catalogCoverage ?? 0).toFixed(4)}</td>
                 <td className="py-3 px-4 text-right font-sans">
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-[var(--radius-pill)] bg-accent-wash text-accent border border-accent/30">
                     Hybrid
                   </span>
                 </td>
@@ -340,53 +339,53 @@ export const RecommendationEvaluationDashboardPage: React.FC = () => {
       </div>
 
       {/* Comparative Visualization Section */}
-      <div className="bg-slate-800/60 border border-slate-700/60 rounded-3xl p-6 shadow-2xl space-y-6">
-        <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+      <div className="bg-surface-1 border border-border-subtle rounded-[var(--radius-lg)] p-6 space-y-6">
+        <h2 className="text-lg font-bold text-text-primary tracking-tight flex items-center gap-2">
           📊 Comparative Benchmark Visualization
         </h2>
 
         <div className="space-y-5">
           {/* F1 Score Bar Comparison */}
           <div className="space-y-2">
-            <div className="flex justify-between text-xs font-semibold text-slate-300">
+            <div className="flex justify-between text-xs font-semibold text-text-secondary">
               <span>F1@K Overall Relevance Score</span>
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-3">
-                <span className="w-24 text-[11px] font-medium text-indigo-300">Content</span>
-                <div className="flex-1 bg-slate-900 rounded-full h-3 overflow-hidden">
+                <span className="w-24 text-[11px] font-medium text-text-tertiary">Content</span>
+                <div className="flex-1 bg-surface-0 rounded-[var(--radius-pill)] h-3 overflow-hidden">
                   <div
-                    className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                    className="bg-border-strong h-full rounded-[var(--radius-pill)] transition-all duration-500"
                     style={{ width: `${Math.round((contentMetrics?.f1AtK ?? 0) * 100)}%` }}
                   />
                 </div>
-                <span className="w-12 text-[11px] font-mono text-slate-300">
+                <span className="w-12 text-[11px] font-mono text-text-secondary">
                   {((contentMetrics?.f1AtK ?? 0) * 100).toFixed(1)}%
                 </span>
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="w-24 text-[11px] font-medium text-purple-300">Collaborative</span>
-                <div className="flex-1 bg-slate-900 rounded-full h-3 overflow-hidden">
+                <span className="w-24 text-[11px] font-medium text-gold">Collaborative</span>
+                <div className="flex-1 bg-surface-0 rounded-[var(--radius-pill)] h-3 overflow-hidden">
                   <div
-                    className="bg-purple-500 h-full rounded-full transition-all duration-500"
+                    className="bg-gold h-full rounded-[var(--radius-pill)] transition-all duration-500"
                     style={{ width: `${Math.round((collabMetrics?.f1AtK ?? 0) * 100)}%` }}
                   />
                 </div>
-                <span className="w-12 text-[11px] font-mono text-slate-300">
+                <span className="w-12 text-[11px] font-mono text-text-secondary">
                   {((collabMetrics?.f1AtK ?? 0) * 100).toFixed(1)}%
                 </span>
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="w-24 text-[11px] font-bold text-emerald-300">Hybrid Engine</span>
-                <div className="flex-1 bg-slate-900 rounded-full h-3 overflow-hidden">
+                <span className="w-24 text-[11px] font-bold text-accent">Hybrid Engine</span>
+                <div className="flex-1 bg-surface-0 rounded-[var(--radius-pill)] h-3 overflow-hidden">
                   <div
-                    className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+                    className="bg-accent h-full rounded-[var(--radius-pill)] transition-all duration-500"
                     style={{ width: `${Math.round((hybridMetrics?.f1AtK ?? 0) * 100)}%` }}
                   />
                 </div>
-                <span className="w-12 text-[11px] font-mono text-emerald-400 font-bold">
+                <span className="w-12 text-[11px] font-mono text-accent font-bold">
                   {((hybridMetrics?.f1AtK ?? 0) * 100).toFixed(1)}%
                 </span>
               </div>
@@ -394,46 +393,46 @@ export const RecommendationEvaluationDashboardPage: React.FC = () => {
           </div>
 
           {/* Diversity Bar Comparison */}
-          <div className="space-y-2 pt-2 border-t border-slate-700/40">
-            <div className="flex justify-between text-xs font-semibold text-slate-300">
+          <div className="space-y-2 pt-2 border-t border-border-subtle">
+            <div className="flex justify-between text-xs font-semibold text-text-secondary">
               <span>Recommendation Diversity Factor</span>
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-3">
-                <span className="w-24 text-[11px] font-medium text-indigo-300">Content</span>
-                <div className="flex-1 bg-slate-900 rounded-full h-3 overflow-hidden">
+                <span className="w-24 text-[11px] font-medium text-text-tertiary">Content</span>
+                <div className="flex-1 bg-surface-0 rounded-[var(--radius-pill)] h-3 overflow-hidden">
                   <div
-                    className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                    className="bg-border-strong h-full rounded-[var(--radius-pill)] transition-all duration-500"
                     style={{ width: `${Math.round((contentMetrics?.diversityScore ?? 0) * 100)}%` }}
                   />
                 </div>
-                <span className="w-12 text-[11px] font-mono text-slate-300">
+                <span className="w-12 text-[11px] font-mono text-text-secondary">
                   {((contentMetrics?.diversityScore ?? 0) * 100).toFixed(1)}%
                 </span>
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="w-24 text-[11px] font-medium text-purple-300">Collaborative</span>
-                <div className="flex-1 bg-slate-900 rounded-full h-3 overflow-hidden">
+                <span className="w-24 text-[11px] font-medium text-gold">Collaborative</span>
+                <div className="flex-1 bg-surface-0 rounded-[var(--radius-pill)] h-3 overflow-hidden">
                   <div
-                    className="bg-purple-500 h-full rounded-full transition-all duration-500"
+                    className="bg-gold h-full rounded-[var(--radius-pill)] transition-all duration-500"
                     style={{ width: `${Math.round((collabMetrics?.diversityScore ?? 0) * 100)}%` }}
                   />
                 </div>
-                <span className="w-12 text-[11px] font-mono text-slate-300">
+                <span className="w-12 text-[11px] font-mono text-text-secondary">
                   {((collabMetrics?.diversityScore ?? 0) * 100).toFixed(1)}%
                 </span>
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="w-24 text-[11px] font-bold text-emerald-300">Hybrid Engine</span>
-                <div className="flex-1 bg-slate-900 rounded-full h-3 overflow-hidden">
+                <span className="w-24 text-[11px] font-bold text-accent">Hybrid Engine</span>
+                <div className="flex-1 bg-surface-0 rounded-[var(--radius-pill)] h-3 overflow-hidden">
                   <div
-                    className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+                    className="bg-accent h-full rounded-[var(--radius-pill)] transition-all duration-500"
                     style={{ width: `${Math.round((hybridMetrics?.diversityScore ?? 0) * 100)}%` }}
                   />
                 </div>
-                <span className="w-12 text-[11px] font-mono text-emerald-400 font-bold">
+                <span className="w-12 text-[11px] font-mono text-accent font-bold">
                   {((hybridMetrics?.diversityScore ?? 0) * 100).toFixed(1)}%
                 </span>
               </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Wordmark } from './Wordmark';
+import { LineHoverText } from './ui/line-hover-link';
 import {
   Home,
   Compass,
@@ -104,7 +105,11 @@ const SidebarContent: React.FC<{ onNavigate?: () => void }> = ({ onNavigate }) =
                         }`}
                       />
                       <Icon size={16} strokeWidth={1.75} />
-                      <span className="flex-1 font-medium">{label}</span>
+                      <span className="flex-1 min-w-0">
+                        <LineHoverText variant="slide" className="font-medium">
+                          {label}
+                        </LineHoverText>
+                      </span>
                       {tag && (
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-gold px-1.5 py-0.5 rounded-sm bg-gold-wash">
                           {tag}

@@ -191,7 +191,7 @@ export function PerspectiveCarousel({
       {showControls && (
         <div
           className={cn(
-            "absolute inset-x-4 bottom-5 z-10 mx-auto flex w-fit items-center justify-center gap-3 rounded-full border border-neutral-300/80 bg-neutral-200/70 px-2 text-neutral-700 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-neutral-900/70 dark:text-neutral-100",
+            "absolute inset-x-4 bottom-5 z-10 mx-auto flex w-fit items-center justify-center gap-3 rounded-[var(--radius-pill)] border border-border-subtle bg-surface-0/70 px-2 text-text-secondary shadow-sm backdrop-blur-sm",
             controlsClassName
           )}
         >

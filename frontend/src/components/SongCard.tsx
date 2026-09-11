@@ -8,6 +8,7 @@ import { AddToPlaylistModal } from './AddToPlaylistModal';
 import { WhyThisSongModal } from './RecommendationExplanationModal';
 import { trackRecommendationInteraction } from '../services/recommendationTrackingService';
 import { formatTime, formatCount } from '../utils/formatters';
+import { LineHoverText } from './ui/line-hover-link';
 
 interface SongCardProps {
   song: Song;
@@ -145,18 +146,6 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
             </div>
 
             <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5">
-                {hasRecommendationInfo && (
-                  <button
-                    onClick={handleExplanationClick}
-                    className="px-2 py-1 text-2xs font-semibold rounded-[var(--radius-pill)] bg-gold/90 hover:bg-gold-strong text-text-on-accent backdrop-blur-md transition-colors flex items-center gap-1 cursor-pointer"
-                    title="Why this song?"
-                    aria-label="Why this song?"
-                  >
-                    <Sparkles size={11} />
-                    Why?
-                  </button>
-                )}
-
                 <button
                   onClick={handlePlaylistClick}
                   className="p-1.5 rounded-full bg-surface-0/70 hover:bg-surface-0 backdrop-blur-md transition-colors text-text-secondary hover:text-text-primary cursor-pointer"
@@ -197,9 +186,27 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
           </div>
 
           <div className="space-y-1">
-            <h3 className="font-semibold text-text-primary text-sm leading-snug line-clamp-1 group-hover:text-accent transition-colors">
-              {song.title}
-            </h3>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h3 className="min-w-0">
+                <LineHoverText
+                  variant="scribble"
+                  className="!inline-block !w-full !truncate font-semibold text-text-primary text-sm leading-snug group-hover:text-accent transition-colors"
+                >
+                  {song.title}
+                </LineHoverText>
+              </h3>
+              {hasRecommendationInfo && (
+                <button
+                  onClick={handleExplanationClick}
+                  className="shrink-0 px-1.5 py-0.5 text-2xs font-semibold rounded-[var(--radius-pill)] bg-gold-wash hover:bg-gold text-gold-strong hover:text-text-on-accent transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Why this song?"
+                  aria-label="Why this song?"
+                >
+                  <Sparkles size={10} />
+                  Why?
+                </button>
+              )}
+            </div>
             <p className="text-xs font-medium text-text-secondary line-clamp-1">{getArtistName()}</p>
             <p className="text-2xs text-text-tertiary line-clamp-1">{getAlbumTitle()}</p>
           </div>

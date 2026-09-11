@@ -27,8 +27,8 @@ export const LISTENING_CONTEXTS: ListeningContextOption[] = [
     label: 'General Listening',
     emoji: '🎵',
     subtitle: 'Daily personal taste profile',
-    colorGradient: 'from-blue-500/20 to-indigo-500/20',
-    activeBorder: 'border-indigo-500 bg-indigo-500/20 text-indigo-200 shadow-indigo-500/20',
+    colorGradient: 'from-accent/20 to-gold/20',
+    activeBorder: 'border-accent bg-accent-wash text-accent shadow-accent/20',
     badgeText: 'Personalized',
   },
   {
@@ -36,8 +36,8 @@ export const LISTENING_CONTEXTS: ListeningContextOption[] = [
     label: 'Study',
     emoji: '📚',
     subtitle: 'Lo-Fi & ambient textures',
-    colorGradient: 'from-amber-500/20 to-orange-500/20',
-    activeBorder: 'border-amber-500 bg-amber-500/20 text-amber-200 shadow-amber-500/20',
+    colorGradient: 'from-gold/20 to-accent/20',
+    activeBorder: 'border-gold bg-gold-wash text-gold shadow-gold/20',
     badgeText: 'Low Distraction',
   },
   {
@@ -45,8 +45,8 @@ export const LISTENING_CONTEXTS: ListeningContextOption[] = [
     label: 'Work',
     emoji: '💻',
     subtitle: 'Deep house & rhythmic beats',
-    colorGradient: 'from-cyan-500/20 to-blue-500/20',
-    activeBorder: 'border-cyan-500 bg-cyan-500/20 text-cyan-200 shadow-cyan-500/20',
+    colorGradient: 'from-accent/20 to-gold/20',
+    activeBorder: 'border-accent bg-accent-wash text-accent shadow-accent/20',
     badgeText: 'Productivity',
   },
   {
@@ -54,8 +54,8 @@ export const LISTENING_CONTEXTS: ListeningContextOption[] = [
     label: 'Workout',
     emoji: '⚡',
     subtitle: 'High energy & driving tempo',
-    colorGradient: 'from-rose-500/20 to-red-500/20',
-    activeBorder: 'border-rose-500 bg-rose-500/20 text-rose-200 shadow-rose-500/20',
+    colorGradient: 'from-danger/20 to-accent/20',
+    activeBorder: 'border-danger bg-danger-wash text-danger shadow-danger/20',
     badgeText: '130-160 BPM',
   },
   {
@@ -63,8 +63,8 @@ export const LISTENING_CONTEXTS: ListeningContextOption[] = [
     label: 'Relaxation',
     emoji: '🍃',
     subtitle: 'Acoustic, folk & soothing tones',
-    colorGradient: 'from-emerald-500/20 to-teal-500/20',
-    activeBorder: 'border-emerald-500 bg-emerald-500/20 text-emerald-200 shadow-emerald-500/20',
+    colorGradient: 'from-success/20 to-gold/20',
+    activeBorder: 'border-success bg-success/10 text-success shadow-success/20',
     badgeText: 'Chill & Unwind',
   },
   {
@@ -72,8 +72,8 @@ export const LISTENING_CONTEXTS: ListeningContextOption[] = [
     label: 'Commute',
     emoji: '🚗',
     subtitle: 'Upbeat pop & sing-along hits',
-    colorGradient: 'from-violet-500/20 to-purple-500/20',
-    activeBorder: 'border-violet-500 bg-violet-500/20 text-violet-200 shadow-violet-500/20',
+    colorGradient: 'from-gold/20 to-accent/20',
+    activeBorder: 'border-gold bg-gold-wash text-gold shadow-gold/20',
     badgeText: 'On the Move',
   },
   {
@@ -81,8 +81,8 @@ export const LISTENING_CONTEXTS: ListeningContextOption[] = [
     label: 'Party',
     emoji: '🎉',
     subtitle: 'Dance floor bangers & anthems',
-    colorGradient: 'from-fuchsia-500/20 to-pink-500/20',
-    activeBorder: 'border-fuchsia-500 bg-fuchsia-500/20 text-fuchsia-200 shadow-fuchsia-500/20',
+    colorGradient: 'from-accent/20 to-danger/20',
+    activeBorder: 'border-accent bg-accent-wash text-accent shadow-accent/20',
     badgeText: 'Max Energy',
   },
   {
@@ -90,8 +90,8 @@ export const LISTENING_CONTEXTS: ListeningContextOption[] = [
     label: 'Sleep',
     emoji: '🌙',
     subtitle: 'Calm soundscapes & soft piano',
-    colorGradient: 'from-slate-500/20 to-indigo-950/40',
-    activeBorder: 'border-indigo-400 bg-indigo-950/40 text-indigo-200 shadow-indigo-500/20',
+    colorGradient: 'from-surface-3/40 to-accent/10',
+    activeBorder: 'border-border-strong bg-surface-3 text-text-primary shadow-black/20',
     badgeText: 'Restful',
   },
   {
@@ -99,8 +99,8 @@ export const LISTENING_CONTEXTS: ListeningContextOption[] = [
     label: 'Focus',
     emoji: '🎯',
     subtitle: 'Minimal techno & flow states',
-    colorGradient: 'from-teal-500/20 to-emerald-500/20',
-    activeBorder: 'border-teal-500 bg-teal-500/20 text-teal-200 shadow-teal-500/20',
+    colorGradient: 'from-success/20 to-gold/20',
+    activeBorder: 'border-success bg-success/10 text-success shadow-success/20',
     badgeText: 'Deep Flow',
   },
 ];
@@ -136,11 +136,11 @@ export const ListeningContextSelector: React.FC<ListeningContextSelectorProps> =
       <div className={`space-y-4 ${className}`}>
         {title && (
           <div className="flex flex-col gap-1">
-            <h3 className="text-lg font-semibold text-white tracking-tight flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-text-primary tracking-tight flex items-center gap-2">
               <span className="text-xl">🎧</span>
               {title}
             </h3>
-            {description && <p className="text-xs text-slate-400">{description}</p>}
+            {description && <p className="text-xs text-text-tertiary">{description}</p>}
           </div>
         )}
 
@@ -158,10 +158,10 @@ export const ListeningContextSelector: React.FC<ListeningContextSelectorProps> =
                 aria-checked={isSelected}
                 onClick={() => onSelectContext(item.id)}
                 type="button"
-                className={`relative flex flex-col items-start p-3.5 rounded-2xl text-left border transition-all duration-200 cursor-pointer select-none group ${
+                className={`relative flex flex-col items-start p-3.5 rounded-[var(--radius-lg)] text-left border transition-all duration-200 cursor-pointer select-none group ${
                   isSelected
-                    ? `border-2 ${item.activeBorder} shadow-lg ring-1 ring-white/10 scale-[1.02]`
-                    : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-800/60 text-slate-300'
+                    ? `border-2 ${item.activeBorder} shadow-lg ring-1 ring-border-strong scale-[1.02]`
+                    : 'bg-surface-1 border-border-subtle hover:border-border-default hover:bg-surface-2 text-text-secondary'
                 }`}
               >
                 <div className="flex items-center justify-between w-full mb-2">
@@ -170,19 +170,19 @@ export const ListeningContextSelector: React.FC<ListeningContextSelectorProps> =
                   </span>
                   {isSelected ? (
                     <span className="flex h-2.5 w-2.5 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-success"></span>
                     </span>
                   ) : (
-                    <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-500 group-hover:text-slate-400 transition-colors">
+                    <span className="text-[10px] uppercase font-semibold tracking-wider text-text-tertiary group-hover:text-text-secondary transition-colors">
                       {item.badgeText}
                     </span>
                   )}
                 </div>
 
-                <div className="font-semibold text-sm text-white tracking-wide">{item.label}</div>
+                <div className="font-semibold text-sm text-text-primary tracking-wide">{item.label}</div>
                 {showSubtitles && (
-                  <div className="text-[11px] text-slate-400 mt-1 line-clamp-1 leading-tight">
+                  <div className="text-[11px] text-text-tertiary mt-1 line-clamp-1 leading-tight">
                     {item.subtitle}
                   </div>
                 )}
@@ -206,10 +206,10 @@ export const ListeningContextSelector: React.FC<ListeningContextSelectorProps> =
               aria-checked={isSelected}
               onClick={() => onSelectContext(item.id)}
               type="button"
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-pill)] text-xs font-medium border transition-all duration-150 cursor-pointer ${
                 isSelected
-                  ? 'border-indigo-500 bg-indigo-600/30 text-indigo-200 font-semibold shadow-sm'
-                  : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                  ? 'border-accent bg-accent-wash text-accent font-semibold shadow-sm'
+                  : 'border-border-subtle bg-surface-1 text-text-tertiary hover:text-text-secondary hover:border-border-default'
               }`}
             >
               <span>{item.emoji}</span>

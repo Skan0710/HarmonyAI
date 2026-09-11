@@ -24,7 +24,7 @@ export const HighlightText: React.FC<HighlightTextProps> = ({
         part.toLowerCase() === highlight.toLowerCase() ? (
           <span
             key={i}
-            className="bg-indigo-500/30 text-indigo-300 font-bold px-1 rounded border border-indigo-500/40"
+            className="bg-accent-wash text-accent font-bold px-1 rounded-[var(--radius-sm)] border border-accent/40"
           >
             {part}
           </span>

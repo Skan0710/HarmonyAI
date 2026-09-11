@@ -3,6 +3,8 @@ import type { Artist, Genre } from '../types/music';
 import { usePreferenceStore } from '../store/usePreferenceStore';
 import { fetchArtists, fetchGenres } from '../services/songService';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { Search } from 'lucide-react';
+import { SmoothInput } from '../components/ui/SmoothInput';
 
 export const PreferencesPage: React.FC = () => {
   const {
@@ -96,7 +98,7 @@ export const PreferencesPage: React.FC = () => {
   };
 
   const fallbackAvatar =
-    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23818cf8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231e293b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23d9a15b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231b1815;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
 
   return (
     <div className="space-y-8 pb-16">
@@ -104,18 +106,18 @@ export const PreferencesPage: React.FC = () => {
       <Breadcrumbs items={[{ label: 'Music Preferences' }]} />
 
       {/* Header Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/80 to-slate-900 border border-indigo-500/20 p-6 sm:p-10 shadow-2xl backdrop-blur-xl">
+      <div className="relative overflow-hidden rounded-[var(--radius-lg)] bg-surface-1 border border-border-subtle p-6 sm:p-10">
         <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-end gap-6">
-          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-800 flex items-center justify-center shadow-xl shadow-indigo-600/30 shrink-0 border border-indigo-400/30">
+          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-[var(--radius-lg)] bg-accent-wash flex items-center justify-center shrink-0 border border-accent/30">
             <span className="text-4xl sm:text-5xl">⚡</span>
           </div>
 
           <div className="flex-1 text-center sm:text-left space-y-2">
-            <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-wider rounded-full border border-indigo-500/30">
+            <span className="px-3 py-1 bg-accent-wash text-accent text-xs font-bold uppercase tracking-wider rounded-[var(--radius-pill)] border border-accent/30">
               Personalization
             </span>
-            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">Music Preferences</h1>
-            <p className="text-slate-300 text-sm sm:text-base max-w-2xl">
+            <h1 className="font-display text-3xl sm:text-5xl text-text-primary tracking-tight">Music Preferences</h1>
+            <p className="text-text-secondary text-sm sm:text-base max-w-2xl">
               Curate your favorite performers and acoustic genres to personalize your AI music discovery experience.
             </p>
           </div>
@@ -125,18 +127,18 @@ export const PreferencesPage: React.FC = () => {
       {/* Loading Skeleton */}
       {loading && (
         <div className="space-y-6 animate-pulse">
-          <div className="h-40 bg-slate-800/60 rounded-3xl" />
-          <div className="h-40 bg-slate-800/60 rounded-3xl" />
+          <div className="h-40 bg-surface-1 rounded-[var(--radius-lg)]" />
+          <div className="h-40 bg-surface-1 rounded-[var(--radius-lg)]" />
         </div>
       )}
 
       {/* Error Retry Banner */}
       {error && !loading && (
-        <div className="p-6 bg-slate-800/60 border border-rose-500/30 rounded-2xl text-center max-w-lg mx-auto space-y-3">
-          <p className="text-rose-400 font-medium text-sm">{error}</p>
+        <div className="p-6 bg-surface-1 border border-danger/30 rounded-[var(--radius-lg)] text-center max-w-lg mx-auto space-y-3">
+          <p className="text-danger font-medium text-sm">{error}</p>
           <button
             onClick={fetchPreferences}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md"
+            className="px-4 py-2 bg-accent hover:bg-accent-strong text-text-on-accent text-xs font-bold rounded-[var(--radius-pill)] transition-colors cursor-pointer"
           >
             Retry Loading Preferences
           </button>
@@ -146,42 +148,41 @@ export const PreferencesPage: React.FC = () => {
       {!loading && !error && (
         <div className="space-y-10">
           {/* SECTION 1: Favorite Artists */}
-          <section className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <section className="bg-surface-1 border border-border-subtle rounded-[var(--radius-lg)] p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-subtle pb-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
                   <span>🎤</span>
                   <span>Favorite Artists</span>
-                  <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  <span className="text-xs font-mono px-2.5 py-0.5 rounded-[var(--radius-pill)] bg-accent-wash text-accent border border-accent/30">
                     {favoriteArtists.length}
                   </span>
                 </h2>
-                <p className="text-slate-400 text-xs mt-1">
+                <p className="text-text-tertiary text-xs mt-1">
                   Search and add performers to your top creator list.
                 </p>
               </div>
 
               {/* Artist Search Bar */}
               <div ref={searchRef} className="relative w-full sm:w-72">
-                <input
+                <SmoothInput
                   type="text"
                   value={artistSearch}
                   onChange={(e) => setArtistSearch(e.target.value)}
                   onFocus={() => setIsDropdownOpen(true)}
                   placeholder="Search artist to add..."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                  wrapperClassName="w-full bg-surface-2 border border-border-default rounded-[var(--radius-md)] focus-within:border-accent transition-colors"
+                  className="w-full pl-9 pr-3 py-2 text-xs text-text-primary placeholder:text-text-tertiary"
                 />
-                <svg className="w-4 h-4 absolute left-3 top-2.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-text-tertiary pointer-events-none" strokeWidth={1.75} />
 
                 {/* Artist Search Results Dropdown */}
                 {isDropdownOpen && artistSearch.trim() && (
-                  <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-2 max-h-56 overflow-y-auto space-y-1">
+                  <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-surface-1 border border-border-default rounded-[var(--radius-lg)] shadow-lg p-2 max-h-56 overflow-y-auto space-y-1">
                     {searching ? (
-                      <div className="p-3 text-center text-xs text-indigo-400">Searching...</div>
+                      <div className="p-3 text-center text-xs text-accent">Searching...</div>
                     ) : searchResults.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-slate-400">No artists found</div>
+                      <div className="p-3 text-center text-xs text-text-tertiary">No artists found</div>
                     ) : (
                       searchResults.map((artist) => {
                         const isFav = isFavoriteArtist(artist._id);
@@ -189,18 +190,18 @@ export const PreferencesPage: React.FC = () => {
                           <div
                             key={artist._id}
                             onClick={() => handleSelectArtist(artist)}
-                            className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-800 cursor-pointer text-xs transition-colors"
+                            className="flex items-center justify-between p-2 rounded-[var(--radius-md)] hover:bg-surface-2 cursor-pointer text-xs transition-colors"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <img
                                 src={artist.profileImage || artist.avatar || fallbackAvatar}
                                 alt={artist.name}
-                                className="w-7 h-7 rounded-full object-cover shrink-0 border border-slate-700"
+                                className="w-7 h-7 rounded-full object-cover shrink-0 border border-border-default"
                               />
-                              <span className="text-slate-200 truncate font-semibold">{artist.name}</span>
+                              <span className="text-text-primary truncate font-semibold">{artist.name}</span>
                             </div>
 
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isFav ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-300'}`}>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-[var(--radius-pill)] font-bold ${isFav ? 'bg-success/15 text-success' : 'bg-accent-wash text-accent'}`}>
                               {isFav ? 'Added ✓' : '+ Add'}
                             </span>
                           </div>
@@ -214,12 +215,12 @@ export const PreferencesPage: React.FC = () => {
 
             {/* Favorite Artists Display Grid */}
             {favoriteArtists.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400 max-w-sm mx-auto space-y-2">
-                <div className="w-12 h-12 rounded-full bg-slate-800 text-indigo-400 flex items-center justify-center mx-auto">
+              <div className="py-8 text-center text-xs text-text-tertiary max-w-sm mx-auto space-y-2">
+                <div className="w-12 h-12 rounded-full bg-surface-2 text-accent flex items-center justify-center mx-auto">
                   🎤
                 </div>
-                <p className="font-medium text-slate-300">No Favorite Artists Selected</p>
-                <p className="text-[11px] text-slate-500">
+                <p className="font-medium text-text-secondary">No Favorite Artists Selected</p>
+                <p className="text-[11px] text-text-tertiary">
                   Use the search bar above to select your favorite music creators.
                 </p>
               </div>
@@ -228,9 +229,9 @@ export const PreferencesPage: React.FC = () => {
                 {favoriteArtists.map((artist) => (
                   <div
                     key={artist._id}
-                    className="group relative bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-2xl p-4 flex flex-col items-center text-center space-y-3 transition-all duration-200"
+                    className="group relative bg-surface-0/60 hover:bg-surface-2 border border-border-subtle rounded-[var(--radius-lg)] p-4 flex flex-col items-center text-center space-y-3 transition-all duration-200"
                   >
-                    <div className="relative w-16 h-16 rounded-full overflow-hidden bg-slate-900 border border-slate-700 shadow-md">
+                    <div className="relative w-16 h-16 rounded-full overflow-hidden bg-surface-2 border border-border-default">
                       <img
                         src={artist.profileImage || artist.avatar || fallbackAvatar}
                         alt={artist.name}
@@ -239,7 +240,7 @@ export const PreferencesPage: React.FC = () => {
                     </div>
 
                     <div className="min-w-0 w-full">
-                      <p className="text-xs font-bold text-slate-100 truncate group-hover:text-indigo-300">
+                      <p className="text-xs font-bold text-text-primary truncate group-hover:text-accent">
                         {artist.name}
                       </p>
                     </div>
@@ -247,7 +248,7 @@ export const PreferencesPage: React.FC = () => {
                     {/* Remove Action Button */}
                     <button
                       onClick={() => removeArtist(artist._id)}
-                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-900 hover:bg-rose-600 text-slate-400 hover:text-white border border-slate-700 flex items-center justify-center text-xs font-bold transition-colors shadow-md"
+                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-surface-1 hover:bg-danger text-text-tertiary hover:text-text-on-accent border border-border-default flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
                       title="Remove from Favorites"
                       aria-label="Remove from Favorites"
                     >
@@ -260,16 +261,16 @@ export const PreferencesPage: React.FC = () => {
           </section>
 
           {/* SECTION 2: Favorite Genres */}
-          <section className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-            <div className="border-b border-slate-800 pb-4">
-              <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+          <section className="bg-surface-1 border border-border-subtle rounded-[var(--radius-lg)] p-6 sm:p-8 space-y-6">
+            <div className="border-b border-border-subtle pb-4">
+              <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
                 <span>🎨</span>
                 <span>Favorite Genres</span>
-                <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                <span className="text-xs font-mono px-2.5 py-0.5 rounded-[var(--radius-pill)] bg-accent-wash text-accent border border-accent/30">
                   {favoriteGenres.length}
                 </span>
               </h2>
-              <p className="text-slate-400 text-xs mt-1">
+              <p className="text-text-tertiary text-xs mt-1">
                 Select your preferred musical styles to enhance recommendations.
               </p>
             </div>
@@ -277,19 +278,19 @@ export const PreferencesPage: React.FC = () => {
             {/* Selected Favorite Genres Pills */}
             {favoriteGenres.length > 0 && (
               <div className="space-y-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                <span className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider block">
                   Your Selected Genres
                 </span>
                 <div className="flex flex-wrap gap-2.5">
                   {favoriteGenres.map((genre) => (
                     <div
                       key={genre._id}
-                      className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-600 text-white border border-indigo-400/40 text-xs font-bold shadow-md animate-in fade-in"
+                      className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-[var(--radius-pill)] bg-accent text-text-on-accent border border-accent-strong/40 text-xs font-bold animate-in fade-in"
                     >
                       <span>{genre.name}</span>
                       <button
                         onClick={() => removeGenre(genre._id)}
-                        className="hover:text-rose-200 text-indigo-200 transition-colors ml-0.5 font-bold"
+                        className="hover:text-danger text-text-on-accent/80 transition-colors ml-0.5 font-bold cursor-pointer"
                         title="Remove genre"
                         aria-label="Remove genre"
                       >
@@ -303,14 +304,14 @@ export const PreferencesPage: React.FC = () => {
 
             {/* Available System Genres Selectable List */}
             <div className="space-y-3 pt-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+              <span className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider block">
                 All Available Genres (Click to Add / Remove)
               </span>
 
               {loadingGenres ? (
                 <div className="flex gap-2 animate-pulse">
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="h-8 w-24 bg-slate-800 rounded-full" />
+                    <div key={i} className="h-8 w-24 bg-surface-2 rounded-[var(--radius-pill)]" />
                   ))}
                 </div>
               ) : (
@@ -321,10 +322,10 @@ export const PreferencesPage: React.FC = () => {
                       <button
                         key={genre._id}
                         onClick={() => handleToggleGenre(genre)}
-                        className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
+                        className={`px-3.5 py-1.5 rounded-[var(--radius-pill)] text-xs font-semibold border transition-all duration-200 cursor-pointer ${
                           selected
-                            ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200 font-bold'
-                            : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-300 hover:text-white'
+                            ? 'bg-accent-wash border-accent text-accent font-bold'
+                            : 'bg-surface-2 hover:bg-surface-3 border-border-default text-text-secondary hover:text-text-primary'
                         }`}
                       >
                         {selected ? '✓ ' : '+ '}

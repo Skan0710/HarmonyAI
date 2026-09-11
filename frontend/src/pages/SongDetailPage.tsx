@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { Song } from '../types/music';
 import { fetchSongById, fetchSimilarSongsApi } from '../services/songService';
+import { Play, Pause, Plus, Zap } from 'lucide-react';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
+import { LineHoverText } from '../components/ui/line-hover-link';
 import { usePlayerStore } from '../store/usePlayerStore';
 
 export const SongDetailPage: React.FC = () => {
@@ -104,19 +106,19 @@ export const SongDetailPage: React.FC = () => {
   };
 
   const fallbackCover =
-    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 24 24" fill="none" stroke="%23818cf8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231e293b;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 24 24" fill="none" stroke="%23d9a15b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231b1815;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
 
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto space-y-6 py-8 animate-pulse">
-        <div className="h-4 bg-slate-800 rounded w-1/3 mb-4" />
+        <div className="h-4 bg-surface-2 rounded w-1/3 mb-4" />
         <div className="flex flex-col md:flex-row gap-8">
-          <div className="w-64 h-64 bg-slate-800 rounded-2xl shrink-0" />
+          <div className="w-64 h-64 bg-surface-2 rounded-[var(--radius-lg)] shrink-0" />
           <div className="space-y-4 flex-1">
-            <div className="h-4 bg-slate-800 rounded w-1/4" />
-            <div className="h-8 bg-slate-800 rounded w-3/4" />
-            <div className="h-5 bg-slate-800 rounded w-1/2" />
-            <div className="h-20 bg-slate-800 rounded-xl w-full" />
+            <div className="h-4 bg-surface-2 rounded w-1/4" />
+            <div className="h-8 bg-surface-2 rounded w-3/4" />
+            <div className="h-5 bg-surface-2 rounded w-1/2" />
+            <div className="h-20 bg-surface-2 rounded-[var(--radius-md)] w-full" />
           </div>
         </div>
       </div>
@@ -125,17 +127,17 @@ export const SongDetailPage: React.FC = () => {
 
   if (error || !song) {
     return (
-      <div className="max-w-md mx-auto my-12 p-8 bg-slate-800/60 border border-slate-700/60 rounded-2xl text-center">
-        <div className="w-14 h-14 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto mb-4">
+      <div className="max-w-md mx-auto my-12 p-8 bg-surface-1 border border-border-subtle rounded-[var(--radius-lg)] text-center">
+        <div className="w-14 h-14 rounded-full bg-danger-wash text-danger flex items-center justify-center mx-auto mb-4">
           <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <h2 className="text-xl font-bold text-slate-100 mb-2">Song Not Found</h2>
-        <p className="text-sm text-slate-400 mb-6">{error || 'The requested track could not be found.'}</p>
+        <h2 className="text-xl font-bold text-text-primary mb-2">Song Not Found</h2>
+        <p className="text-sm text-text-tertiary mb-6">{error || 'The requested track could not be found.'}</p>
         <button
           onClick={() => navigate('/library')}
-          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm rounded-xl transition-colors shadow-lg shadow-indigo-600/30"
+          className="px-5 py-2.5 bg-accent hover:bg-accent-strong text-text-on-accent font-medium text-sm rounded-[var(--radius-pill)] transition-colors cursor-pointer"
         >
           Back to Music Library
         </button>
@@ -157,9 +159,9 @@ export const SongDetailPage: React.FC = () => {
       />
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
+      <div className="relative overflow-hidden bg-surface-1 border border-border-subtle rounded-[var(--radius-lg)] p-6 sm:p-8">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-8 z-10 relative">
-          <div className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-2xl overflow-hidden bg-slate-800 shadow-2xl shrink-0 border border-slate-700/60 group">
+          <div className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-[var(--radius-artwork)] overflow-hidden bg-surface-2 shadow-2xl shrink-0 border border-border-subtle group">
             <img
               src={coverUrl}
               alt={song.title}
@@ -167,7 +169,7 @@ export const SongDetailPage: React.FC = () => {
               className="w-full h-full object-cover"
             />
             <div className="absolute top-3 left-3">
-              <span className="px-2.5 py-1 text-xs font-bold bg-slate-900/90 text-indigo-300 rounded-full border border-indigo-500/40 backdrop-blur-md">
+              <span className="px-2.5 py-1 text-xs font-bold bg-surface-0/90 text-accent rounded-[var(--radius-pill)] border border-accent/30 backdrop-blur-md">
                 {getGenreName()}
               </span>
             </div>
@@ -176,56 +178,54 @@ export const SongDetailPage: React.FC = () => {
           <div className="flex-1 space-y-5 text-center md:text-left">
             <div>
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-1.5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Song Details</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-accent">Song Details</span>
                 {song.releaseYear && (
-                  <span className="text-xs text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
+                  <span className="text-xs text-text-tertiary bg-surface-2 px-2 py-0.5 rounded-[var(--radius-sm)] border border-border-subtle">
                     {song.releaseYear}
                   </span>
                 )}
               </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
-                {song.title}
+              <h1 className="font-display text-3xl sm:text-4xl text-text-primary tracking-tight leading-tight">
+                <LineHoverText variant="scribble" className="!inline">
+                  {song.title}
+                </LineHoverText>
               </h1>
-              <p className="text-lg font-semibold text-slate-300 mt-1">{getArtistName()}</p>
-              <p className="text-sm text-slate-400 mt-0.5">
-                Album: <span className="text-slate-200 font-medium">{getAlbumTitle()}</span>
+              <p className="text-lg font-semibold text-text-secondary mt-1">{getArtistName()}</p>
+              <p className="text-sm text-text-tertiary mt-0.5">
+                Album: <span className="text-text-secondary font-medium">{getAlbumTitle()}</span>
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 p-3.5 bg-slate-950/60 border border-slate-800 rounded-xl text-center md:text-left">
+            <div className="grid grid-cols-3 gap-3 p-3.5 bg-surface-0/60 border border-border-subtle rounded-[var(--radius-md)] text-center md:text-left">
               <div>
-                <span className="text-[11px] font-medium text-slate-400 uppercase block">Duration</span>
-                <span className="text-sm font-semibold text-slate-200 font-mono">{formatDuration(song.duration)}</span>
+                <span className="text-[11px] font-medium text-text-tertiary uppercase block">Duration</span>
+                <span className="text-sm font-semibold text-text-primary font-mono">{formatDuration(song.duration)}</span>
               </div>
 
               <div>
-                <span className="text-[11px] font-medium text-slate-400 uppercase block">Play Count</span>
-                <span className="text-sm font-semibold text-indigo-300">{formatPlayCount(song.playCount)}</span>
+                <span className="text-[11px] font-medium text-text-tertiary uppercase block">Play Count</span>
+                <span className="text-sm font-semibold text-accent">{formatPlayCount(song.playCount)}</span>
               </div>
 
               <div>
-                <span className="text-[11px] font-medium text-slate-400 uppercase block">Genre</span>
-                <span className="text-sm font-semibold text-slate-200">{getGenreName()}</span>
+                <span className="text-[11px] font-medium text-text-tertiary uppercase block">Genre</span>
+                <span className="text-sm font-semibold text-text-primary">{getGenreName()}</span>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-1">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-1">
               <button
                 onClick={handlePlayToggle}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-indigo-600/40 flex items-center gap-2"
+                className="px-6 py-3 bg-accent hover:bg-accent-strong text-text-on-accent font-semibold text-sm rounded-[var(--radius-pill)] transition-colors flex items-center gap-2 cursor-pointer"
               >
                 {isCurrentTrackPlaying ? (
                   <>
-                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M6 4h4v16H6zm8 0h4v16h-4z" />
-                    </svg>
+                    <Pause size={17} fill="currentColor" strokeWidth={0} />
                     Pause Track
                   </>
                 ) : (
                   <>
-                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
+                    <Play size={17} fill="currentColor" strokeWidth={0} />
                     Play Track
                   </>
                 )}
@@ -233,17 +233,16 @@ export const SongDetailPage: React.FC = () => {
 
               <button
                 onClick={() => setIsPlaylistModalOpen(true)}
-                className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-medium text-sm rounded-xl border border-slate-700 transition-colors flex items-center gap-2"
+                className="px-5 py-3 bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary font-medium text-sm rounded-[var(--radius-pill)] transition-colors flex items-center gap-2 cursor-pointer"
               >
-                <span className="text-indigo-400 font-bold">+</span>
+                <Plus size={15} strokeWidth={2} className="text-accent" />
                 <span>Add to Playlist</span>
               </button>
 
-              <Link
-                to="/library"
-                className="px-5 py-3 bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white font-medium text-sm rounded-xl border border-slate-700/80 transition-colors"
-              >
-                Explore More Songs
+              <Link to="/library">
+                <LineHoverText variant="slide" className="px-1 py-3 text-text-secondary hover:text-text-primary font-medium text-sm transition-colors">
+                  Explore More Songs
+                </LineHoverText>
               </Link>
             </div>
           </div>
@@ -251,37 +250,38 @@ export const SongDetailPage: React.FC = () => {
       </div>
 
       {song.audioFeatures && (song.audioFeatures.bpm || song.audioFeatures.energy) && (
-        <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <h3 className="text-base font-bold text-slate-200 tracking-tight flex items-center gap-2">
-            <span>⚡ Audio & Acoustic Features</span>
+        <section className="bg-surface-1 border border-border-subtle rounded-[var(--radius-lg)] p-6 space-y-4">
+          <h3 className="text-base font-bold text-text-primary tracking-tight flex items-center gap-2">
+            <Zap size={16} className="text-gold" strokeWidth={1.75} />
+            Audio & Acoustic Features
           </h3>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
             {song.audioFeatures.bpm && (
-              <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
-                <span className="text-slate-400 block mb-1">Tempo / BPM</span>
-                <span className="text-lg font-bold text-indigo-400">{song.audioFeatures.bpm} BPM</span>
+              <div className="p-3 bg-surface-0/60 border border-border-subtle rounded-[var(--radius-md)]">
+                <span className="text-text-tertiary block mb-1">Tempo / BPM</span>
+                <span className="text-lg font-bold text-accent">{song.audioFeatures.bpm} BPM</span>
               </div>
             )}
 
             {song.audioFeatures.energy !== undefined && (
-              <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
-                <span className="text-slate-400 block mb-1">Energy Score</span>
-                <span className="text-lg font-bold text-emerald-400">{Math.round(song.audioFeatures.energy * 100)}%</span>
+              <div className="p-3 bg-surface-0/60 border border-border-subtle rounded-[var(--radius-md)]">
+                <span className="text-text-tertiary block mb-1">Energy Score</span>
+                <span className="text-lg font-bold text-success">{Math.round(song.audioFeatures.energy * 100)}%</span>
               </div>
             )}
 
             {song.audioFeatures.valence !== undefined && (
-              <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
-                <span className="text-slate-400 block mb-1">Mood / Valence</span>
-                <span className="text-lg font-bold text-purple-400">{Math.round(song.audioFeatures.valence * 100)}%</span>
+              <div className="p-3 bg-surface-0/60 border border-border-subtle rounded-[var(--radius-md)]">
+                <span className="text-text-tertiary block mb-1">Mood / Valence</span>
+                <span className="text-lg font-bold text-gold">{Math.round(song.audioFeatures.valence * 100)}%</span>
               </div>
             )}
 
             {song.audioFeatures.danceability !== undefined && (
-              <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
-                <span className="text-slate-400 block mb-1">Danceability</span>
-                <span className="text-lg font-bold text-amber-400">{Math.round(song.audioFeatures.danceability * 100)}%</span>
+              <div className="p-3 bg-surface-0/60 border border-border-subtle rounded-[var(--radius-md)]">
+                <span className="text-text-tertiary block mb-1">Danceability</span>
+                <span className="text-lg font-bold text-accent">{Math.round(song.audioFeatures.danceability * 100)}%</span>
               </div>
             )}
           </div>
