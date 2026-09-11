@@ -1,5 +1,6 @@
-import { Types } from 'mongoose';
-import { Song } from '../models/Song.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 import { SongFeatureExtractionService } from './songFeatureExtractionService.js';
 import { ContentSimilarityService } from './similarityService.js';
 
@@ -14,7 +15,7 @@ export class ContentRecommendationService {
    * Generates content-based song recommendations for a given seed song ID.
    * Compares candidate catalog tracks using feature vectors and categorical metadata similarity.
    * 
-   * @param songId Target seed song ObjectId string
+   * @param songId Target seed song ID string
    * @param limit Maximum number of recommended songs to return (default 10)
    * @param debug Include similarity score explanation breakdown (development-only)
    */
@@ -23,35 +24,34 @@ export class ContentRecommendationService {
     limit = 10,
     debug = false
   ): Promise<any[]> {
-    if (!Types.ObjectId.isValid(songId)) {
+    if (!isValidObjectId(songId)) {
       throw new Error('Invalid song ID');
     }
 
-    const seedObjectId = new Types.ObjectId(songId);
+    // 1. Fetch seed song from Supabase
+    const { data: seedRaw, error: seedError } = await supabase
+      .from('songs')
+      .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+      .eq('id', songId)
+      .maybeSingle();
 
-    // 1. Fetch seed song with full population
-    const seedSong = await Song.findById(seedObjectId)
-      .populate('artist', 'name profileImage avatar verified')
-      .populate('album', 'title coverImage releaseYear')
-      .populate('genre', 'name slug')
-      .lean();
-
-    if (!seedSong) {
+    if (seedError || !seedRaw) {
       throw new Error('Seed song not found');
     }
+
+    const seedSong = mapSongRow(seedRaw);
 
     // 2. Extract seed song normalized features
     const seedFeatures = SongFeatureExtractionService.extractFeatures(seedSong);
 
-    // 3. Retrieve suitable candidate songs from MongoDB (excluding seed song)
-    const candidateSongs = await Song.find({
-      _id: { $ne: seedObjectId },
-      isPublished: true,
-    })
-      .populate('artist', 'name profileImage avatar verified')
-      .populate('album', 'title coverImage releaseYear')
-      .populate('genre', 'name slug')
-      .lean();
+    // 3. Retrieve suitable candidate songs from Supabase (excluding seed song)
+    const { data: candidateRows } = await supabase
+      .from('songs')
+      .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+      .neq('id', songId)
+      .eq('is_published', true);
+
+    const candidateSongs = (candidateRows || []).map(mapSongRow);
 
     if (candidateSongs.length === 0) {
       return [];

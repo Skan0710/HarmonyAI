@@ -1,6 +1,7 @@
-import { Song } from '../models/Song.js';
-import { Artist } from '../models/Artist.js';
-import { Album } from '../models/Album.js';
+import { supabase } from '../config/supabase.js';
+import { mapSongRow } from './songService.js';
+import { mapArtistRow } from './artistService.js';
+import { mapAlbumRow } from './albumService.js';
 
 export interface GroupedSearchResults {
   songs: any[];
@@ -24,47 +25,33 @@ export const searchCatalog = async (
     };
   }
 
-  // Create case-insensitive regex for partial matching
-  const searchRegex = new RegExp(trimmedQuery, 'i');
+  const safeLimit = Math.max(1, Math.min(50, limit));
+  const pattern = `%${trimmedQuery}%`;
 
-  // Execute concurrent searches across Songs, Artists, and Albums
-  const [songs, artists, albums] = await Promise.all([
-    Song.find({
-      isPublished: true,
-      $or: [
-        { title: searchRegex },
-        { tags: searchRegex },
-        { language: searchRegex },
-      ],
-    })
-      .populate('artist', 'name profileImage avatar verified')
-      .populate('album', 'title coverImage releaseYear')
-      .populate('genre', 'name slug')
-      .limit(limit)
-      .lean(),
+  const [songsRes, artistsRes, albumsRes] = await Promise.all([
+    supabase
+      .from('songs')
+      .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+      .eq('is_published', true)
+      .or(`title.ilike.${pattern},language.ilike.${pattern}`)
+      .limit(safeLimit),
 
-    Artist.find({
-      $or: [
-        { name: searchRegex },
-        { bio: searchRegex },
-        { tags: searchRegex },
-      ],
-    })
-      .limit(limit)
-      .lean(),
+    supabase
+      .from('artists')
+      .select('*')
+      .or(`name.ilike.${pattern},bio.ilike.${pattern}`)
+      .limit(safeLimit),
 
-    Album.find({
-      $or: [
-        { title: searchRegex },
-        { tags: searchRegex },
-      ],
-    })
-      .populate('artist', 'name profileImage avatar verified')
-      .populate('genre', 'name slug')
-      .limit(limit)
-      .lean(),
+    supabase
+      .from('albums')
+      .select('*, artists!albums_artist_id_fkey(*), genres!albums_genre_id_fkey(*)')
+      .or(`title.ilike.${pattern}`)
+      .limit(safeLimit),
   ]);
 
+  const songs = (songsRes.data || []).map(mapSongRow);
+  const artists = (artistsRes.data || []).map((a) => mapArtistRow(a));
+  const albums = (albumsRes.data || []).map(mapAlbumRow);
   const total = songs.length + artists.length + albums.length;
 
   return {
@@ -75,15 +62,10 @@ export const searchCatalog = async (
   };
 };
 
-/**
- * Placeholder hook for future vector embedding semantic search.
- * Can be called when semantic search parameter is enabled.
- */
 export const searchCatalogSemantic = async (
   vectorQuery: number[],
   limit: number = 10
 ): Promise<GroupedSearchResults> => {
-  // Extensible method signature for future ANN vector search integration
   return {
     songs: [],
     artists: [],

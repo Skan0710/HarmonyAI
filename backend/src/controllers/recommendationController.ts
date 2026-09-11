@@ -26,12 +26,14 @@ import { ComfortDiscoveryScoringService } from '../services/comfortDiscoveryScor
 import { TasteBoundaryDetectionService } from '../services/tasteBoundaryDetectionService.js';
 import { UnifiedMusicDNAService } from '../services/unifiedMusicDnaService.js';
 import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
-import { extractQueryParams } from '../utils/validators.js';
+import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
+import { supabase } from '../config/supabase.js';
+import { mapSongRow } from '../services/songService.js';
 
 export const getSimilarSongs = controllerWrapper(async (req: Request, res: Response) => {
   const { songId } = req.params;
 
-  if (!songId || !Types.ObjectId.isValid(songId)) {
+  if (!songId || !isValidObjectId(songId)) {
     throw new ControllerError(400, 'Invalid song ID format');
   }
 
@@ -103,7 +105,7 @@ export const getHybridRecommendations = controllerWrapper(async (req: Request, r
   const parsedLimit = isNaN(q.limit) || q.limit < 1 ? 10 : q.limit;
 
   const seedSongId = req.query.seedSongId ? String(req.query.seedSongId) : undefined;
-  if (seedSongId && !Types.ObjectId.isValid(seedSongId)) {
+  if (seedSongId && !isValidObjectId(seedSongId)) {
     throw new ControllerError(400, 'Invalid seed song ID format');
   }
 
@@ -336,7 +338,7 @@ export const getSmartAutoplayCandidates = controllerWrapper(async (req: Request,
   let currentTrackId: string | undefined = undefined;
   if (rawTrackId) {
     const trackStr = String(rawTrackId).trim();
-    if (!Types.ObjectId.isValid(trackStr)) {
+    if (!isValidObjectId(trackStr)) {
       throw new ControllerError(400, 'Invalid currentTrack ID format');
     }
     currentTrackId = trackStr;
@@ -407,12 +409,14 @@ export const getSmartAutoplayCandidates = controllerWrapper(async (req: Request,
     // 6. Look up Current Track Info
     const targetTrackId = currentTrackId || result.currentTrackId;
     let currentTrackInfo: any = null;
-    if (targetTrackId && Types.ObjectId.isValid(targetTrackId)) {
+    if (targetTrackId && isValidObjectId(targetTrackId)) {
       try {
-        currentTrackInfo = await Song.findById(targetTrackId)
-          .populate('artist', 'name')
-          .populate('genre', 'name')
-          .lean();
+        const { data: rawSong } = await supabase
+          .from('songs')
+          .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+          .eq('id', targetTrackId)
+          .maybeSingle();
+        currentTrackInfo = mapSongRow(rawSong);
       } catch {
         currentTrackInfo = null;
       }
@@ -475,15 +479,18 @@ export const getRecommendationExplanation = controllerWrapper(async (req: Reques
 
   const { songId } = req.params;
 
-  if (!songId || !Types.ObjectId.isValid(songId)) {
+  if (!songId || !isValidObjectId(songId)) {
     throw new ControllerError(400, 'Invalid song ID format');
   }
 
   // 1. Fetch song with populated artist and genre
-  const song = await Song.findById(songId)
-    .populate('artist', 'name image bio genres')
-    .populate('genre', 'name description')
-    .lean();
+  const { data: songRaw } = await supabase
+    .from('songs')
+    .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+    .eq('id', songId)
+    .maybeSingle();
+
+  const song = mapSongRow(songRaw);
 
   if (!song) {
     throw new ControllerError(404, 'Song not found');

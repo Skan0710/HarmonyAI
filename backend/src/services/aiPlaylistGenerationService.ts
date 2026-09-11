@@ -101,7 +101,7 @@ export class GeminiLLMInterpreter implements ILLMPlaylistInterpreter {
 
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY || '';
-    this.modelName = process.env.LLM_MODEL || 'gemini-1.5-flash';
+    this.modelName = process.env.LLM_MODEL || 'gemini-2.5-flash';
   }
 
   async interpretPrompt(userPrompt: string): Promise<AIPlaylistPreference> {

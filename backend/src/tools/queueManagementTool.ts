@@ -1,6 +1,6 @@
 import { AssistantTool, AssistantToolContext, ToolExecutionResult, ToolParameterSchema } from './toolTypes.js';
-import { Song } from '../models/Song.js';
-import { Types } from 'mongoose';
+import { supabase } from '../config/supabase.js';
+import { mapSongRow } from '../services/songService.js';
 import { validateObjectIds } from '../utils/validators.js';
 
 export interface QueueManagementInput {

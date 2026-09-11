@@ -115,7 +115,7 @@ export class ContextualAssistantService {
   static async extractContextFromPrompt(userPrompt: string): Promise<ContextPreference> {
     const prompt = (userPrompt || '').trim().slice(0, 500); // 500 max length to prevent token abuse
     const apiKey = process.env.GEMINI_API_KEY;
-    const modelName = process.env.LLM_MODEL || 'gemini-1.5-flash';
+    const modelName = process.env.LLM_MODEL || 'gemini-2.5-flash';
 
     if (!apiKey) {
       const fallbackExtracted = this.extractContextRuleBased(prompt);

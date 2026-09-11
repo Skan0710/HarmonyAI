@@ -42,7 +42,7 @@ export interface GetArtistsFilter {
   limit?: number;
 }
 
-function mapArtistRow(row: any, genres: any[] = []) {
+export function mapArtistRow(row: any, genres: any[] = []) {
   if (!row) return null;
   return {
     _id: row.id,

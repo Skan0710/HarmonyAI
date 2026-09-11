@@ -1,17 +1,15 @@
-import { Types } from 'mongoose';
-import { Song, ISong } from '../models/Song.js';
-import { User } from '../models/User.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
-import { ColdStartDetectionService } from './coldStartDetectionService.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 
 export interface ColdStartRecommendationParams {
-  userId: string;
+  userId?: string;
   limit?: number;
   excludeSongIds?: string[];
 }
 
 export interface ColdStartRecommendationResult {
-  songs: ISong[];
+  songs: any[];
   strategy: 'COLD_START';
   classification: string;
   candidateSources: string[];
@@ -19,110 +17,93 @@ export interface ColdStartRecommendationResult {
 
 export class ColdStartRecommendationService {
   /**
-   * Generates high-quality recommendations for NEW and LIMITED_DATA users by pooling popular,
-   * trending, and new-release songs while prioritizing explicitly selected favorite genres/artists
-   * and enforcing artist/genre diversity.
+   * Generates high-quality recommendations for NEW, LIMITED_DATA, and ANONYMOUS users by pooling popular,
+   * trending, and new-release songs from Supabase while enforcing artist/genre diversity.
    */
   static async getColdStartRecommendations(
     params: ColdStartRecommendationParams
   ): Promise<ColdStartRecommendationResult> {
     const { userId, limit = 10, excludeSongIds = [] } = params;
 
-    if (!Types.ObjectId.isValid(userId)) {
-      throw new Error('Invalid user ID');
+    let favoriteGenreIds = new Set<string>();
+    let favoriteArtistIds = new Set<string>();
+    let userLikedSongIds = new Set<string>();
+    let historySongIds = new Set<string>();
+    let classification = 'NEW';
+
+    // 1. If valid authenticated user ID is provided, query user taste signals from Supabase
+    if (userId && isValidObjectId(userId)) {
+      try {
+        const { data: userDoc } = await supabase
+          .from('users')
+          .select('favorite_genres, favorite_artists, liked_songs')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (userDoc) {
+          if (Array.isArray(userDoc.favorite_genres)) {
+            userDoc.favorite_genres.forEach((g: string) => favoriteGenreIds.add(String(g)));
+          }
+          if (Array.isArray(userDoc.favorite_artists)) {
+            userDoc.favorite_artists.forEach((a: string) => favoriteArtistIds.add(String(a)));
+          }
+          if (Array.isArray(userDoc.liked_songs)) {
+            userDoc.liked_songs.forEach((s: string) => userLikedSongIds.add(String(s)));
+          }
+        }
+
+        const { data: historyDocs } = await supabase
+          .from('listening_history')
+          .select('song_id')
+          .eq('user_id', userId)
+          .limit(100);
+
+        if (Array.isArray(historyDocs)) {
+          historyDocs.forEach((h: any) => {
+            if (h.song_id) historySongIds.add(String(h.song_id));
+          });
+          if (historyDocs.length > 5) {
+            classification = 'LIMITED_DATA';
+          }
+        }
+      } catch (err: any) {
+        console.warn('[ColdStartRecommendationService] Non-critical user signal fetch failure:', err.message);
+      }
     }
 
-    const userObjId = new Types.ObjectId(userId);
-
-    // 1. Detect Cold Start Classification Status
-    const coldStartInfo = await ColdStartDetectionService.detectUserColdStartStatus(userId);
-    const classification = coldStartInfo.classification;
-
-    // 2. Fetch User Explicit Favorites, Liked Songs, and History
-    const userDoc = await User.findById(userObjId)
-      .populate('favoriteGenres', '_id name')
-      .populate('favoriteArtists', '_id name')
-      .populate('likedSongs', '_id')
-      .lean();
-
-    const favoriteGenreIds = new Set<string>(
-      ((userDoc?.favoriteGenres as any[]) || []).map((g) => (g._id ? g._id.toString() : g.toString()))
-    );
-
-    const favoriteArtistIds = new Set<string>(
-      ((userDoc?.favoriteArtists as any[]) || []).map((a) => (a._id ? a._id.toString() : a.toString()))
-    );
-
-    const userLikedSongIds = new Set<string>(
-      ((userDoc?.likedSongs as any[]) || []).map((s) => (s._id ? s._id.toString() : s.toString()))
-    );
-
-    const historyDocs = await ListeningHistory.find({ user: userObjId })
-      .select('song')
-      .lean();
-
-    const historySongIds = new Set<string>(historyDocs.map((h) => h.song.toString()));
-
-    // Exclude songs the user has played, liked, or explicitly passed
     const fullExcludeSet = new Set<string>([
       ...userLikedSongIds,
       ...historySongIds,
       ...excludeSongIds,
     ]);
 
-    // 3. Pool Candidates across 3 Primary Channels:
-    // Channel A: Explicit Favorite Genre & Artist Matches
-    let favoriteCandidates: ISong[] = [];
-    if (favoriteGenreIds.size > 0 || favoriteArtistIds.size > 0) {
-      const validGenreObjectIds = Array.from(favoriteGenreIds)
-        .filter((id) => Types.ObjectId.isValid(id))
-        .map((id) => new Types.ObjectId(id));
-      const validArtistObjectIds = Array.from(favoriteArtistIds)
-        .filter((id) => Types.ObjectId.isValid(id))
-        .map((id) => new Types.ObjectId(id));
+    // 2. Concurrently fetch candidate pools from Supabase
+    const [popularRes, newReleasesRes] = await Promise.all([
+      supabase
+        .from('songs')
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .eq('is_published', true)
+        .order('play_count', { ascending: false })
+        .limit(30),
 
-      const orConditions: any[] = [];
-      if (validGenreObjectIds.length > 0) {
-        orConditions.push({ genre: { $in: validGenreObjectIds } });
-      }
-      if (validArtistObjectIds.length > 0) {
-        orConditions.push({ artist: { $in: validArtistObjectIds } });
-      }
+      supabase
+        .from('songs')
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .eq('is_published', true)
+        .order('release_year', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .limit(30),
+    ]);
 
-      if (orConditions.length > 0) {
-        favoriteCandidates = await Song.find({
-          isPublished: true,
-          $or: orConditions,
-        })
-          .populate('artist', 'name avatar')
-          .populate('genre', 'name slug')
-          .sort({ playCount: -1 })
-          .limit(30)
-          .lean();
-      }
-    }
+    const popularCandidates = (popularRes.data || []).map(mapSongRow);
+    const newReleaseCandidates = (newReleasesRes.data || []).map(mapSongRow);
 
-    // Channel B: Popular / Trending Tracks
-    const popularCandidates = await Song.find({ isPublished: true })
-      .populate('artist', 'name avatar')
-      .populate('genre', 'name slug')
-      .sort({ playCount: -1 })
-      .limit(30)
-      .lean();
-
-    // Channel C: New Release Tracks
-    const newReleaseCandidates = await Song.find({ isPublished: true })
-      .populate('artist', 'name avatar')
-      .populate('genre', 'name slug')
-      .sort({ releaseYear: -1, createdAt: -1 })
-      .limit(30)
-      .lean();
-
-    // 4. Score and Rank Candidate Songs
-    const candidateMap = new Map<string, { song: ISong; score: number; sources: Set<string> }>();
+    // 3. Score and rank candidate songs
+    const candidateMap = new Map<string, { song: any; score: number; sources: Set<string> }>();
 
     const addOrUpdateCandidate = (songDoc: any, baseScore: number, sourceTag: string) => {
-      const sId = songDoc._id.toString();
+      if (!songDoc) return;
+      const sId = String(songDoc.id || songDoc._id);
       if (fullExcludeSet.has(sId)) return;
 
       if (!candidateMap.has(sId)) {
@@ -133,76 +114,65 @@ export class ColdStartRecommendationService {
         });
       } else {
         const item = candidateMap.get(sId)!;
-        item.score += baseScore * 0.5; // Boost multi-channel matches
+        item.score += baseScore * 0.5;
         item.sources.add(sourceTag);
       }
     };
 
-    for (const song of favoriteCandidates) {
-      let favBonus = 0.5;
-      const gId = typeof song.genre === 'object' && song.genre?._id ? song.genre._id.toString() : String(song.genre);
-      const aId = typeof song.artist === 'object' && song.artist?._id ? song.artist._id.toString() : String(song.artist);
+    popularCandidates.forEach((s: any, idx: number) => {
+      const rankDecay = Math.max(0, 1 - idx * 0.02);
+      addOrUpdateCandidate(s, 1.0 * rankDecay, 'popular');
+    });
 
-      if (favoriteGenreIds.has(gId)) favBonus += 0.3;
-      if (favoriteArtistIds.has(aId)) favBonus += 0.4;
+    newReleaseCandidates.forEach((s: any, idx: number) => {
+      const rankDecay = Math.max(0, 1 - idx * 0.02);
+      addOrUpdateCandidate(s, 0.85 * rankDecay, 'new_releases');
+    });
 
-      addOrUpdateCandidate(song, favBonus, 'favorite_match');
+    // 4. Fallback if exclusions cleared everything
+    if (candidateMap.size === 0) {
+      popularCandidates.forEach((s: any) => addOrUpdateCandidate(s, 0.5, 'popular_fallback'));
     }
 
-    for (const song of popularCandidates) {
-      addOrUpdateCandidate(song, 0.4, 'popular_trending');
-    }
+    const rankedList = Array.from(candidateMap.values()).sort((a, b) => b.score - a.score);
 
-    for (const song of newReleaseCandidates) {
-      addOrUpdateCandidate(song, 0.35, 'new_releases');
-    }
-
-    const scoredCandidates = Array.from(candidateMap.values()).sort((a, b) => b.score - a.score);
-
-    // 5. Enforce Diversity Across Artists and Genres
-    const finalSelectedSongs: ISong[] = [];
+    // 5. Apply artist and genre diversity caps (max 2 songs per artist)
+    const selectedSongs: any[] = [];
     const artistCounts = new Map<string, number>();
-    const genreCounts = new Map<string, number>();
+    const allCandidateSources = new Set<string>();
 
-    const maxPerArtist = 2;
-    const maxPerGenre = 3;
+    for (const item of rankedList) {
+      if (selectedSongs.length >= limit) break;
 
-    for (const item of scoredCandidates) {
-      if (finalSelectedSongs.length >= limit) break;
+      const artistKey = item.song.artist?.id || item.song.artist?._id || item.song.artist || 'unknown';
+      const currentCount = artistCounts.get(artistKey) || 0;
 
-      const song = item.song;
-      const aId = typeof song.artist === 'object' && song.artist?._id ? song.artist._id.toString() : String(song.artist);
-      const gId = typeof song.genre === 'object' && song.genre?._id ? song.genre._id.toString() : String(song.genre);
-
-      const currentArtistCount = artistCounts.get(aId) || 0;
-      const currentGenreCount = genreCounts.get(gId) || 0;
-
-      if (currentArtistCount < maxPerArtist && currentGenreCount < maxPerGenre) {
-        finalSelectedSongs.push(song);
-        artistCounts.set(aId, currentArtistCount + 1);
-        genreCounts.set(gId, currentGenreCount + 1);
+      if (currentCount < 2) {
+        selectedSongs.push(item.song);
+        artistCounts.set(artistKey, currentCount + 1);
+        item.sources.forEach((src) => allCandidateSources.add(src));
       }
     }
 
-    // Fallback if diversity cap was too strict for small catalogs
-    if (finalSelectedSongs.length < limit) {
-      for (const item of scoredCandidates) {
-        if (finalSelectedSongs.length >= limit) break;
-        if (!finalSelectedSongs.some((s) => s._id.toString() === item.song._id.toString())) {
-          finalSelectedSongs.push(item.song);
+    // Fill remaining up to limit if diversity filters were too strict
+    if (selectedSongs.length < limit) {
+      const currentSelectedIds = new Set(selectedSongs.map((s) => String(s.id || s._id)));
+      for (const item of rankedList) {
+        if (selectedSongs.length >= limit) break;
+        const sId = String(item.song.id || item.song._id);
+        if (!currentSelectedIds.has(sId)) {
+          selectedSongs.push(item.song);
+          currentSelectedIds.add(sId);
+          item.sources.forEach((src) => allCandidateSources.add(src));
         }
       }
     }
 
-    const allSources = Array.from(
-      new Set(scoredCandidates.flatMap((item) => Array.from(item.sources)))
-    );
-
     return {
-      songs: finalSelectedSongs,
+      songs: selectedSongs,
       strategy: 'COLD_START',
       classification,
-      candidateSources: allSources,
+      candidateSources: Array.from(allCandidateSources),
     };
   }
 }

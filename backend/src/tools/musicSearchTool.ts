@@ -1,5 +1,7 @@
 import { AssistantTool, AssistantToolContext, ToolExecutionResult, ToolParameterSchema } from './toolTypes.js';
-import { Song, ISong } from '../models/Song.js';
+import { supabase } from '../config/supabase.js';
+import { mapSongRow } from '../services/songService.js';
+export type ISong = any;
 import { searchCatalog, GroupedSearchResults } from '../services/searchService.js';
 
 export interface MusicSearchInput {
@@ -94,24 +96,29 @@ export class MusicSearchTool implements AssistantTool<MusicSearchInput, MusicSea
     }
     songs = songs.slice(0, safeLimit);
 
-    // Fallback: direct Song collection query when catalog search yields no results
-    if (songs.length === 0) {
-      const searchRegex = new RegExp(query.trim(), 'i');
-      const fallbackQuery: Record<string, any> = {
-        isPublished: true,
-        $or: [
-          { title: searchRegex },
-          { tags: searchRegex },
-          { language: searchRegex },
-        ],
-      };
+    // If no songs matched title but artists were found in catalog, fetch by artist:
+    if (songs.length === 0 && catalogResults.artists && catalogResults.artists.length > 0) {
+      const artistId = catalogResults.artists[0].id || catalogResults.artists[0]._id;
+      const { data: artistSongs } = await supabase
+        .from('songs')
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .eq('artist_id', artistId)
+        .eq('is_published', true)
+        .limit(safeLimit);
+      songs = (artistSongs || []).map(mapSongRow);
+    }
 
-      songs = await Song.find(fallbackQuery)
-        .populate('artist', 'name profileImage avatar verified')
-        .populate('album', 'title coverImage releaseYear')
-        .populate('genre', 'name slug')
-        .limit(safeLimit * 3)
-        .lean() as any;
+    // Fallback: direct Supabase query when catalog search yields no results
+    if (songs.length === 0) {
+      const pattern = `%${query.trim()}%`;
+      const { data: fallbackRows } = await supabase
+        .from('songs')
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .eq('is_published', true)
+        .or(`title.ilike.${pattern},language.ilike.${pattern}`)
+        .limit(safeLimit * 2);
+
+      songs = (fallbackRows || []).map(mapSongRow);
 
       // Apply the same genre / artist filters on the fallback results
       if (genre) {

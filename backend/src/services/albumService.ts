@@ -36,7 +36,7 @@ export interface GetAlbumsFilter {
   limit?: number;
 }
 
-function mapAlbumRow(row: any) {
+export function mapAlbumRow(row: any) {
   if (!row) return null;
   const artistObj = row.artists || row['artists!albums_artist_id_fkey'] || null;
   const genreObj = row.genres || row['genres!albums_genre_id_fkey'] || null;

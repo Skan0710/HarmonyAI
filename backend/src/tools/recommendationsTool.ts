@@ -3,8 +3,9 @@ import { HybridRecommendationService } from '../services/hybridRecommendationSer
 import { ContextAwareRecommendationService } from '../services/contextAwareRecommendationService.js';
 import { SessionRecommendationService } from '../services/sessionRecommendationService.js';
 import { ColdStartRecommendationService } from '../services/coldStartRecommendationService.js';
-import { Song } from '../models/Song.js';
-import { Types } from 'mongoose';
+import { supabase } from '../config/supabase.js';
+import { mapSongRow } from '../services/songService.js';
+import { isValidObjectId } from '../utils/validators.js';
 
 export interface RecommendationsInput {
   strategy?: 'hybrid' | 'contextual' | 'session' | 'auto';
@@ -115,7 +116,7 @@ export class RecommendationsTool implements AssistantTool<RecommendationsInput, 
     }
 
     // 2. Session Recommendation Strategy
-    if (strategy === 'session' && userId && Types.ObjectId.isValid(userId)) {
+    if (strategy === 'session' && userId && isValidObjectId(userId)) {
       const sessionRes = await SessionRecommendationService.getSessionRecommendations({
         userId,
         limit: safeLimit,
@@ -130,7 +131,7 @@ export class RecommendationsTool implements AssistantTool<RecommendationsInput, 
     }
 
     // 3. Personalized Hybrid Strategy
-    if (userId && Types.ObjectId.isValid(userId)) {
+    if (userId && isValidObjectId(userId)) {
       try {
         const hybridRes = await HybridRecommendationService.getHybridRecommendations({
           userId,
@@ -159,13 +160,14 @@ export class RecommendationsTool implements AssistantTool<RecommendationsInput, 
     }
 
     // 4. Anonymous Catalog Fallback
-    const popularSongs = await Song.find({ isPublished: true })
-      .sort({ playCount: -1 })
-      .populate('artist', 'name profileImage avatar')
-      .populate('album', 'title coverImage')
-      .populate('genre', 'name slug')
-      .limit(safeLimit)
-      .lean();
+    const { data: popularRaw } = await supabase
+      .from('songs')
+      .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+      .eq('is_published', true)
+      .order('play_count', { ascending: false })
+      .limit(safeLimit);
+
+    const popularSongs = (popularRaw || []).map(mapSongRow);
 
     return {
       strategyUsed: 'popular_catalog',

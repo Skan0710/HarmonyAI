@@ -1,6 +1,5 @@
-import { Types } from 'mongoose';
-import { ListeningHistory } from '../models/ListeningHistory.js';
-import { Song } from '../models/Song.js';
+import { supabase } from '../config/supabase.js';
+import { mapSongRow } from './songService.js';
 
 export interface TrendingSongResult {
   song: any;
@@ -10,12 +9,7 @@ export interface TrendingSongResult {
 
 export class TrendingService {
   /**
-   * Calculates dynamic trending score based on play recency and play counts.
-   * Uses exponential time decay scoring: score = sum(exp(-lambda * ageInHours)) + 0.05 * totalPlayCount
-   * 
-   * @param limit Number of top trending songs to return (default 10)
-   * @param windowHours Time window in hours to consider for recent activity (default 168h = 7 days)
-   * @param halfLifeHours Half-life decay in hours (default 24h)
+   * Calculates dynamic trending score based on play recency and play counts from Supabase.
    */
   static async getTrendingSongs(
     limit = 10,
@@ -26,63 +20,53 @@ export class TrendingService {
     const cutoffDate = new Date(now.getTime() - windowHours * 60 * 60 * 1000);
     const lambda = Math.LN2 / halfLifeHours;
 
-    // 1. Fetch recent history records within the window
-    const recentHistory = await ListeningHistory.find({
-      playedAt: { $gte: cutoffDate },
-    })
-      .select('song playedAt')
-      .lean();
+    // 1. Fetch recent history records from Supabase
+    const { data: recentHistory } = await supabase
+      .from('listening_history')
+      .select('song_id, played_at')
+      .gte('played_at', cutoffDate.toISOString());
 
     const songScores = new Map<string, { score: number; count: number }>();
 
     // 2. Compute time-decay recency weights for recent plays
-    for (const record of recentHistory) {
-      if (!record.song) continue;
-      const songId = record.song.toString();
-      const ageInHours = (now.getTime() - new Date(record.playedAt).getTime()) / (1000 * 60 * 60);
+    if (Array.isArray(recentHistory)) {
+      for (const record of recentHistory) {
+        if (!record.song_id) continue;
+        const songId = record.song_id;
+        const ageInHours = (now.getTime() - new Date(record.played_at).getTime()) / (1000 * 60 * 60);
 
-      // Exponential decay weight: 1.0 for now, 0.5 for 24h ago, 0.25 for 48h ago
-      const recencyWeight = Math.exp(-lambda * Math.max(0, ageInHours));
+        const recencyWeight = Math.exp(-lambda * Math.max(0, ageInHours));
 
-      if (songScores.has(songId)) {
-        const existing = songScores.get(songId)!;
-        existing.score += recencyWeight;
-        existing.count += 1;
-      } else {
-        songScores.set(songId, { score: recencyWeight, count: 1 });
+        if (songScores.has(songId)) {
+          const existing = songScores.get(songId)!;
+          existing.score += recencyWeight;
+          existing.count += 1;
+        } else {
+          songScores.set(songId, { score: recencyWeight, count: 1 });
+        }
       }
     }
 
-    // 3. Fetch candidate catalog songs (prioritizing recently played and top played songs)
-    const playedSongIds = Array.from(songScores.keys()).filter((id) => Types.ObjectId.isValid(id));
-    const songQuery: any = playedSongIds.length > 0
-      ? {
-          $or: [
-            { _id: { $in: playedSongIds.map((id) => new Types.ObjectId(id)) } },
-            { isPublished: true },
-          ],
-        }
-      : {};
+    // 3. Fetch candidate songs from Supabase
+    const candidateLimit = Math.max(limit * 5, 50);
+    const { data: songsRaw } = await supabase
+      .from('songs')
+      .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+      .eq('is_published', true)
+      .order('play_count', { ascending: false })
+      .limit(candidateLimit);
 
-    const candidateLimit = Math.max(limit * 5, 100);
-    const allSongs = await Song.find(songQuery)
-      .populate('artist', 'name profileImage avatar verified')
-      .populate('album', 'title coverImage releaseYear')
-      .populate('genre', 'name slug')
-      .sort({ playCount: -1 })
-      .limit(candidateLimit)
-      .lean();
+    const allSongs = (songsRaw || []).map(mapSongRow);
 
     // 4. Calculate final score combining recency score and overall playCount
-    const scoredSongs = allSongs.map((song) => {
-      const songId = song._id.toString();
+    const scoredSongs = allSongs.map((song: any) => {
+      const songId = song.id || song._id;
       const historyStats = songScores.get(songId);
 
       const recentScore = historyStats ? historyStats.score : 0;
       const recentCount = historyStats ? historyStats.count : 0;
       const catalogPlayCount = song.playCount || 0;
 
-      // Final Trending Score Formula
       const totalTrendingScore = Number((recentScore * 10 + catalogPlayCount * 0.2).toFixed(2));
 
       return {
@@ -93,8 +77,8 @@ export class TrendingService {
     });
 
     // 5. Sort descending by trending score
-    scoredSongs.sort((a, b) => b.trendingScore - a.trendingScore);
+    scoredSongs.sort((a: any, b: any) => b.trendingScore - a.trendingScore);
 
-    return scoredSongs.slice(0, limit);
+    return scoredSongs.slice(0, Math.max(1, limit));
   }
 }

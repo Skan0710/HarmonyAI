@@ -168,7 +168,7 @@ export class AssistantIntentService {
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
-    const modelName = process.env.LLM_MODEL || 'gemini-1.5-flash';
+    const modelName = process.env.LLM_MODEL || 'gemini-2.5-flash';
 
     if (!apiKey) {
       return this.selectIntentRuleBased(trimmedPrompt, context);

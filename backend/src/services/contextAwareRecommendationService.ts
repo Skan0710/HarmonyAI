@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import { ContextDetectionService } from './contextDetectionService.js';
 import { ContextPreference } from '../schemas/contextPreferenceSchema.js';
 import { ColdStartDetectionService } from './coldStartDetectionService.js';
@@ -44,7 +44,7 @@ export class ContextAwareRecommendationService {
     });
 
     // 2. Unauthenticated / Anonymous User -> Cold Start
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       const coldStartRes = await ColdStartRecommendationService.getColdStartRecommendations({
         userId: 'anonymous',
         limit,

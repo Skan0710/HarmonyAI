@@ -1,8 +1,9 @@
 import { AssistantTool, AssistantToolContext, ToolExecutionResult, ToolParameterSchema } from './toolTypes.js';
 import { HybridRecommendationService } from '../services/hybridRecommendationService.js';
 import { ColdStartRecommendationService } from '../services/coldStartRecommendationService.js';
-import { Song } from '../models/Song.js';
-import { Types } from 'mongoose';
+import { supabase } from '../config/supabase.js';
+import { mapSongRow } from '../services/songService.js';
+import { isValidObjectId } from '../utils/validators.js';
 
 export interface PersonalizedRecommendationsInput {
   seedSongId?: string;
@@ -38,8 +39,8 @@ export class PersonalizedRecommendationsTool implements AssistantTool<Personaliz
     const limit = typeof raw.limit === 'number' && raw.limit > 0 ? Math.min(30, raw.limit) : 10;
     const seedSongId = typeof raw.seedSongId === 'string' && raw.seedSongId.trim() ? raw.seedSongId.trim() : undefined;
 
-    if (seedSongId && !Types.ObjectId.isValid(seedSongId)) {
-      return { valid: false, error: 'Invalid seedSongId format (must be a valid ObjectId).' };
+    if (seedSongId && !isValidObjectId(seedSongId)) {
+      return { valid: false, error: 'seedSongId must be a valid ID string' };
     }
 
     return {
@@ -69,7 +70,7 @@ export class PersonalizedRecommendationsTool implements AssistantTool<Personaliz
       const safeLimit = Math.max(1, Math.min(30, limit));
       const userId = context.userId;
 
-      if (userId && Types.ObjectId.isValid(userId)) {
+      if (userId && isValidObjectId(userId)) {
         try {
           const hybridRes = await HybridRecommendationService.getHybridRecommendations({
             userId,
@@ -107,13 +108,14 @@ export class PersonalizedRecommendationsTool implements AssistantTool<Personaliz
       }
 
       // Anonymous fallback
-      const popularSongs = await Song.find({ isPublished: true })
-        .sort({ playCount: -1 })
-        .populate('artist', 'name profileImage avatar')
-        .populate('album', 'title coverImage')
-        .populate('genre', 'name slug')
-        .limit(safeLimit)
-        .lean();
+      const { data: popularRaw } = await supabase
+        .from('songs')
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .eq('is_published', true)
+        .order('play_count', { ascending: false })
+        .limit(safeLimit);
+
+      const popularSongs = (popularRaw || []).map(mapSongRow);
 
       return {
         success: true,

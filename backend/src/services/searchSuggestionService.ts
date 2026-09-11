@@ -1,6 +1,4 @@
-import { Song } from '../models/Song.js';
-import { Artist } from '../models/Artist.js';
-import { Album } from '../models/Album.js';
+import { supabase } from '../config/supabase.js';
 
 export type SuggestionEntityType = 'artist' | 'song' | 'album';
 export type SuggestionMatchType = 'exact_prefix' | 'word_prefix' | 'substring';
@@ -59,24 +57,29 @@ export class SearchSuggestionService {
       return { score: Number((0.90 + lengthBonus).toFixed(4)), matchType: 'exact_prefix' };
     }
 
-    // Check if any internal word starts with query (e.g. "The Weeknd" starts with "weeknd")
-    const words = cleanTarget.split(/[\s\-_/]+/);
-    const wordPrefixMatch = words.some((w) => w.startsWith(cleanQuery));
-    if (wordPrefixMatch) {
-      return { score: 0.80, matchType: 'word_prefix' };
+    // Word boundary / word prefix match
+    const words = cleanTarget.split(/[\s\-_]+/);
+    for (let i = 0; i < words.length; i++) {
+      if (words[i].startsWith(cleanQuery)) {
+        // Earlier word position scores higher
+        const positionPenalty = Math.min(0.10, i * 0.03);
+        return { score: Number((0.85 - positionPenalty).toFixed(4)), matchType: 'word_prefix' };
+      }
     }
 
-    if (cleanTarget.includes(cleanQuery)) {
-      return { score: 0.60, matchType: 'substring' };
+    // Substring match
+    const subIndex = cleanTarget.indexOf(cleanQuery);
+    if (subIndex !== -1) {
+      const positionFactor = Math.max(0, 1 - subIndex / cleanTarget.length);
+      const score = 0.50 + positionFactor * 0.20;
+      return { score: Number(score.toFixed(4)), matchType: 'substring' };
     }
 
     return null;
   }
 
   /**
-   * Main suggestion service method:
-   * Queries Artist, Song, and Album collections, applies prefix-first ranking,
-   * eliminates duplicate suggestion texts/entities, and returns a lightweight list.
+   * Returns autocomplete entity suggestions based on query string.
    */
   public static async getSuggestions(options: SearchSuggestionOptions): Promise<SearchSuggestionResponse> {
     const { query = '', limit = 6, includeEntities = ['artist', 'song', 'album'] } = options;
@@ -91,7 +94,7 @@ export class SearchSuggestionService {
     }
 
     const safeLimit = Math.max(1, Math.min(20, limit));
-    const searchRegex = new RegExp(trimmedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    const pattern = `%${trimmedQuery}%`;
 
     const searchArtists = includeEntities.includes('artist');
     const searchSongs = includeEntities.includes('song');
@@ -100,34 +103,28 @@ export class SearchSuggestionService {
     const candidates: SearchSuggestionItem[] = [];
     const seenKeys = new Set<string>();
 
-    // Concurrently fetch candidate matches from catalog
-    const [artists, songs, albums] = await Promise.all([
+    // Concurrently fetch candidate matches from Supabase catalog
+    const [artistsRes, songsRes, albumsRes] = await Promise.all([
       searchArtists
-        ? Artist.find({ name: searchRegex })
-            .select('_id name profileImage avatar verified genres')
-            .limit(safeLimit * 2)
-            .lean()
-            .catch(() => [])
-        : Promise.resolve([]),
-
+        ? supabase.from('artists').select('id, name, profile_image, avatar, verified').ilike('name', pattern).limit(safeLimit * 2)
+        : Promise.resolve({ data: [] }),
       searchSongs
-        ? Song.find({ title: searchRegex, isPublished: true })
-            .select('_id title duration coverImage artist')
-            .populate('artist', 'name')
-            .limit(safeLimit * 2)
-            .lean()
-            .catch(() => [])
-        : Promise.resolve([]),
-
+        ? supabase.from('songs').select('id, title, duration, cover_image, artists!songs_artist_id_fkey(name)').eq('is_published', true).ilike('title', pattern).limit(safeLimit * 2)
+        : Promise.resolve({ data: [] }),
       searchAlbums
-        ? Album.find({ title: searchRegex })
-            .select('_id title coverImage releaseYear artist')
-            .populate('artist', 'name')
-            .limit(safeLimit * 2)
-            .lean()
-            .catch(() => [])
-        : Promise.resolve([]),
+        ? supabase.from('albums').select('id, title, cover_image, release_year, artists!albums_artist_id_fkey(name)').ilike('title', pattern).limit(safeLimit * 2)
+        : Promise.resolve({ data: [] }),
     ]);
+
+    const artists = (artistsRes.data || []).map((a: any) => ({ _id: a.id, id: a.id, name: a.name, profileImage: a.profile_image, avatar: a.avatar, verified: a.verified }));
+    const songs = (songsRes.data || []).map((s: any) => {
+      const art = s.artists || s['artists!songs_artist_id_fkey'];
+      return { _id: s.id, id: s.id, title: s.title, duration: s.duration, coverImage: s.cover_image, artist: art ? { name: art.name } : null };
+    });
+    const albums = (albumsRes.data || []).map((a: any) => {
+      const art = a.artists || a['artists!albums_artist_id_fkey'];
+      return { _id: a.id, id: a.id, title: a.title, coverImage: a.cover_image, releaseYear: a.release_year, artist: art ? { name: art.name } : null };
+    });
 
     // 1. Process Artist Matches
     if (Array.isArray(artists)) {
