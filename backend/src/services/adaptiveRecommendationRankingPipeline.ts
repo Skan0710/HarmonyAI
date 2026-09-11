@@ -34,7 +34,6 @@ import {
   UnifiedMusicDNA,
   MusicDNAProfileAttributes,
 } from '../schemas/musicDnaSchema.js';
-import { IMusicDNA } from '../models/MusicDNA.js';
 import { UnifiedMusicDNAService } from './unifiedMusicDnaService.js';
 import { PersonalMusicTwinAttributes } from '../schemas/personalMusicTwinSchema.js';
 import { PersonalMusicTwinService } from './personalMusicTwinService.js';
@@ -72,7 +71,7 @@ export interface AdaptivePipelineOptions {
   temporalProfile?: UnifiedLayeredTasteProfile | null;
   temporalInfluence?: number;
   useTemporalProfile?: boolean;
-  musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any;
+  musicDnaProfile?: UnifiedMusicDNA | MusicDNAProfileAttributes | any;
   musicDnaInfluence?: number;
   useMusicDna?: boolean;
   tasteEvolutionSignal?: TasteEvolutionSignal | null;
@@ -219,7 +218,7 @@ export class AdaptiveRecommendationRankingPipeline {
     candidateLimit?: number;
     candidates?: HybridCandidate[];
     userClassification?: 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
-    musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any;
+    musicDnaProfile?: UnifiedMusicDNA | MusicDNAProfileAttributes | any;
   }): Promise<{
     candidates: HybridCandidate[];
     isColdStart: boolean;
@@ -328,7 +327,7 @@ export class AdaptiveRecommendationRankingPipeline {
     activeSessionDoc?: IListeningSession | null;
     temporalProfile?: UnifiedLayeredTasteProfile | null;
     temporalInfluence?: number;
-    musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any;
+    musicDnaProfile?: UnifiedMusicDNA | MusicDNAProfileAttributes | any;
     musicDnaInfluence?: number;
     tasteEvolutionSignal?: TasteEvolutionSignal | null;
     tasteEvolutionInfluence?: number;

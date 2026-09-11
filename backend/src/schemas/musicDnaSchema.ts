@@ -1,15 +1,13 @@
-import { Types } from 'mongoose';
 import {
   StandardListeningSituation,
   ListeningSituationType,
   normalizeListeningSituation,
 } from './recommendationContextSchema.js';
 import { ContextMood } from './contextPreferenceSchema.js';
-import { TemporalTimeWindow, normalizeTimeWindow } from '../models/TemporalPreference.js';
-import { IAudioFeatures } from '../models/Song.js';
+import { TemporalTimeWindow, normalizeTimeWindow, IAudioFeatures } from '../types/domainModels.js';
 
 export interface MusicDNAGenrePreference {
-  genre?: Types.ObjectId | string;
+  genre?: string;
   name: string;
   affinityScore: number; // 0.0 to 1.0
   playCount: number;
@@ -17,7 +15,7 @@ export interface MusicDNAGenrePreference {
 }
 
 export interface MusicDNAArtistPreference {
-  artist?: Types.ObjectId | string;
+  artist?: string;
   name: string;
   affinityScore: number; // 0.0 to 1.0
   playCount: number;
@@ -79,7 +77,7 @@ export interface MusicDNATemporalTaste {
 }
 
 export interface MusicDNAProfileAttributes {
-  userId: Types.ObjectId | string;
+  userId: string;
   dnaVersion: string;
   genres: MusicDNAGenrePreference[];
   artists: MusicDNAArtistPreference[];
@@ -492,7 +490,7 @@ export function validateAndSanitizeMusicDNA(raw: any): MusicDNAValidationResult 
  * Returns a baseline Music DNA profile structure for a given user.
  */
 export function getDefaultMusicDNAProfile(
-  userId: string | Types.ObjectId
+  userId: string
 ): MusicDNAProfileAttributes {
   return {
     userId,

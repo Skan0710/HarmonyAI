@@ -11,7 +11,7 @@ import {
   ContextAwareRecommendationService,
   ContextualRecommendationResult,
 } from './contextAwareRecommendationService.js';
-import { ISong } from '../models/Song.js';
+import { ISong } from '../types/domainModels.js';
 
 dotenv.config();
 

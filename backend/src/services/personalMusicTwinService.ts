@@ -1,8 +1,5 @@
+import { supabase } from '../config/supabase.js';
 import { isValidObjectId } from '../utils/validators.js';
-import {
-  PersonalMusicTwin,
-  IPersonalMusicTwin,
-} from '../models/PersonalMusicTwin.js';
 import {
   PersonalMusicTwinAttributes,
   ITwinMusicalTraits,
@@ -44,7 +41,108 @@ import {
   MusicTwinEvolutionService,
 } from './musicTwinEvolutionService.js';
 import { UnifiedMusicDNA } from '../schemas/musicDnaSchema.js';
-import { IMusicDNASnapshot } from '../models/MusicDNASnapshot.js';
+import { IMusicDNASnapshot } from '../types/domainModels.js';
+
+export interface IPersonalMusicTwin extends PersonalMusicTwinAttributes {
+  _id: string;
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+function mapTwinRow(row: any): IPersonalMusicTwin {
+  const metadata = row.metadata || {};
+  return {
+    _id: row.id,
+    id: row.id,
+    userId: row.user_id,
+    twinVersion: metadata.twinVersion || '1.0.0',
+    listenerArchetype: metadata.listenerArchetype || 'Balanced Explorer',
+    archetypeDescription:
+      metadata.archetypeDescription ||
+      'A versatile listener who appreciates a balanced mix of familiar favorites and intriguing discoveries.',
+    dominantMusicalTraits: row.musical_traits || DEFAULT_MUSICAL_TRAITS,
+    genreIdentity: row.genre_identity,
+    moodIdentity: row.mood_identity,
+    explorationTendency: typeof metadata.explorationTendency === 'number' ? metadata.explorationTendency : 0.5,
+    familiarityTendency: typeof metadata.familiarityTendency === 'number' ? metadata.familiarityTendency : 0.5,
+    diversityPreference: typeof metadata.diversityPreference === 'number' ? metadata.diversityPreference : 0.5,
+    listeningBehavior: row.listening_behavior,
+    tasteStability: row.taste_stability,
+    tasteEvolution: row.taste_evolution,
+    currentEmergingInterests: row.emerging_interests,
+    personalityProfile: row.personality_profile,
+    compatibilityDimensions: row.compatibility_dimensions,
+    confidenceScore: typeof metadata.confidenceScore === 'number' ? metadata.confidenceScore : 0.1,
+    lastUpdatedTimestamp: row.last_sync_at ? new Date(row.last_sync_at) : new Date(),
+    isDataSufficient: Boolean(metadata.isDataSufficient),
+    metadata: metadata.extra || {},
+    createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+    updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
+  };
+}
+
+async function findTwinByUserId(userId: string): Promise<IPersonalMusicTwin | null> {
+  if (!isValidObjectId(userId)) return null;
+  const { data, error } = await supabase
+    .from('personal_music_twin')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return mapTwinRow(data);
+}
+
+async function updateDerivedTwin(
+  userId: string,
+  updates: Partial<PersonalMusicTwinAttributes>
+): Promise<IPersonalMusicTwin> {
+  if (!isValidObjectId(userId)) {
+    throw new Error(`Invalid userId provided for Personal Music Twin update: ${userId}`);
+  }
+
+  const sanitized = validateAndSanitizePersonalMusicTwin({
+    ...updates,
+    userId,
+    lastUpdatedTimestamp: new Date(),
+  });
+
+  const nowIso = new Date().toISOString();
+  const { data, error } = await (supabase.from('personal_music_twin') as any).upsert(
+    {
+      user_id: userId,
+      musical_traits: sanitized.dominantMusicalTraits as any,
+      genre_identity: sanitized.genreIdentity as any,
+      mood_identity: sanitized.moodIdentity as any,
+      listening_behavior: sanitized.listeningBehavior as any,
+      taste_stability: sanitized.tasteStability as any,
+      taste_evolution: sanitized.tasteEvolution as any,
+      emerging_interests: sanitized.currentEmergingInterests as any,
+      personality_profile: sanitized.personalityProfile as any,
+      compatibility_dimensions: sanitized.compatibilityDimensions as any,
+      last_sync_at: nowIso,
+      updated_at: nowIso,
+      metadata: {
+        twinVersion: sanitized.twinVersion,
+        listenerArchetype: sanitized.listenerArchetype,
+        archetypeDescription: sanitized.archetypeDescription,
+        explorationTendency: sanitized.explorationTendency,
+        familiarityTendency: sanitized.familiarityTendency,
+        diversityPreference: sanitized.diversityPreference,
+        confidenceScore: sanitized.confidenceScore,
+        isDataSufficient: sanitized.isDataSufficient,
+        extra: sanitized.metadata || {},
+      } as any,
+    },
+    { onConflict: 'user_id' }
+  ).select().single();
+
+  if (error || !data) {
+    throw new Error(`Failed to persist Personal Music Twin: ${error?.message}`);
+  }
+
+  return mapTwinRow(data);
+}
 
 export interface TwinGenerationOptions {
   forceRefresh?: boolean;
@@ -407,12 +505,12 @@ export class PersonalMusicTwinService {
     });
 
     // Check if previous twin exists to evolve characteristics smoothly
-    const existingTwin = await PersonalMusicTwin.findByUserId(userId).catch(() => null);
+    const existingTwin = await findTwinByUserId(userId).catch(() => null);
 
     let finalAttributes = twinAttributes;
     if (existingTwin) {
       const evolutionResult = MusicTwinEvolutionService.evolveTwin(
-        existingTwin.toObject() as any,
+        existingTwin as any,
         twinAttributes,
         {
           totalInteractionCount: dna.interactionsCountAtLastRefresh,
@@ -422,7 +520,7 @@ export class PersonalMusicTwinService {
     }
 
     // Persist or update existing document
-    const updatedTwin = await PersonalMusicTwin.updateDerivedTwin(userId, finalAttributes);
+    const updatedTwin = await updateDerivedTwin(userId, finalAttributes);
     return updatedTwin;
   }
 
@@ -449,7 +547,7 @@ export class PersonalMusicTwinService {
     }
 
     if (!options.forceRefresh) {
-      const existing = await PersonalMusicTwin.findByUserId(userId);
+      const existing = await findTwinByUserId(userId);
       if (existing) {
         const maxAgeMs = (options.maxAgeMinutes ?? 60) * 60 * 1000;
         const ageMs = Date.now() - new Date(existing.lastUpdatedTimestamp).getTime();

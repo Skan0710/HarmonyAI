@@ -5,7 +5,7 @@ import type {
   ISnapshotTasteItem,
   ISnapshotMoodItem,
   ISnapshotListeningBehavior,
-} from '../models/MusicDNASnapshot.js';
+} from '../types/domainModels.js';
 import { UnifiedMusicDNAService } from './unifiedMusicDnaService.js';
 import { UnifiedMusicDNA } from '../schemas/musicDnaSchema.js';
 

@@ -2,7 +2,7 @@ import { supabase } from '../config/supabase.js';
 import {
   TemporalTimeWindow,
   TimeWindow,
-} from '../models/TemporalPreference.js';
+} from '../types/domainModels.js';
 import {
   TemporalPreferenceAggregationConfig,
   getTemporalAggregationConfig,

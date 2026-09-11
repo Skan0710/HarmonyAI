@@ -1,4 +1,3 @@
-import { Types } from 'mongoose';
 
 /**
  * Higher-level acoustic and musical traits defining the user's sonic signature.
@@ -125,7 +124,7 @@ export interface ITwinCompatibilityDimensions {
  * Complete Personal Music Twin data attributes.
  */
 export interface PersonalMusicTwinAttributes {
-  userId: string | Types.ObjectId;
+  userId: string;
   twinVersion: string;
   listenerArchetype: string;
   archetypeDescription: string;
@@ -224,7 +223,7 @@ export const DEFAULT_COMPATIBILITY_DIMENSIONS: ITwinCompatibilityDimensions = {
  * Factory for creating a clean default Personal Music Twin representation.
  */
 export function getDefaultPersonalMusicTwin(
-  userId: string | Types.ObjectId
+  userId: string
 ): PersonalMusicTwinAttributes {
   return {
     userId,
@@ -263,7 +262,7 @@ export function validateAndSanitizePersonalMusicTwin(
     return Math.min(1.0, Math.max(0.0, num));
   };
 
-  const userId = twin.userId || new Types.ObjectId().toString();
+  const userId = twin.userId || crypto.randomUUID();
 
   const traits = twin.dominantMusicalTraits || DEFAULT_MUSICAL_TRAITS;
   const musicalTraits: ITwinMusicalTraits = {

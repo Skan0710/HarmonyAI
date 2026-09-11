@@ -1,4 +1,4 @@
-import { ISong } from '../models/Song.js';
+import { ISong } from '../types/domainModels.js';
 import { ContextPreference } from '../schemas/contextPreferenceSchema.js';
 import { IListeningSession } from '../services/listeningSessionService.js';
 

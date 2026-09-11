@@ -32,6 +32,16 @@ alter table listening_sessions
 alter table music_dna
   add column if not exists metadata jsonb not null default '{}';
 
+-- personal_music_twin already has columns for the structured sub-objects
+-- (musical_traits/genre_identity/mood_identity/listening_behavior/taste_stability/
+-- taste_evolution/emerging_interests/personality_profile/compatibility_dimensions);
+-- `metadata` holds the remaining scalar fields the old Mongoose document had
+-- (twinVersion, listenerArchetype, archetypeDescription, explorationTendency,
+-- familiarityTendency, diversityPreference, confidenceScore, isDataSufficient) that
+-- have no dedicated column.
+alter table personal_music_twin
+  add column if not exists metadata jsonb not null default '{}';
+
 do $$
 begin
   if not exists (

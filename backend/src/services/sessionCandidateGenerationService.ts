@@ -1,4 +1,4 @@
-import { ISong } from '../models/Song.js';
+import { ISong } from '../types/domainModels.js';
 import { supabase } from '../config/supabase.js';
 import { mapSongRow } from './songService.js';
 import { IListeningSession, ListeningSessionService } from './listeningSessionService.js';

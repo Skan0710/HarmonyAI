@@ -463,6 +463,7 @@ export type Database = {
           id: string
           last_sync_at: string | null
           listening_behavior: Json | null
+          metadata: Json
           mood_identity: Json | null
           musical_traits: Json | null
           personality_profile: Json | null
@@ -479,6 +480,7 @@ export type Database = {
           id?: string
           last_sync_at?: string | null
           listening_behavior?: Json | null
+          metadata?: Json
           mood_identity?: Json | null
           musical_traits?: Json | null
           personality_profile?: Json | null
@@ -495,6 +497,7 @@ export type Database = {
           id?: string
           last_sync_at?: string | null
           listening_behavior?: Json | null
+          metadata?: Json
           mood_identity?: Json | null
           musical_traits?: Json | null
           personality_profile?: Json | null

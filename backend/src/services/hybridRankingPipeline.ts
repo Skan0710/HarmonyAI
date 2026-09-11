@@ -32,7 +32,6 @@ import {
   UnifiedMusicDNA,
   MusicDNAProfileAttributes,
 } from '../schemas/musicDnaSchema.js';
-import { IMusicDNA } from '../models/MusicDNA.js';
 import { PersonalMusicTwinAttributes } from '../schemas/personalMusicTwinSchema.js';
 
 export interface TasteEvolutionSignal {
@@ -376,7 +375,7 @@ export class HybridRankingPipeline {
    */
   private static calculateMusicDnaFitScore(
     songDoc: any,
-    dna: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any,
+    dna: UnifiedMusicDNA | MusicDNAProfileAttributes | any,
     config: MusicDNAInfluenceConfig
   ): number {
     if (!songDoc || !dna) return 0.5;
@@ -808,7 +807,7 @@ export class HybridRankingPipeline {
     sessionDoc?: IListeningSession | null,
     temporalProfile?: UnifiedLayeredTasteProfile | null,
     customTemporalInfluence?: number,
-    musicDnaProfile?: UnifiedMusicDNA | IMusicDNA | MusicDNAProfileAttributes | any,
+    musicDnaProfile?: UnifiedMusicDNA | MusicDNAProfileAttributes | any,
     customMusicDnaInfluence?: number,
     tasteEvolutionSignal?: TasteEvolutionSignal | null,
     customEvolutionInfluence?: number,

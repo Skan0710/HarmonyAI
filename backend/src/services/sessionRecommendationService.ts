@@ -3,7 +3,7 @@ import { ListeningSessionService } from './listeningSessionService.js';
 import { SessionCandidateGenerationService, SessionCandidateResult } from './sessionCandidateGenerationService.js';
 import { ColdStartRecommendationService } from './coldStartRecommendationService.js';
 import { SessionProfileService } from './sessionProfileService.js';
-import { ISong } from '../models/Song.js';
+import { ISong } from '../types/domainModels.js';
 
 export interface SessionRankedItem {
   song: ISong;

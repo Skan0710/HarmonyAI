@@ -17,7 +17,7 @@ import {
   DEFAULT_TEMPORAL_TASTE,
   clampNumber,
 } from '../schemas/musicDnaSchema.js';
-import { IAudioFeatures } from '../models/Song.js';
+import { IAudioFeatures } from '../types/domainModels.js';
 import { MusicDNAProfilingService } from './musicDnaProfilingService.js';
 import { MusicDNABehaviorProfilingService, BehaviorProfilingRawInputs } from './musicDnaBehaviorProfilingService.js';
 

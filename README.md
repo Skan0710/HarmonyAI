@@ -78,7 +78,7 @@ flowchart TD
         PlayerStore["usePlayerStore (Zustand Playback State & Autoplay Buffer)"]
     end
 
-    subgraph Backend ["Backend (Node.js + Express + TypeScript + Mongoose)"]
+    subgraph Backend ["Backend (Node.js + Express + TypeScript)"]
         API["REST API Routes & Controllers"]
         SmartAutoplay["SmartAutoplayService (Adaptive Queue & Evaluation)"]
         SessionProfile["SessionTasteProfileService (Drift Detection & Profiling)"]
@@ -87,8 +87,8 @@ flowchart TD
         SessionService["ListeningSessionService (Active Session Tracking)"]
     end
 
-    subgraph Database ["Database (MongoDB)"]
-        Mongo["Collections: Users, Songs, ListeningSessions, ListeningHistory, Contexts"]
+    subgraph Database ["Database (Supabase / Postgres)"]
+        Supa["Tables: users, songs, listening_sessions, listening_history, recommendation_context"]
     end
 
     Frontend <-->|REST API / JWT Auth| Backend
@@ -105,7 +105,7 @@ flowchart TD
 - **Backend**:
   - Node.js & Express 4
   - TypeScript (Strict type safety)
-  - Mongoose 9 & MongoDB
+  - Supabase (Postgres) via @supabase/supabase-js
   - JSON Web Tokens (JWT) & bcryptjs
   - tsx & nodemon development environment
 - **Testing**:
@@ -122,7 +122,7 @@ HarmonyAI/
 │   │   ├── config/             # Recommendation weights, recency, session & drift configs
 │   │   ├── controllers/        # Auth, song, recommendation, playlist & session controllers
 │   │   ├── middleware/         # Auth, validation, and error middleware
-│   │   ├── models/             # Mongoose schemas (Song, User, ListeningSession, History, etc.)
+│   │   ├── types/domainModels.ts # Plain TS types for domain objects (ISong, IUser, etc.)
 │   │   ├── routes/             # Express API route declarations
 │   │   ├── schemas/            # Validation schemas (Context, AI playlist preference)
 │   │   ├── services/           # Core algorithmic engines:
@@ -161,7 +161,7 @@ HarmonyAI/
 ### Prerequisites
 - **Node.js** (v18+ or v20+ recommended)
 - **npm** (v9+)
-- **MongoDB** (Local instance or MongoDB Atlas URI)
+- **Supabase project** (Postgres database + API keys)
 
 ### 1. Clone the Repository
 ```bash
@@ -175,7 +175,8 @@ git config core.hooksPath .githooks  # enables the pre-commit secret scan
 #### Backend Configuration (`backend/.env`):
 ```env
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/harmonyai
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
 JWT_SECRET=your_super_secret_jwt_key_here
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173

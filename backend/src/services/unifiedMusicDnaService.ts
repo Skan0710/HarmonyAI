@@ -123,7 +123,7 @@ export class UnifiedMusicDNAService {
     const rawInputs = await this.fetchUserData(userId, options.referenceDate);
     const unified = this.generateUnifiedProfileFromData(rawInputs, options);
 
-    // Synchronize to MusicDNA Mongoose Document
+    // Synchronize to the music_dna row in Supabase
     await this.persistToMusicDNA(userId, unified);
 
     return unified;

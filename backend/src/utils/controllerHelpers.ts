@@ -1,12 +1,11 @@
 import { Request, Response } from 'express';
-import { IUser } from '../models/User.js';
+import { IUser } from '../types/domainModels.js';
 
 /**
  * Wraps an async controller handler with automatic try/catch and standardized error responses.
  * Eliminates the repetitive try { ... } catch (error) { res.status(5xx).json(...) } pattern.
  *
  * For errors with specific status codes, throw a ControllerError.
- * CastError and ValidationError are automatically mapped to 400.
  */
 export const controllerWrapper = (
   fn: (req: Request, res: Response) => Promise<void>
@@ -32,17 +31,8 @@ export const controllerWrapper = (
       return;
     }
 
-    // Mongoose validation / cast errors
-    if (error.name === 'ValidationError' || error.name === 'CastError') {
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Invalid input data',
-      });
-      return;
-    }
-
-    // Duplicate key errors
-    if (error.code === 11000) {
+    // Postgres unique constraint violation (Supabase/PostgREST error code)
+    if (error.code === '23505') {
       res.status(400).json({
         success: false,
         message: error.message || 'A record with that value already exists',

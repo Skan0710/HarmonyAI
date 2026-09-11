@@ -1,4 +1,4 @@
-import { ISong } from '../models/Song.js';
+import { ISong } from '../types/domainModels.js';
 import { HybridCandidate } from './candidateGenerationService.js';
 import { ContextPreference } from '../schemas/contextPreferenceSchema.js';
 import { MoodFilteringService } from './moodFilteringService.js';

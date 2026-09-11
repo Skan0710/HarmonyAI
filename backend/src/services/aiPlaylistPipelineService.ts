@@ -1,4 +1,6 @@
-import { ISong, Song } from '../models/Song.js';
+import { ISong } from '../types/domainModels.js';
+import { supabase } from '../config/supabase.js';
+import { mapSongRow } from './songService.js';
 import { AIPlaylistPreference } from '../schemas/aiPlaylistPreferenceSchema.js';
 import { AIPlaylistGenerationService } from './aiPlaylistGenerationService.js';
 import { PlaylistCandidateGenerationService } from './playlistCandidateGenerationService.js';
@@ -83,15 +85,17 @@ export class AIPlaylistPipelineService {
       // If catalog still under target count, fetch general published catalog songs
       if (selectedCandidates.length < targetCount) {
         try {
-          const fallbackDocs = await Song.find({
-            isPublished: true,
-            _id: { $nin: Array.from(selectedSongIds) },
-          })
-            .populate('artist', 'name')
-            .populate('album', 'title')
-            .populate('genre', 'name slug')
-            .limit(targetCount - selectedCandidates.length)
-            .lean();
+          const excludedIds = Array.from(selectedSongIds);
+          let fallbackQuery = supabase
+            .from('songs')
+            .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+            .eq('is_published', true)
+            .limit(targetCount - selectedCandidates.length);
+          if (excludedIds.length > 0) {
+            fallbackQuery = fallbackQuery.not('id', 'in', `(${excludedIds.join(',')})`);
+          }
+          const { data: fallbackRows } = await fallbackQuery;
+          const fallbackDocs = (fallbackRows || []).map(mapSongRow).filter(Boolean) as any[];
 
           for (const fallbackSong of fallbackDocs) {
             selectedCandidates.push({

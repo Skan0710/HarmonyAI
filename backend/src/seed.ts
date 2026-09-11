@@ -1,10 +1,9 @@
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
-import { connectDB } from './config/db.js';
-import { Genre } from './models/Genre.js';
-import { Artist } from './models/Artist.js';
-import { Album } from './models/Album.js';
-import { Song } from './models/Song.js';
+import { supabase } from './config/supabase.js';
+import { GenreService } from './services/genreService.js';
+import { ArtistService } from './services/artistService.js';
+import { AlbumService } from './services/albumService.js';
+import { SongService } from './services/songService.js';
 
 dotenv.config();
 
@@ -25,16 +24,15 @@ const AUDIO_SAMPLE_URLS = [
 const seedDatabase = async () => {
   try {
     console.log('🌱 Starting HarmonyAI Database Seed...');
-    await connectDB();
 
-    // Clear existing catalog data to prevent duplicate accumulation
+    // Clear existing catalog data to prevent duplicate accumulation.
+    // Order matters: songs/albums reference artists/genres via foreign keys.
     console.log('🧹 Clearing existing Songs, Albums, Artists, and Genres...');
-    await Promise.all([
-      Song.deleteMany({}),
-      Album.deleteMany({}),
-      Artist.deleteMany({}),
-      Genre.deleteMany({}),
-    ]);
+    await supabase.from('songs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('albums').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('artist_genres').delete().neq('artist_id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('artists').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('genres').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
     // 1. Seed Genres
     console.log('🎵 Seeding Genres...');
@@ -105,8 +103,8 @@ const seedDatabase = async () => {
       },
     ];
 
-    const genres = await Genre.insertMany(genreData);
-    const genreMap = new Map(genres.map((g) => [g.slug, g._id]));
+    const genres = await Promise.all(genreData.map((g) => GenreService.createGenre(g)));
+    const genreMap = new Map(genres.map((g) => [g.slug as string, g._id as string]));
 
     // 2. Seed Artists
     console.log('🎤 Seeding Artists...');
@@ -116,7 +114,7 @@ const seedDatabase = async () => {
         bio: 'Synthwave duo blending 80s nostalgia with futuristic electronic beats.',
         profileImage: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&auto=format&fit=crop',
         bannerImage: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('electronic'), genreMap.get('pop')],
+        genres: [genreMap.get('electronic'), genreMap.get('pop')].filter(Boolean) as string[],
         monthlyListeners: 1250000,
         verified: true,
         tags: ['synthwave', 'electronic', 'retrowave'],
@@ -126,7 +124,7 @@ const seedDatabase = async () => {
         bio: 'Atmospheric indie pop singer-songwriter with hauntingly beautiful vocals.',
         profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop',
         bannerImage: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('indie'), genreMap.get('pop')],
+        genres: [genreMap.get('indie'), genreMap.get('pop')].filter(Boolean) as string[],
         monthlyListeners: 890000,
         verified: true,
         tags: ['indie', 'dreamy', 'pop'],
@@ -136,7 +134,7 @@ const seedDatabase = async () => {
         bio: 'High-octane EDM producer crafting mainstage festival anthems.',
         profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop',
         bannerImage: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('electronic')],
+        genres: [genreMap.get('electronic')].filter(Boolean) as string[],
         monthlyListeners: 2400000,
         verified: true,
         tags: ['edm', 'dance', 'festival'],
@@ -146,7 +144,7 @@ const seedDatabase = async () => {
         bio: 'Contemporary R&B collective with soul-infused basslines and lush harmonies.',
         profileImage: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop',
         bannerImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('r-and-b')],
+        genres: [genreMap.get('r-and-b')].filter(Boolean) as string[],
         monthlyListeners: 760000,
         verified: true,
         tags: ['rnb', 'soul', 'chill'],
@@ -156,7 +154,7 @@ const seedDatabase = async () => {
         bio: 'Alternative rock band pushing boundaries with explosive riffs and introspective lyrics.',
         profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop',
         bannerImage: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('rock')],
+        genres: [genreMap.get('rock')].filter(Boolean) as string[],
         monthlyListeners: 1540000,
         verified: true,
         tags: ['rock', 'alternative', 'guitar'],
@@ -166,7 +164,7 @@ const seedDatabase = async () => {
         bio: 'Chart-topping hip-hop artist known for intricate storytelling and heavy 808s.',
         profileImage: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=400&auto=format&fit=crop',
         bannerImage: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('hip-hop')],
+        genres: [genreMap.get('hip-hop')].filter(Boolean) as string[],
         monthlyListeners: 3100000,
         verified: true,
         tags: ['hiphop', 'rap', 'urban'],
@@ -176,7 +174,7 @@ const seedDatabase = async () => {
         bio: 'Modern classical ensemble merging chamber orchestra traditions with film scores.',
         profileImage: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=400&auto=format&fit=crop',
         bannerImage: 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('classical')],
+        genres: [genreMap.get('classical')].filter(Boolean) as string[],
         monthlyListeners: 420000,
         verified: false,
         tags: ['classical', 'piano', 'strings'],
@@ -186,7 +184,7 @@ const seedDatabase = async () => {
         bio: 'Jazz quintet captivating audiences with smooth saxophone riffs and swing feel.',
         profileImage: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=400&auto=format&fit=crop',
         bannerImage: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('jazz')],
+        genres: [genreMap.get('jazz')].filter(Boolean) as string[],
         monthlyListeners: 380000,
         verified: false,
         tags: ['jazz', 'sax', 'relaxing'],
@@ -196,7 +194,7 @@ const seedDatabase = async () => {
         bio: 'Futuristic synthpop project with neon aesthetics and catchy hooks.',
         profileImage: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop',
         bannerImage: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('pop'), genreMap.get('electronic')],
+        genres: [genreMap.get('pop'), genreMap.get('electronic')].filter(Boolean) as string[],
         monthlyListeners: 980000,
         verified: true,
         tags: ['synthpop', 'dance', 'electronic'],
@@ -206,123 +204,49 @@ const seedDatabase = async () => {
         bio: 'Folk & indie duo exploring acoustic strings and organic soundscapes.',
         profileImage: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop',
         bannerImage: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('indie')],
+        genres: [genreMap.get('indie')].filter(Boolean) as string[],
         monthlyListeners: 540000,
         verified: false,
         tags: ['folk', 'acoustic', 'chill'],
       },
     ];
 
-    const artists = await Artist.insertMany(artistData);
-    const artistMap = new Map(artists.map((a) => [a.name, a._id]));
+    const artists = await Promise.all(artistData.map((a) => ArtistService.createArtist(a)));
+    const artistMap = new Map(artists.map((a) => [a.name as string, a._id as string]));
 
     // 3. Seed Albums
     console.log('💿 Seeding Albums...');
     const albumData = [
-      {
-        title: 'Neon Skyline',
-        artist: artistMap.get('The Midnight Wave'),
-        genre: genreMap.get('electronic'),
-        coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop',
-        releaseYear: 2023,
-        albumType: 'album',
-        totalTracks: 4,
-        tags: ['synthwave', 'electronic'],
-      },
-      {
-        title: 'Celestial Whispers',
-        artist: artistMap.get('Luna Resonance'),
-        genre: genreMap.get('indie'),
-        coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop',
-        releaseYear: 2024,
-        albumType: 'album',
-        totalTracks: 5,
-        tags: ['indie', 'dreamy'],
-      },
-      {
-        title: 'Overdrive',
-        artist: artistMap.get('Apex Pulse'),
-        genre: genreMap.get('electronic'),
-        coverImage: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop',
-        releaseYear: 2024,
-        albumType: 'album',
-        totalTracks: 5,
-        tags: ['edm', 'dance'],
-      },
-      {
-        title: 'Midnight Lounge',
-        artist: artistMap.get('Velvet Groove'),
-        genre: genreMap.get('r-and-b'),
-        coverImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop',
-        releaseYear: 2023,
-        albumType: 'album',
-        totalTracks: 5,
-        tags: ['rnb', 'soul'],
-      },
-      {
-        title: 'Thunder & Dust',
-        artist: artistMap.get('Echoes of Orion'),
-        genre: genreMap.get('rock'),
-        coverImage: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&auto=format&fit=crop',
-        releaseYear: 2022,
-        albumType: 'album',
-        totalTracks: 5,
-        tags: ['rock', 'alternative'],
-      },
-      {
-        title: 'Urban Chronicles',
-        artist: artistMap.get('Rhythm & Rhyme'),
-        genre: genreMap.get('hip-hop'),
-        coverImage: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&auto=format&fit=crop',
-        releaseYear: 2025,
-        albumType: 'album',
-        totalTracks: 5,
-        tags: ['hiphop', 'rap'],
-      },
-      {
-        title: 'Symphony of Lights',
-        artist: artistMap.get('Starlight Quartet'),
-        genre: genreMap.get('classical'),
-        coverImage: 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=500&auto=format&fit=crop',
-        releaseYear: 2021,
-        albumType: 'album',
-        totalTracks: 5,
-        tags: ['classical', 'piano'],
-      },
-      {
-        title: 'Midnight in Harlem',
-        artist: artistMap.get('Blue Horizon'),
-        genre: genreMap.get('jazz'),
-        coverImage: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=500&auto=format&fit=crop',
-        releaseYear: 2023,
-        albumType: 'album',
-        totalTracks: 5,
-        tags: ['jazz', 'relaxing'],
-      },
-      {
-        title: 'Electric Dreams',
-        artist: artistMap.get('Solaris Nova'),
-        genre: genreMap.get('pop'),
-        coverImage: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&auto=format&fit=crop',
-        releaseYear: 2024,
-        albumType: 'album',
-        totalTracks: 5,
-        tags: ['synthpop', 'pop'],
-      },
-      {
-        title: 'Woodland Echoes',
-        artist: artistMap.get('Acoustic Drift'),
-        genre: genreMap.get('indie'),
-        coverImage: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format&fit=crop',
-        releaseYear: 2023,
-        albumType: 'album',
-        totalTracks: 5,
-        tags: ['folk', 'acoustic'],
-      },
+      { title: 'Neon Skyline', artist: 'The Midnight Wave', genre: 'electronic', coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop', releaseYear: 2023, albumType: 'album', totalTracks: 4, tags: ['synthwave', 'electronic'] },
+      { title: 'Celestial Whispers', artist: 'Luna Resonance', genre: 'indie', coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop', releaseYear: 2024, albumType: 'album', totalTracks: 5, tags: ['indie', 'dreamy'] },
+      { title: 'Overdrive', artist: 'Apex Pulse', genre: 'electronic', coverImage: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop', releaseYear: 2024, albumType: 'album', totalTracks: 5, tags: ['edm', 'dance'] },
+      { title: 'Midnight Lounge', artist: 'Velvet Groove', genre: 'r-and-b', coverImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop', releaseYear: 2023, albumType: 'album', totalTracks: 5, tags: ['rnb', 'soul'] },
+      { title: 'Thunder & Dust', artist: 'Echoes of Orion', genre: 'rock', coverImage: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&auto=format&fit=crop', releaseYear: 2022, albumType: 'album', totalTracks: 5, tags: ['rock', 'alternative'] },
+      { title: 'Urban Chronicles', artist: 'Rhythm & Rhyme', genre: 'hip-hop', coverImage: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&auto=format&fit=crop', releaseYear: 2025, albumType: 'album', totalTracks: 5, tags: ['hiphop', 'rap'] },
+      { title: 'Symphony of Lights', artist: 'Starlight Quartet', genre: 'classical', coverImage: 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=500&auto=format&fit=crop', releaseYear: 2021, albumType: 'album', totalTracks: 5, tags: ['classical', 'piano'] },
+      { title: 'Midnight in Harlem', artist: 'Blue Horizon', genre: 'jazz', coverImage: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=500&auto=format&fit=crop', releaseYear: 2023, albumType: 'album', totalTracks: 5, tags: ['jazz', 'relaxing'] },
+      { title: 'Electric Dreams', artist: 'Solaris Nova', genre: 'pop', coverImage: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&auto=format&fit=crop', releaseYear: 2024, albumType: 'album', totalTracks: 5, tags: ['synthpop', 'pop'] },
+      { title: 'Woodland Echoes', artist: 'Acoustic Drift', genre: 'indie', coverImage: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format&fit=crop', releaseYear: 2023, albumType: 'album', totalTracks: 5, tags: ['folk', 'acoustic'] },
     ];
 
-    const albums = await Album.insertMany(albumData);
-    const albumMap = new Map(albums.map((al) => [al.title, al._id]));
+    const albums = await Promise.all(
+      albumData.map((al) => {
+        const artistId = artistMap.get(al.artist);
+        const genreId = genreMap.get(al.genre);
+        if (!artistId) throw new Error(`Seed error: unknown artist "${al.artist}"`);
+        return AlbumService.createAlbum({
+          title: al.title,
+          artist: artistId,
+          genre: genreId,
+          coverImage: al.coverImage,
+          releaseYear: al.releaseYear,
+          albumType: al.albumType,
+          totalTracks: al.totalTracks,
+          tags: al.tags,
+        });
+      })
+    );
+    const albumMap = new Map(albums.map((al) => [al.title as string, al._id as string]));
 
     // 4. Seed ~50 Songs
     console.log('🎶 Seeding 50 Songs with Audio Features & Recommendation Metadata...');
@@ -395,40 +319,39 @@ const seedDatabase = async () => {
       { title: 'Folk Tales of October', artist: 'Acoustic Drift', album: 'Woodland Echoes', genre: 'indie', duration: 260, bpm: 92, energy: 0.42, valence: 0.50 },
     ];
 
-    const songsToInsert = songTemplates.map((tmpl, idx) => {
-      const artistId = artistMap.get(tmpl.artist);
-      const albumId = albumMap.get(tmpl.album);
-      const genreId = genreMap.get(tmpl.genre);
-      const sampleAudioUrl = AUDIO_SAMPLE_URLS[idx % AUDIO_SAMPLE_URLS.length];
-      const playCount = Math.floor(Math.random() * 450000) + 5000;
-      const releaseYear = 2020 + (idx % 6);
+    const songs = await Promise.all(
+      songTemplates.map((tmpl, idx) => {
+        const artistId = artistMap.get(tmpl.artist);
+        const albumId = albumMap.get(tmpl.album);
+        const genreId = genreMap.get(tmpl.genre);
+        if (!artistId || !genreId) throw new Error(`Seed error: unknown artist/genre for "${tmpl.title}"`);
+        const sampleAudioUrl = AUDIO_SAMPLE_URLS[idx % AUDIO_SAMPLE_URLS.length];
+        const playCount = Math.floor(Math.random() * 450000) + 5000;
+        const releaseYear = 2020 + (idx % 6);
 
-      return {
-        title: tmpl.title,
-        artist: artistId,
-        album: albumId,
-        genre: genreId,
-        duration: tmpl.duration,
-        coverImage: `https://images.unsplash.com/photo-${1518709268805 + idx}?w=500&auto=format&fit=crop`,
-        audioUrl: sampleAudioUrl,
-        releaseYear,
-        playCount,
-        audioFeatures: {
-          bpm: tmpl.bpm,
-          energy: tmpl.energy,
-          danceability: Math.round((0.5 + Math.random() * 0.4) * 100) / 100,
-          valence: tmpl.valence,
-          acousticness: tmpl.genre === 'classical' || tmpl.genre === 'indie' || tmpl.genre === 'jazz' ? 0.8 : 0.2,
-          instrumentalness: tmpl.genre === 'classical' ? 0.9 : 0.1,
-        },
-        tags: [tmpl.genre, 'harmonyai-seed', tmpl.bpm > 120 ? 'upbeat' : 'chill'],
-        language: 'English',
-        explicit: false,
-        isPublished: true,
-      };
-    });
-
-    const songs = await Song.insertMany(songsToInsert);
+        return SongService.createSong({
+          title: tmpl.title,
+          artist: artistId,
+          album: albumId,
+          genre: genreId,
+          duration: tmpl.duration,
+          coverImage: `https://images.unsplash.com/photo-${1518709268805 + idx}?w=500&auto=format&fit=crop`,
+          audioUrl: sampleAudioUrl,
+          releaseYear,
+          audioFeatures: {
+            bpm: tmpl.bpm,
+            energy: tmpl.energy,
+            danceability: Math.round((0.5 + Math.random() * 0.4) * 100) / 100,
+            valence: tmpl.valence,
+            acousticness: tmpl.genre === 'classical' || tmpl.genre === 'indie' || tmpl.genre === 'jazz' ? 0.8 : 0.2,
+            instrumentalness: tmpl.genre === 'classical' ? 0.9 : 0.1,
+          },
+          tags: [tmpl.genre, 'harmonyai-seed', tmpl.bpm > 120 ? 'upbeat' : 'chill'],
+          language: 'English',
+          explicit: false,
+        });
+      })
+    );
 
     console.log('\n==================================================');
     console.log('🎉 HarmonyAI Database Seeding Complete Successfully!');

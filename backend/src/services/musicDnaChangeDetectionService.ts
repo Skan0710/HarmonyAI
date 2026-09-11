@@ -1,5 +1,5 @@
 import { isValidObjectId } from '../utils/validators.js';
-import { IMusicDNASnapshot } from '../models/MusicDNASnapshot.js';
+import { IMusicDNASnapshot } from '../types/domainModels.js';
 import { MusicDNASnapshotService } from './musicDnaSnapshotService.js';
 import { UnifiedMusicDNAService } from './unifiedMusicDnaService.js';
 import { UnifiedMusicDNA } from '../schemas/musicDnaSchema.js';

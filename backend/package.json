@@ -7,8 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "seed": "tsx src/seed.ts",
-    "migrate:supabase": "tsx src/migrate-mongo-to-supabase.ts"
+    "seed": "tsx src/seed.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -18,8 +17,7 @@
     "express": "^4.19.2",
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
-    "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.9.1"
+    "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

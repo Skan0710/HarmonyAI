@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase.js';
 import { AlbumService } from '../services/albumService.js';
-import { AlbumType } from '../models/Album.js';
+import { AlbumType } from '../types/domainModels.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
 import { extractQueryParams, sanitizeString, isValidObjectId } from '../utils/validators.js';
 
