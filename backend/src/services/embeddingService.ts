@@ -52,92 +52,24 @@ export class LocalDeterministicEmbeddingProvider implements IEmbeddingProvider {
   }
 }
 
-/**
- * Gemini API Embedding Provider utilizing process.env.GEMINI_API_KEY
- */
-export class GeminiEmbeddingProvider implements IEmbeddingProvider {
-  name = 'gemini';
-  dimension = 768;
-
-  private apiKey: string;
-
-  constructor() {
-    this.apiKey = process.env.GEMINI_API_KEY || '';
-  }
-
-  async generateEmbedding(text: string): Promise<number[]> {
-    if (!this.apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is not configured');
-    }
-
-    if (!text || !text.trim()) {
-      return new Array(this.dimension).fill(0);
-    }
-
-    try {
-      // Fetch Gemini text embedding endpoint
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${this.apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'models/text-embedding-004',
-            content: {
-              parts: [{ text: text.trim() }],
-            },
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorJson = await response.json().catch(() => ({}));
-        throw new Error(
-          `Gemini API embedding request failed (${response.status}): ${
-            errorJson?.error?.message || response.statusText
-          }`
-        );
-      }
-
-      const data = await response.json();
-      const values: number[] = data?.embedding?.values || [];
-
-      if (!Array.isArray(values) || values.length === 0) {
-        throw new Error('Gemini API returned an empty embedding vector');
-      }
-
-      return values;
-    } catch (err: any) {
-      throw new Error(`Embedding generation error [GeminiProvider]: ${err.message}`);
-    }
-  }
-
-  async generateBatchEmbeddings(texts: string[]): Promise<number[][]> {
-    return Promise.all(texts.map((t) => this.generateEmbedding(t)));
-  }
-}
-
 export class EmbeddingService {
   private static activeProvider: IEmbeddingProvider;
 
   /**
    * Initializes or resolves active embedding provider based on environment variables:
-   * EMBEDDING_PROVIDER ('gemini' | 'local_deterministic' | 'mock')
+   * EMBEDDING_PROVIDER ('local_deterministic' | 'mock')
+   *
+   * Note: Groq (the LLM provider used elsewhere in this service — see llmClient.ts)
+   * does not host an embeddings endpoint, so semantic search always uses the local
+   * deterministic provider unless a custom provider is injected via setProvider().
    */
   static getProvider(): IEmbeddingProvider {
     if (this.activeProvider) {
       return this.activeProvider;
     }
 
-    const providerEnv = (process.env.EMBEDDING_PROVIDER || '').toLowerCase();
-    const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY);
-
-    if ((providerEnv === 'gemini' || !providerEnv) && hasGeminiKey) {
-      this.activeProvider = new GeminiEmbeddingProvider();
-    } else {
-      const dim = parseInt(process.env.EMBEDDING_DIMENSION || '128', 10);
-      this.activeProvider = new LocalDeterministicEmbeddingProvider(isNaN(dim) ? 128 : dim);
-    }
+    const dim = parseInt(process.env.EMBEDDING_DIMENSION || '128', 10);
+    this.activeProvider = new LocalDeterministicEmbeddingProvider(isNaN(dim) ? 128 : dim);
 
     return this.activeProvider;
   }

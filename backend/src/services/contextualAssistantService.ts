@@ -12,6 +12,7 @@ import {
   ContextualRecommendationResult,
 } from './contextAwareRecommendationService.js';
 import { ISong } from '../models/Song.js';
+import { hasGroqKey, generateGroqCompletion, extractJsonObject } from './llmClient.js';
 
 dotenv.config();
 
@@ -25,7 +26,7 @@ export interface ExtractedContextResponse {
 export class ContextualAssistantService {
   /**
    * Deterministically extracts structured context parameters (mood, activity, timeOfDay, energyLevel)
-   * from natural-language requests using rule-based pattern matching (used for local fallback or when GEMINI_API_KEY is unconfigured).
+   * from natural-language requests using rule-based pattern matching (used for local fallback or when GROQ_API_KEY is unconfigured).
    */
   static extractContextRuleBased(prompt: string): Partial<ContextPreference> {
     const clean = prompt.trim().toLowerCase();
@@ -108,16 +109,14 @@ export class ContextualAssistantService {
   }
 
   /**
-   * Extracts structured context preferences from a natural-language request using Gemini LLM if configured,
+   * Extracts structured context preferences from a natural-language request using the Groq LLM if configured,
    * falling back safely to rule-based pattern matching.
    * DOES NOT GENERATE SONG NAMES; ONLY STRUCTURED CONTEXT PREFERENCES.
    */
   static async extractContextFromPrompt(userPrompt: string): Promise<ContextPreference> {
     const prompt = (userPrompt || '').trim().slice(0, 500); // 500 max length to prevent token abuse
-    const apiKey = process.env.GEMINI_API_KEY;
-    const modelName = process.env.LLM_MODEL || 'gemini-1.5-flash';
 
-    if (!apiKey) {
+    if (!hasGroqKey()) {
       const fallbackExtracted = this.extractContextRuleBased(prompt);
       return validateAndSanitizeContextPreference(fallbackExtracted);
     }
@@ -136,32 +135,10 @@ Analyze the user request and output JSON strictly matching this schema:
 }
 IMPORTANT: DO NOT invent song titles, artist names, or song lists. Only output structured JSON.`;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: systemInstruction },
-                  { text: `User Request: "${prompt}"` },
-                ],
-              },
-            ],
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const data: any = await response.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          return validateAndSanitizeContextPreference(parsed);
-        }
+      const rawText = await generateGroqCompletion(systemInstruction, `User Request: "${prompt}"`);
+      const parsed = extractJsonObject(rawText);
+      if (parsed) {
+        return validateAndSanitizeContextPreference(parsed);
       }
     } catch (err: any) {
       console.warn(

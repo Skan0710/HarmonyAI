@@ -3,6 +3,7 @@ import {
   AIPlaylistPreference,
   validateAndSanitizePlaylistPreference,
 } from '../schemas/aiPlaylistPreferenceSchema.js';
+import { hasGroqKey, generateGroqCompletion, extractJsonObject } from './llmClient.js';
 
 dotenv.config();
 
@@ -92,21 +93,14 @@ export class RuleBasedFallbackLLMInterpreter implements ILLMPlaylistInterpreter 
 }
 
 /**
- * Gemini LLM Playlist Interpreter utilizing process.env.GEMINI_API_KEY and configurable process.env.LLM_MODEL
+ * Groq LLM Playlist Interpreter utilizing process.env.GROQ_API_KEY and configurable process.env.LLM_MODEL
  */
-export class GeminiLLMInterpreter implements ILLMPlaylistInterpreter {
-  name = 'gemini';
-  private apiKey: string;
-  private modelName: string;
-
-  constructor() {
-    this.apiKey = process.env.GEMINI_API_KEY || '';
-    this.modelName = process.env.LLM_MODEL || 'gemini-1.5-flash';
-  }
+export class GroqLLMInterpreter implements ILLMPlaylistInterpreter {
+  name = 'groq';
 
   async interpretPrompt(userPrompt: string): Promise<AIPlaylistPreference> {
-    if (!this.apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is not configured');
+    if (!hasGroqKey()) {
+      throw new Error('GROQ_API_KEY environment variable is not configured');
     }
 
     const systemPrompt = `You are a professional music curator. Interpret the user's natural-language playlist request into a valid JSON object matching this schema strictly without generating specific song track names or extra text:
@@ -129,47 +123,11 @@ export class GeminiLLMInterpreter implements ILLMPlaylistInterpreter {
 DO NOT include specific song track titles in the output. Extract only playlist preferences and metadata.`;
 
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${this.modelName}:generateContent?key=${this.apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: `${systemPrompt}\nUser Request: "${userPrompt.trim()}"` },
-                ],
-              },
-            ],
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(
-          `Gemini API request failed (${response.status}): ${
-            errData?.error?.message || response.statusText
-          }`
-        );
-      }
-
-      const data = await response.json();
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-      // Clean Markdown JSON wrapping if present (e.g. ```json ... ```)
-      const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      
-      let parsed: any;
-      try {
-        parsed = JSON.parse(cleanJson);
-      } catch (parseError: any) {
-        throw new Error(`Malformed JSON response from LLM: ${parseError.message}`);
-      }
+      const rawText = await generateGroqCompletion(systemPrompt, `User Request: "${userPrompt.trim()}"`);
+      const parsed = extractJsonObject(rawText);
 
       if (!parsed || typeof parsed !== 'object') {
-        throw new Error('Invalid non-object payload returned by Gemini API');
+        throw new Error('Invalid or non-JSON payload returned by Groq API');
       }
 
       return validateAndSanitizePlaylistPreference(parsed);
@@ -184,7 +142,7 @@ export class AIPlaylistGenerationService {
   public static readonly MAX_PROMPT_LENGTH = 500;
 
   /**
-   * Resolves active LLM playlist interpreter based on process.env.LLM_PROVIDER and GEMINI_API_KEY
+   * Resolves active LLM playlist interpreter based on process.env.LLM_PROVIDER and GROQ_API_KEY
    */
   static getInterpreter(): ILLMPlaylistInterpreter {
     if (this.activeInterpreter) {
@@ -192,10 +150,9 @@ export class AIPlaylistGenerationService {
     }
 
     const providerEnv = (process.env.LLM_PROVIDER || '').toLowerCase();
-    const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY);
 
-    if ((providerEnv === 'gemini' || !providerEnv) && hasGeminiKey) {
-      this.activeInterpreter = new GeminiLLMInterpreter();
+    if ((providerEnv === 'groq' || !providerEnv) && hasGroqKey()) {
+      this.activeInterpreter = new GroqLLMInterpreter();
     } else {
       this.activeInterpreter = new RuleBasedFallbackLLMInterpreter();
     }
