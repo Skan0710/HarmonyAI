@@ -240,12 +240,13 @@ export const SearchPage: React.FC = () => {
   return (
     <div className="pb-16">
       <section className="border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-8">
+        <div className="max-w-2xl mx-auto">
         <p className="text-xs font-medium text-text-tertiary uppercase tracking-[0.14em]">Search</p>
         <h1 className="font-display text-2xl sm:text-3xl text-text-primary leading-snug mt-3">
           What are you in the mood for?
         </h1>
 
-        <div ref={containerRef} className="relative max-w-2xl mt-6">
+        <div ref={containerRef} className="relative mt-6">
           <div className="relative flex items-center">
             <SearchIcon size={17} className="absolute left-4 text-text-tertiary pointer-events-none z-10" strokeWidth={1.75} />
             <SmoothInput
@@ -308,7 +309,7 @@ export const SearchPage: React.FC = () => {
                   if (tab.id !== 'all') params.mode = tab.id;
                   setSearchParams(params, { replace: true });
                 }}
-                className={`px-3 py-1.5 rounded-[var(--radius-pill)] text-xs font-medium transition-colors cursor-pointer ${
+                className={`px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium transition-colors cursor-pointer ${
                   activeMode === tab.id ? 'bg-accent text-text-on-accent font-semibold' : 'bg-surface-2 text-text-secondary hover:text-text-primary'
                 }`}
               >
@@ -323,12 +324,13 @@ export const SearchPage: React.FC = () => {
               <button
                 key={vibe}
                 onClick={() => handleSelectSearchTerm(vibe)}
-                className="px-3 py-1 bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary rounded-[var(--radius-pill)] text-xs font-medium transition-all duration-[var(--duration-fast)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.45)] active:translate-y-0 active:scale-95 shrink-0 cursor-pointer"
+                className="px-4 py-2 bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary rounded-[var(--radius-pill)] text-sm font-medium transition-all duration-[var(--duration-fast)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.45)] active:translate-y-0 active:scale-95 shrink-0 cursor-pointer"
               >
                 {vibe}
               </button>
             ))}
           </div>
+        </div>
         </div>
       </section>
 
@@ -371,7 +373,7 @@ export const SearchPage: React.FC = () => {
                 <button
                   key={vibe}
                   onClick={() => handleSelectSearchTerm(vibe)}
-                  className="px-3 py-1.5 bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary rounded-[var(--radius-pill)] text-xs font-medium transition-all duration-[var(--duration-fast)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.45)] active:translate-y-0 active:scale-95 cursor-pointer"
+                  className="px-4 py-2 bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary rounded-[var(--radius-pill)] text-sm font-medium transition-all duration-[var(--duration-fast)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.45)] active:translate-y-0 active:scale-95 cursor-pointer"
                 >
                   {vibe}
                 </button>

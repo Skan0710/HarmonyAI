@@ -61,9 +61,9 @@ const Noise: React.FC<NoiseProps> = ({ patternRefreshInterval = 4, patternAlpha 
  */
 export const AmbientBackground: React.FC = () => (
   <div className="fixed inset-0 -z-10 overflow-hidden bg-surface-0">
-    <div className="absolute inset-0 bg-[radial-gradient(circle_640px_at_15%_-10%,rgba(255,106,67,0.16),transparent)]" />
-    <div className="absolute inset-0 bg-[radial-gradient(circle_580px_at_90%_15%,rgba(217,161,91,0.12),transparent)]" />
-    <div className="absolute inset-0 bg-[radial-gradient(circle_720px_at_50%_115%,rgba(255,106,67,0.08),transparent)]" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_640px_at_15%_-10%,rgba(255,106,67,0.18),transparent)]" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_680px_at_88%_10%,rgba(245,206,148,0.22),transparent)]" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_720px_at_50%_115%,rgba(255,106,67,0.1),transparent)]" />
     <Noise />
   </div>
 );

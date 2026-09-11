@@ -96,7 +96,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
 
       <Wordmark className="md:hidden text-base shrink-0" />
 
-      <div ref={searchContainerRef} className="relative flex-1 max-w-lg mx-auto md:ml-6 md:mr-0">
+      <div ref={searchContainerRef} className="relative flex-1 max-w-lg mx-auto">
         <form onSubmit={handleSearchSubmit} className="relative">
           <Search
             size={15}
