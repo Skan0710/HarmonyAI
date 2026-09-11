@@ -61,15 +61,9 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// --- Stricter Rate Limiting for Auth Endpoints ---
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many authentication attempts, please try again later.' },
-});
-app.use('/api/auth', authLimiter);
+// Auth endpoints get their own per-route limiters (see authRoutes.ts) — register
+// and login are split so a legitimate login-heavy session can't eat into the
+// budget an attacker would need for mass signup, or vice versa.
 
 // Routes
 app.get('/', (req: Request, res: Response) => {

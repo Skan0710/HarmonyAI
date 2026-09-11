@@ -31,7 +31,7 @@ export const protect = async (
     const decoded = verifyToken(token) as { id: string };
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, name, email, profile_picture, created_at, updated_at')
+      .select('id, name, email, profile_picture, role, created_at, updated_at')
       .eq('id', decoded.id)
       .maybeSingle();
 
@@ -49,6 +49,7 @@ export const protect = async (
       name: user.name,
       email: user.email,
       profilePicture: user.profile_picture,
+      role: user.role || 'user',
       createdAt: user.created_at ? new Date(user.created_at) : new Date(),
       updatedAt: user.updated_at ? new Date(user.updated_at) : new Date(),
     } as any;
@@ -76,7 +77,7 @@ export const optionalAuth = async (
     const decoded = verifyToken(token) as { id: string };
     const { data: user } = await supabase
       .from('users')
-      .select('id, name, email, profile_picture, created_at, updated_at')
+      .select('id, name, email, profile_picture, role, created_at, updated_at')
       .eq('id', decoded.id)
       .maybeSingle();
 
@@ -87,12 +88,29 @@ export const optionalAuth = async (
         name: user.name,
         email: user.email,
         profilePicture: user.profile_picture,
+        role: user.role || 'user',
         createdAt: user.created_at ? new Date(user.created_at) : new Date(),
         updatedAt: user.updated_at ? new Date(user.updated_at) : new Date(),
       } as any;
     }
   } catch {
     // Ignore invalid tokens in optionalAuth
+  }
+  next();
+};
+
+/**
+ * Must run after `protect`. Rejects any authenticated user whose role isn't
+ * 'admin' — without this, routes gated only by `protect` are reachable by
+ * any registered account, not just admins.
+ */
+export const requireAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  if (req.user?.role !== 'admin') {
+    res.status(403).json({
+      success: false,
+      message: 'Admin access required.',
+    });
+    return;
   }
   next();
 };

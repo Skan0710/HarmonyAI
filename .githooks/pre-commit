@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Blocks commits containing likely secrets. Runs gitleaks if installed
+# (https://github.com/gitleaks/gitleaks), otherwise falls back to a
+# basic pattern scan of staged changes.
+#
+# Enable with: git config core.hooksPath .githooks
+
+set -euo pipefail
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact -v
+  exit $?
+fi
+
+echo "[pre-commit] gitleaks not found — falling back to basic secret pattern scan."
+echo "[pre-commit] Install gitleaks for full coverage: https://github.com/gitleaks/gitleaks"
+
+PATTERN='(AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|mongodb(\+srv)?://[^:]+:[^@]+@)'
+
+if git diff --cached -U0 -- . ':(exclude)*.lock' ':(exclude)package-lock.json' | grep -EnI "$PATTERN"; then
+  echo ""
+  echo "[pre-commit] BLOCKED: staged changes look like they contain a secret (see above)."
+  echo "[pre-commit] Remove it, or use 'git commit --no-verify' if this is a confirmed false positive."
+  exit 1
+fi
+
+exit 0

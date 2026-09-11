@@ -8,6 +8,7 @@ export interface IUser extends Document {
   email: string;
   password?: string;
   profilePicture?: string;
+  role?: 'user' | 'admin';
   likedSongs: Types.ObjectId[];
   favoriteArtists: Types.ObjectId[];
   favoriteGenres: Types.ObjectId[];

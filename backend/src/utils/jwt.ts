@@ -2,16 +2,13 @@ import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 
 /**
  * Retrieve the JWT secret from environment variables.
- * Throws if not configured in production to prevent use of weak secrets.
+ * Always required — no hardcoded fallback, since a fallback baked into
+ * source is just as forgeable as never having a secret at all.
  */
 function getJwtSecret(): Secret {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('JWT_SECRET environment variable is required in production');
-    }
-    console.warn('[Security] JWT_SECRET not set. Using development fallback — do NOT deploy without JWT_SECRET.');
-    return 'dev_fallback_secret_do_not_use_in_production';
+    throw new Error('JWT_SECRET environment variable is required. Set it in your .env file.');
   }
   return secret;
 }

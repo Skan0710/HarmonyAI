@@ -72,7 +72,9 @@ export const unifiedDiscovery = controllerWrapper(async (req: Request, res: Resp
       `Invalid search mode '${rawMode}'. Supported modes: ${ALLOWED_DISCOVERY_MODES.join(', ')}`
     );
   }
-  const mode = rawMode as DiscoveryMode;
+  // Semantic/hybrid/recommendation modes call out to the Gemini embedding API —
+  // only allow them once req.user exists, so anonymous callers can't script free Gemini calls.
+  const mode: DiscoveryMode = req.user ? (rawMode as DiscoveryMode) : 'keyword';
 
   const q = extractQueryParams(req, { limit: 'int', page: 'int' });
   const page = !isNaN(q.page) && q.page > 0 ? q.page : 1;

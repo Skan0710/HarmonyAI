@@ -41,6 +41,7 @@ import {
   getEngagementMetrics,
 } from '../controllers/recommendationPerformanceController.js';
 import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
+import { assistantAiLimiter, dailyAiLimiter } from '../middlewares/sharedAiLimiters.js';
 
 const router = Router();
 
@@ -92,8 +93,9 @@ router.post('/smart-autoplay', protect, getSmartAutoplayCandidates);
 // GET /api/recommendations/session?limit=10 (Protected JWT)
 router.get('/session', protect, getSessionRecommendations);
 
-// POST /api/recommendations/assistant (Optional Auth - Natural-Language Context Assistant)
-router.post('/assistant', optionalAuth, processContextualAssistantRequest);
+// POST /api/recommendations/assistant (Protected JWT - Natural-Language Context Assistant)
+// Calls the Gemini LLM — requires auth and shares the assistant AI quota with /api/assistant/chat.
+router.post('/assistant', protect, assistantAiLimiter, dailyAiLimiter, processContextualAssistantRequest);
 
 // GET /api/recommendations/contextual?mood=...&activity=...&energy=...&duration=... (Optional Auth)
 router.get('/contextual', optionalAuth, getContextualRecommendations);

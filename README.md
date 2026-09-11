@@ -167,6 +167,7 @@ HarmonyAI/
 ```bash
 git clone https://github.com/Skan0710/HarmonyAI.git
 cd HarmonyAI
+git config core.hooksPath .githooks  # enables the pre-commit secret scan
 ```
 
 ### 2. Environment Configuration

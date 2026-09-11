@@ -22,7 +22,7 @@ export const evaluateRecommendationStrategy = controllerWrapper(async (req: Requ
 
   const validStrategies = ['content', 'collaborative', 'hybrid'];
   const strategy = validStrategies.includes(q.strategy) ? q.strategy : 'hybrid';
-  const k = isNaN(q.k) || q.k < 1 ? 10 : q.k;
+  const k = isNaN(q.k) || q.k < 1 ? 10 : Math.min(50, q.k);
 
   // Security: always use the authenticated user's ID; never accept userId from query params
   // to prevent one user from evaluating another user's recommendations

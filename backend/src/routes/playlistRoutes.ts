@@ -10,12 +10,16 @@ import {
   generateAIPlaylistEndpoint,
 } from '../controllers/playlistController.js';
 import { protect, optionalAuth } from '../middlewares/authMiddleware.js';
+import { perUserAiLimiter } from '../middlewares/aiRateLimiter.js';
 
 const router = Router();
 
 // AI Playlist Generation Endpoints (Authenticated, In-memory generation pipeline)
-router.post('/ai-generate', protect, generateAIPlaylistEndpoint);
-router.post('/generate', protect, generateAIPlaylistEndpoint);
+// Calls Gemini per request — generous ceiling for real use, pointless to script past it.
+const hourlyPlaylistLimiter = perUserAiLimiter(10, 60 * 60 * 1000);
+const dailyPlaylistLimiter = perUserAiLimiter(30, 24 * 60 * 60 * 1000);
+router.post('/ai-generate', protect, hourlyPlaylistLimiter, dailyPlaylistLimiter, generateAIPlaylistEndpoint);
+router.post('/generate', protect, hourlyPlaylistLimiter, dailyPlaylistLimiter, generateAIPlaylistEndpoint);
 
 // Protected & Public Playlist Routes
 router.post('/', protect, createPlaylist);

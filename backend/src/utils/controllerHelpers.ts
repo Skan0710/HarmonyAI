@@ -23,6 +23,15 @@ export const controllerWrapper = (
       return;
     }
 
+    // Errors with an explicit statusCode attached (e.g. AuthService business errors)
+    if (typeof error.statusCode === 'number') {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+      return;
+    }
+
     // Mongoose validation / cast errors
     if (error.name === 'ValidationError' || error.name === 'CastError') {
       res.status(400).json({

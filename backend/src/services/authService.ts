@@ -25,6 +25,22 @@ export interface AuthResult {
   token: string;
 }
 
+interface FailedAttemptRecord {
+  count: number;
+  windowStart: number;
+  lockedUntil?: number;
+}
+
+const FAILED_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const FAILED_ATTEMPT_LIMIT = 10;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+
+// Per-account failed-login tracking, independent of IP — an attacker
+// distributing attempts across many IPs against one email is not slowed by
+// the IP-based route limiter alone. In-memory is sufficient here since this
+// process is the sole auth authority (no distributed session store).
+const failedAttemptsByEmail = new Map<string, FailedAttemptRecord>();
+
 export class AuthService {
   static async register(input: RegisterInput): Promise<AuthResult> {
     const { name, email, password, profilePicture } = input;
@@ -79,6 +95,14 @@ export class AuthService {
     const { email, password } = input;
     const normalizedEmail = email.toLowerCase().trim();
 
+    const now = Date.now();
+    const existingRecord = failedAttemptsByEmail.get(normalizedEmail);
+    if (existingRecord?.lockedUntil && existingRecord.lockedUntil > now) {
+      const authErr = new Error('Too many failed login attempts for this account. Please try again later.');
+      (authErr as Error & { statusCode?: number }).statusCode = 429;
+      throw authErr;
+    }
+
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
@@ -86,6 +110,7 @@ export class AuthService {
       .maybeSingle();
 
     if (error || !user || !password) {
+      this.registerFailedLoginAttempt(normalizedEmail, now);
       const authErr = new Error('Invalid email or password');
       (authErr as Error & { statusCode?: number }).statusCode = 401;
       throw authErr;
@@ -94,11 +119,13 @@ export class AuthService {
     // Compare password
     const isMatch = user.password_hash ? await bcrypt.compare(password, user.password_hash) : false;
     if (!isMatch) {
+      this.registerFailedLoginAttempt(normalizedEmail, now);
       const authErr = new Error('Invalid email or password');
       (authErr as Error & { statusCode?: number }).statusCode = 401;
       throw authErr;
     }
 
+    failedAttemptsByEmail.delete(normalizedEmail);
     const token = generateToken(user.id);
 
     return {
@@ -111,5 +138,19 @@ export class AuthService {
       },
       token,
     };
+  }
+
+  private static registerFailedLoginAttempt(normalizedEmail: string, now: number): void {
+    const record = failedAttemptsByEmail.get(normalizedEmail);
+
+    if (!record || now - record.windowStart > FAILED_ATTEMPT_WINDOW_MS) {
+      failedAttemptsByEmail.set(normalizedEmail, { count: 1, windowStart: now });
+      return;
+    }
+
+    record.count += 1;
+    if (record.count >= FAILED_ATTEMPT_LIMIT) {
+      record.lockedUntil = now + LOCKOUT_DURATION_MS;
+    }
   }
 }
