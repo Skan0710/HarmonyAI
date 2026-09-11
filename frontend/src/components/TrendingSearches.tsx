@@ -29,7 +29,7 @@ export const TrendingSearches: React.FC<TrendingSearchesProps> = ({ onSelectTren
           <button
             key={term}
             onClick={() => onSelectTrending(term)}
-            className="px-3 py-1.5 bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary rounded-[var(--radius-pill)] text-xs font-medium transition-colors cursor-pointer"
+            className="px-3 py-1.5 bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary rounded-[var(--radius-pill)] text-xs font-medium transition-all duration-[var(--duration-fast)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.45)] active:translate-y-0 active:scale-95 cursor-pointer"
           >
             {term}
           </button>

@@ -221,7 +221,7 @@ export const AssistantPage: React.FC = () => {
             type="button"
             onClick={() => handleExampleClick(example)}
             disabled={isLoading}
-            className="text-xs whitespace-nowrap px-3 py-1.5 rounded-[var(--radius-pill)] bg-surface-1 hover:bg-surface-2 border border-border-default text-text-secondary hover:text-text-primary transition-colors cursor-pointer disabled:opacity-50"
+            className="text-xs whitespace-nowrap px-3 py-1.5 rounded-[var(--radius-pill)] bg-surface-1 hover:bg-surface-2 border border-border-default text-text-secondary hover:text-text-primary transition-all duration-[var(--duration-fast)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.45)] active:translate-y-0 active:scale-95 cursor-pointer disabled:opacity-50"
           >
             ✨ {example}
           </button>

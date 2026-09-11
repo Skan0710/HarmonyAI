@@ -5,13 +5,15 @@ import { Sidebar } from './Sidebar';
 import { MiniPlayer } from './MiniPlayer';
 import { QueueDrawer } from './QueueDrawer';
 import { FullPlayer } from './FullPlayer';
+import { AmbientBackground } from './ui/AmbientBackground';
 
 export const MainLayout: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [fullPlayerOpen, setFullPlayerOpen] = useState(false);
 
   return (
-    <div className="flex flex-col h-screen bg-surface-0 text-text-primary">
+    <div className="flex flex-col h-screen text-text-primary">
+      <AmbientBackground />
       <Navbar onMenuClick={() => setMobileNavOpen(true)} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
