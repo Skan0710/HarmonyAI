@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { History, TrendingUp, TrendingDown, Sparkles } from 'lucide-react';
 import { fetchMusicDnaEvolutionOverviewApi, type MusicDnaEvolutionOverview } from '../services/musicIntelligenceService';
 import { Meter } from '../components/ui/Meter';
+import { PageHero } from '../components/PageHero';
 
 const formatName = (name: string): string => name.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -78,19 +79,14 @@ export const TasteEvolutionPage: React.FC = () => {
 
   return (
     <div className="pb-16">
-      <section className="border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-8">
-        <p className="text-xs font-medium text-text-tertiary uppercase tracking-[0.14em]">Taste evolution</p>
-        <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-text-primary leading-snug mt-3 max-w-2xl">
-          {overview.recentChanges.summary}
-        </h1>
-
-        <div className="grid sm:grid-cols-3 gap-6 max-w-xl mt-8">
+      <PageHero eyebrow="Taste evolution" title={overview.recentChanges.summary}>
+        <div className="grid sm:grid-cols-3 gap-6 mt-8">
           <Meter label="Stability" value={overview.stabilityMetrics.tasteStabilityScore} color="var(--success)" />
           <Meter label="Volatility" value={overview.stabilityMetrics.tasteVolatilityScore} color="var(--danger)" />
           <Meter label="Discovery tendency" value={overview.stabilityMetrics.discoveryTendencyScore} color="var(--gold)" />
         </div>
-        <p className="text-sm text-text-secondary mt-5 max-w-xl">{overview.stabilityMetrics.explanation}</p>
-      </section>
+        <p className="text-sm text-text-secondary mt-5">{overview.stabilityMetrics.explanation}</p>
+      </PageHero>
 
       {events.length > 0 && (
         <div className="px-5 sm:px-8 lg:px-12 pt-9">

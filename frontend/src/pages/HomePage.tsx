@@ -134,7 +134,7 @@ export const HomePage: React.FC = () => {
     <div className="pb-16">
       {/* Hero — personalized statement, not a marketing banner */}
       <section className="relative overflow-hidden border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-6">
-        <div className="relative max-w-2xl">
+        <div className="relative max-w-2xl mx-auto">
           <p className="text-xs font-medium text-text-tertiary uppercase tracking-[0.14em]">
             {getTimeGreeting()}, {user?.name?.split(' ')[0] || 'there'}
           </p>

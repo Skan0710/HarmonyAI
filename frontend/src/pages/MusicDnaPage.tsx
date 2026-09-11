@@ -5,6 +5,7 @@ import { ThreeErrorBoundary } from '../components/ThreeErrorBoundary';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { hasWebGL } from '../utils/webgl';
 import { Meter } from '../components/ui/Meter';
+import { PageHero } from '../components/PageHero';
 import type { DnaNode, DnaNodeCategory } from '../components/MusicDnaConstellation';
 
 const MusicDnaConstellation = lazy(() =>
@@ -100,17 +101,17 @@ export const MusicDnaPage: React.FC = () => {
 
   return (
     <div className="pb-16">
-      <section className="border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-6">
-        <p className="text-xs font-medium text-text-tertiary uppercase tracking-[0.14em]">Music DNA</p>
-        <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-text-primary leading-snug mt-3">
-          {formatName(profile.listeningBehavior.listenerArchetype)}
-        </h1>
-        <p className="text-sm text-text-secondary mt-2 max-w-xl">
-          {Math.round(profile.confidenceScore * 100)}% confidence, built from your listening history. Every point in
-          the constellation below is a genre, artist, or mood — pulled closer to the core the more it defines your
-          sound.
-        </p>
-      </section>
+      <PageHero
+        eyebrow="Music DNA"
+        title={formatName(profile.listeningBehavior.listenerArchetype)}
+        description={
+          <>
+            {Math.round(profile.confidenceScore * 100)}% confidence, built from your listening history. Every point in
+            the constellation below is a genre, artist, or mood — pulled closer to the core the more it defines your
+            sound.
+          </>
+        }
+      />
 
       <div className="px-5 sm:px-8 lg:px-12 pt-8 grid lg:grid-cols-[1fr_320px] gap-8">
         <div className="relative aspect-[4/3] sm:aspect-[16/10] rounded-[var(--radius-lg)] bg-surface-1 overflow-hidden">

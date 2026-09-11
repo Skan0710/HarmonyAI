@@ -15,6 +15,7 @@ import { PlaylistDetailPage } from './pages/PlaylistDetailPage';
 import { AIPlaylistGeneratorPage } from './pages/AIPlaylistGeneratorPage';
 import { AssistantPage } from './pages/AssistantPage';
 import { PreferencesPage } from './pages/PreferencesPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { LikedSongsPage } from './pages/LikedSongsPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { SongDetailPage } from './pages/SongDetailPage';
@@ -66,6 +67,7 @@ function App() {
             <Route path="/playlists/:id" element={<PlaylistDetailPage />} />
             <Route path="/ai-playlist" element={<AIPlaylistGeneratorPage />} />
             <Route path="/preferences" element={<PreferencesPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/library" element={<MusicLibraryPage />} />
             <Route path="/liked-songs" element={<LikedSongsPage />} />
             <Route path="/history" element={<HistoryPage />} />

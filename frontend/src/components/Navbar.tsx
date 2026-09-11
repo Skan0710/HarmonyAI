@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, Search, LogOut, Command } from 'lucide-react';
 import { searchGlobal } from '../services/searchService';
 import type { GroupedSearchResults } from '../services/searchService';
@@ -17,6 +17,8 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSearchPage = location.pathname === '/search';
   const addSearch = useRecentSearchesStore((state) => state.addSearch);
   const openCommandPalette = useCommandPaletteStore((state) => state.open);
 
@@ -96,38 +98,42 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         <Menu size={20} />
       </button>
 
-      <Wordmark className="md:hidden text-base shrink-0" />
+      <Wordmark className="text-lg shrink-0" />
 
-      <div ref={searchContainerRef} className="relative flex-1 max-w-lg mx-auto">
-        <form onSubmit={handleSearchSubmit} className="relative">
-          <Search
-            size={15}
-            strokeWidth={1.75}
-            className="text-text-tertiary absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-          />
-          <input
-            type="text"
-            value={navSearch}
-            onChange={(e) => setNavSearch(e.target.value)}
-            onFocus={() => setIsFocused(true)}
-            placeholder="Search songs, artists, albums, or a mood…"
-            className="w-full bg-surface-2 text-text-primary placeholder-text-tertiary pl-10 pr-4 py-2 rounded-[var(--radius-pill)] text-sm border border-transparent focus:outline-none focus:border-border-strong transition-colors duration-[var(--duration-fast)]"
-          />
-          {loading && (
-            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+      {isSearchPage ? (
+        <div className="flex-1" />
+      ) : (
+        <div ref={searchContainerRef} className="relative flex-1 max-w-lg mx-auto">
+          <form onSubmit={handleSearchSubmit} className="relative">
+            <Search
+              size={15}
+              strokeWidth={1.75}
+              className="text-text-tertiary absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+            />
+            <input
+              type="text"
+              value={navSearch}
+              onChange={(e) => setNavSearch(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              placeholder="Search songs, artists, albums, or a mood…"
+              className="w-full bg-surface-2 text-text-primary placeholder-text-tertiary pl-10 pr-4 py-2 rounded-[var(--radius-pill)] text-sm border border-transparent focus:outline-none focus:border-border-strong transition-colors duration-[var(--duration-fast)]"
+            />
+            {loading && (
+              <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+            )}
+          </form>
+
+          {isFocused && (
+            <SearchSuggestionsDropdown
+              query={navSearch}
+              suggestions={suggestions}
+              loading={loading}
+              onSelectSearch={handleSelectRecent}
+              onClose={() => setIsFocused(false)}
+            />
           )}
-        </form>
-
-        {isFocused && (
-          <SearchSuggestionsDropdown
-            query={navSearch}
-            suggestions={suggestions}
-            loading={loading}
-            onSelectSearch={handleSelectRecent}
-            onClose={() => setIsFocused(false)}
-          />
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-3 text-sm shrink-0">
         <button
@@ -144,12 +150,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
 
         {isAuthenticated && user ? (
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2">
+            <Link
+              to="/profile"
+              className="hidden sm:flex items-center gap-2 px-2 py-1 -mx-2 -my-1 rounded-[var(--radius-pill)] hover:bg-surface-2 transition-colors cursor-pointer"
+              title="View profile"
+            >
               <div className="w-7 h-7 rounded-full bg-accent-wash text-accent text-xs font-semibold flex items-center justify-center">
                 {getInitials(user.name)}
               </div>
               <span className="text-text-secondary font-medium text-xs">{user.name}</span>
-            </div>
+            </Link>
             <button
               onClick={handleLogout}
               className="p-2 text-text-tertiary hover:text-danger transition-colors cursor-pointer"

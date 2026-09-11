@@ -43,7 +43,7 @@ export const RegisterPage: React.FC = () => {
           <AudioLines size={22} strokeWidth={1.75} />
         </div>
         <h1 className="font-display italic text-3xl text-text-primary tracking-tight">
-          harmony<span className="text-accent not-italic">ai</span>
+          Harmony<span className="text-accent not-italic">AI</span>
         </h1>
         <p className="text-xs text-text-tertiary mt-2">Create your personalized music account</p>
       </div>

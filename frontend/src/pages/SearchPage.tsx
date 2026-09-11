@@ -17,6 +17,7 @@ import { MusicGrid } from '../components/MusicGrid';
 import { ArtistCard } from '../components/ArtistCard';
 import { AlbumCard } from '../components/AlbumCard';
 import { TrendingSearches } from '../components/TrendingSearches';
+import { PageHero } from '../components/PageHero';
 import { SmoothInput } from '../components/ui/SmoothInput';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useRecentSearchesStore } from '../store/useRecentSearchesStore';
@@ -239,13 +240,7 @@ export const SearchPage: React.FC = () => {
 
   return (
     <div className="pb-16">
-      <section className="border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-8">
-        <div className="max-w-2xl mx-auto">
-        <p className="text-xs font-medium text-text-tertiary uppercase tracking-[0.14em]">Search</p>
-        <h1 className="font-display text-2xl sm:text-3xl text-text-primary leading-snug mt-3">
-          What are you in the mood for?
-        </h1>
-
+      <PageHero eyebrow="Search" title="What are you in the mood for?">
         <div ref={containerRef} className="relative mt-6">
           <div className="relative flex items-center">
             <SearchIcon size={17} className="absolute left-4 text-text-tertiary pointer-events-none z-10" strokeWidth={1.75} />
@@ -331,8 +326,7 @@ export const SearchPage: React.FC = () => {
             ))}
           </div>
         </div>
-        </div>
-      </section>
+      </PageHero>
 
       <div className="px-5 sm:px-8 lg:px-12 pt-9 space-y-11">
         {loading && !discoveryData && (

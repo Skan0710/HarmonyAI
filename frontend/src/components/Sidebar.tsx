@@ -1,7 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Wordmark } from './Wordmark';
 import { LineHoverText } from './ui/line-hover-link';
 import {
   Home,
@@ -90,21 +89,21 @@ const SidebarContent: React.FC<{ onNavigate?: () => void }> = ({ onNavigate }) =
                   to={to}
                   end={end}
                   className={({ isActive }) =>
-                    `group relative flex items-center gap-3 pl-3 pr-2.5 py-2 text-sm transition-colors duration-[var(--duration-fast)] ${
+                    `group relative flex items-center gap-3.5 pl-3.5 pr-3 py-2.5 rounded-[var(--radius-sm)] text-[15px] transition-colors duration-[var(--duration-fast)] ${
                       isActive
-                        ? 'text-text-primary'
-                        : 'text-text-secondary hover:text-text-primary'
+                        ? 'bg-accent-wash text-text-primary'
+                        : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
                       <span
-                        className={`absolute left-0 top-1 bottom-1 w-[2px] rounded-full transition-colors duration-[var(--duration-fast)] ${
+                        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full transition-colors duration-[var(--duration-fast)] ${
                           isActive ? 'bg-accent' : 'bg-transparent'
                         }`}
                       />
-                      <Icon size={16} strokeWidth={1.75} />
+                      <Icon size={18} strokeWidth={1.75} />
                       <span className="flex-1 min-w-0">
                         <LineHoverText variant="slide" className="font-medium">
                           {label}
@@ -128,12 +127,12 @@ const SidebarContent: React.FC<{ onNavigate?: () => void }> = ({ onNavigate }) =
       <NavLink
         to="/preferences"
         className={({ isActive }) =>
-          `flex items-center gap-3 pl-3 pr-2.5 py-2 text-sm font-medium rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-fast)] ${
-            isActive ? 'text-text-primary bg-surface-2' : 'text-text-secondary hover:text-text-primary'
+          `flex items-center gap-3.5 pl-3.5 pr-3 py-2.5 text-[15px] font-medium rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-fast)] ${
+            isActive ? 'text-text-primary bg-accent-wash' : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'
           }`
         }
       >
-        <SlidersHorizontal size={16} strokeWidth={1.75} />
+        <SlidersHorizontal size={18} strokeWidth={1.75} />
         Preferences
       </NavLink>
     </div>
@@ -143,10 +142,7 @@ const SidebarContent: React.FC<{ onNavigate?: () => void }> = ({ onNavigate }) =
 export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose }) => {
   return (
     <>
-      <aside className="hidden md:flex w-60 shrink-0 flex-col bg-surface-1/85 backdrop-blur-xl border-r border-border-subtle">
-        <div className="px-6 pt-7 pb-6">
-          <Wordmark />
-        </div>
+      <aside className="hidden md:flex w-60 shrink-0 flex-col bg-surface-1 bg-[radial-gradient(circle_420px_at_15%_-5%,rgba(255,106,67,0.16),transparent),radial-gradient(circle_360px_at_100%_100%,rgba(217,161,91,0.12),transparent)] border-r border-border-subtle pt-5">
         <SidebarContent />
       </aside>
 
@@ -166,10 +162,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose })
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-              className="md:hidden fixed top-0 left-0 bottom-0 z-50 w-72 flex flex-col bg-surface-1/85 backdrop-blur-xl border-r border-border-subtle"
+              className="md:hidden fixed top-0 left-0 bottom-0 z-50 w-72 flex flex-col bg-surface-1 bg-[radial-gradient(circle_420px_at_15%_-5%,rgba(255,106,67,0.16),transparent),radial-gradient(circle_360px_at_100%_100%,rgba(217,161,91,0.12),transparent)] border-r border-border-subtle"
             >
               <div className="px-6 pt-6 pb-6 flex items-center justify-between">
-                <Wordmark onClick={onClose} />
+                <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-tertiary">Navigation</p>
                 <button
                   onClick={onClose}
                   aria-label="Close navigation"

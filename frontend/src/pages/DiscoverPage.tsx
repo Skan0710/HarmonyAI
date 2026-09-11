@@ -10,6 +10,7 @@ import {
 import { DiscoveryDial } from '../components/DiscoveryDial';
 import { MediaCarousel } from '../components/MediaCarousel';
 import { MoodActivityDiscoverySection } from '../components/MoodActivityDiscoverySection';
+import { PageHero } from '../components/PageHero';
 import { usePlayerStore } from '../store/usePlayerStore';
 
 const SIGNAL_BY_STRATEGY: Record<string, { icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>; label: string }[]> = {
@@ -69,15 +70,8 @@ export const DiscoverPage: React.FC = () => {
 
   return (
     <div className="pb-16">
-      <section className="border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-8">
-        <div className="max-w-2xl">
-          <p className="text-xs font-medium text-text-tertiary uppercase tracking-[0.14em]">Discover</p>
-          <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-text-primary leading-snug mt-3">
-            Where should your music take you?
-          </h1>
-        </div>
-
-        <div className="max-w-xl mt-8">
+      <PageHero eyebrow="Discover" title="Where should your music take you?">
+        <div className="mt-8">
           {!loadingModes && Object.keys(modes).length > 0 && (
             <DiscoveryDial modes={modes} selected={selectedMode} onSelect={setSelectedMode} />
           )}
@@ -91,7 +85,7 @@ export const DiscoverPage: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
-              className="mt-6 max-w-xl"
+              className="mt-6"
             >
               <p className="text-sm text-text-secondary leading-relaxed">{activeMode.description}</p>
               <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -108,7 +102,7 @@ export const DiscoverPage: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </section>
+      </PageHero>
 
       <div className="px-5 sm:px-8 lg:px-12 pt-9 space-y-11">
         <MediaCarousel

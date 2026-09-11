@@ -6,6 +6,7 @@ import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { hasWebGL } from '../utils/webgl';
 import { Meter } from '../components/ui/Meter';
 import { AnimatedLink } from '../components/ui/AnimatedLink';
+import { PageHero } from '../components/PageHero';
 
 const MusicTwinOrganism = lazy(() =>
   import('../components/MusicTwinOrganism').then((m) => ({ default: m.MusicTwinOrganism }))
@@ -56,15 +57,12 @@ export const MusicTwinPage: React.FC = () => {
 
   return (
     <div className="pb-16">
-      <section className="border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-6">
-        <p className="text-xs font-medium text-text-tertiary uppercase tracking-[0.14em]">Meet your Music Twin</p>
-        <h1 className="font-display italic text-2xl sm:text-3xl lg:text-4xl text-text-primary leading-snug mt-3">
-          {twin.currentMusicalIdentity.personaName}
-        </h1>
-        {twin.currentMusicalIdentity.tagline && (
-          <p className="text-sm text-text-secondary mt-2 max-w-xl">{twin.currentMusicalIdentity.tagline}</p>
-        )}
-      </section>
+      <PageHero
+        eyebrow="Meet your Music Twin"
+        title={twin.currentMusicalIdentity.personaName}
+        titleClassName="italic"
+        description={twin.currentMusicalIdentity.tagline || undefined}
+      />
 
       <div className="px-5 sm:px-8 lg:px-12 pt-8 grid lg:grid-cols-[1fr_320px] gap-8">
         <div className="relative aspect-[4/3] sm:aspect-[16/10] rounded-[var(--radius-lg)] bg-surface-1 overflow-hidden">
