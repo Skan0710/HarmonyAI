@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   TasteBoundaryDetectionService,
   TasteBoundaryProfile,
@@ -22,7 +21,7 @@ export async function runTasteBoundaryDetectionTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 1: Narrow taste profile (tight boundary centered around single core genre)');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const narrowTwin: any = {
       userId,
@@ -78,7 +77,7 @@ export async function runTasteBoundaryDetectionTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 2: Diverse taste profile (wide boundary spanning multiple distinct genre clusters)');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const diverseTwin: any = {
       userId,
@@ -139,7 +138,7 @@ export async function runTasteBoundaryDetectionTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 3: Highly exploratory user (frontiers and cross-genre expansion)');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const exploratoryTwin: any = {
       userId,
@@ -185,7 +184,7 @@ export async function runTasteBoundaryDetectionTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 4: Highly comfort-oriented user (focuses on familiar underexplored catalog)');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const comfortTwin: any = {
       userId,
@@ -232,7 +231,7 @@ export async function runTasteBoundaryDetectionTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 5: Insufficient user history (cold start safe fallback)');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const result = TasteBoundaryDetectionService.detectTasteBoundaries({
       userId,
@@ -259,7 +258,7 @@ export async function runTasteBoundaryDetectionTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 6: getUserTasteBoundaries asynchronous integration');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const originalDna = UnifiedMusicDNAService.getOrGenerateProfile;
     const originalTwin = PersonalMusicTwinService.getOrGenerateTwin;

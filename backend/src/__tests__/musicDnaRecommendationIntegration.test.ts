@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   HybridRankingPipeline,
   HybridRankedResult,
@@ -59,7 +58,7 @@ export async function runMusicDnaRecommendationIntegrationTests() {
   });
 
   const createMockMusicDNA = (overrides?: Partial<UnifiedMusicDNA>): UnifiedMusicDNA => ({
-    userId: new Types.ObjectId().toString(),
+    userId: crypto.randomUUID().toString(),
     dnaVersion: '1.0.0',
     confidenceScore: 0.9,
     lastRefreshedAt: new Date(),
@@ -145,7 +144,7 @@ export async function runMusicDnaRecommendationIntegrationTests() {
       ],
     },
     listeningBehavior: {
-      userId: new Types.ObjectId().toString(),
+      userId: crypto.randomUUID().toString(),
       repeatListeningTendency: 0.7,
       discoveryTendency: 0.4,
       skipTendency: 0.1,
@@ -557,7 +556,7 @@ export async function runMusicDnaRecommendationIntegrationTests() {
     // =========================================================================
     {
       console.log('\n--- Test 7: Full Adaptive Recommendation Ranking Pipeline Integration ---');
-      const userId = new Types.ObjectId().toString();
+      const userId = crypto.randomUUID().toString();
       const musicDna = createMockMusicDNA({
         tendencies: {
           discoveryTendency: 0.4,

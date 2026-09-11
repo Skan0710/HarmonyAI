@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import { SessionCandidateGenerationService, SessionCandidateResult } from '../services/sessionCandidateGenerationService.js';
 import { TemporarySessionProfile } from '../services/sessionProfileService.js';
 
@@ -21,7 +20,7 @@ export function runSessionCandidateGenerationServiceTests() {
     };
 
     const candidateSongSynthwave = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Synthwave Hit',
       genre: { name: 'Synthwave' },
       artist: { _id: 'artist_a', name: 'Artist A' },
@@ -30,7 +29,7 @@ export function runSessionCandidateGenerationServiceTests() {
     };
 
     const candidateSongAcoustic = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Slow Acoustic',
       genre: { name: 'Acoustic' },
       artist: { _id: 'artist_b', name: 'Artist B' },
@@ -57,14 +56,14 @@ export function runSessionCandidateGenerationServiceTests() {
   {
     const candidatesInput: SessionCandidateResult[] = [
       {
-        song: { _id: new Types.ObjectId(), title: 'Track 1', artist: 'Artist X' } as any,
+        song: { _id: crypto.randomUUID(), title: 'Track 1', artist: 'Artist X' } as any,
         sessionRelevanceScore: 0.92,
         contentSimilarityScore: 0.9,
         sessionProfileAffinity: 0.94,
         source: 'session_content_similarity',
       },
       {
-        song: { _id: new Types.ObjectId(), title: 'Track 2', artist: 'Artist Y' } as any,
+        song: { _id: crypto.randomUUID(), title: 'Track 2', artist: 'Artist Y' } as any,
         sessionRelevanceScore: 0.85,
         contentSimilarityScore: 0.8,
         sessionProfileAffinity: 0.9,

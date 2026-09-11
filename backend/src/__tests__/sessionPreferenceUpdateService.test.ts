@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { ACTION_WEIGHT_MULTIPLIERS, SessionPreferenceUpdateService } from '../services/sessionPreferenceUpdateService.js';
-import { SessionActionType } from '../models/ListeningSession.js';
+import { SessionActionType } from '../services/listeningSessionService.js';
 
 export function runSessionPreferenceUpdateServiceTests() {
   console.log('[Session Preference Update Service Test Suite] Starting tests...');

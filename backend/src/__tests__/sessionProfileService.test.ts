@@ -1,7 +1,6 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import { SessionProfileService } from '../services/sessionProfileService.js';
-import { IListeningSession } from '../models/ListeningSession.js';
+import { IListeningSession } from '../services/listeningSessionService.js';
 
 export function runSessionProfileServiceTests() {
   console.log('[Session Profile Service Test Suite] Starting tests...');

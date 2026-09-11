@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   OutsideComfortZoneRecommendationService,
   OutsideComfortZoneRankingInputs,
@@ -17,7 +16,7 @@ import { HybridRecommendationService } from '../services/hybridRecommendationSer
 export async function runOutsideComfortZoneRecommendationTests() {
   console.log('[Outside-Comfort-Zone Recommendations Test Suite] Starting tests...');
 
-  const mockUserId = new Types.ObjectId().toString();
+  const mockUserId = crypto.randomUUID().toString();
 
   // Mock Music DNA for a Synthwave & Ambient listener
   const mockMusicDna = {
@@ -190,10 +189,10 @@ export async function runOutsideComfortZoneRecommendationTests() {
   };
 
   // Mock Candidate pool
-  const songIdCore = new Types.ObjectId().toString();
-  const songIdAdjacent1 = new Types.ObjectId().toString();
-  const songIdAdjacent2 = new Types.ObjectId().toString();
-  const songIdUnrelated = new Types.ObjectId().toString();
+  const songIdCore = crypto.randomUUID().toString();
+  const songIdAdjacent1 = crypto.randomUUID().toString();
+  const songIdAdjacent2 = crypto.randomUUID().toString();
+  const songIdUnrelated = crypto.randomUUID().toString();
 
   const mockCandidates: HybridCandidate[] = [
     // 1. Core familiar track - already in user listening history
@@ -396,9 +395,9 @@ export async function runOutsideComfortZoneRecommendationTests() {
   {
     const duplicateCandidates: HybridCandidate[] = [
       {
-        songId: new Types.ObjectId().toString(),
+        songId: crypto.randomUUID().toString(),
         songDoc: {
-          _id: new Types.ObjectId().toString(),
+          _id: crypto.randomUUID().toString(),
           title: 'Darksynth One',
           artist: 'Artist A',
           genres: ['darksynth'],
@@ -412,9 +411,9 @@ export async function runOutsideComfortZoneRecommendationTests() {
         sources: ['test'],
       },
       {
-        songId: new Types.ObjectId().toString(),
+        songId: crypto.randomUUID().toString(),
         songDoc: {
-          _id: new Types.ObjectId().toString(),
+          _id: crypto.randomUUID().toString(),
           title: 'Darksynth Two',
           artist: 'Artist B',
           genres: ['darksynth'],
@@ -428,9 +427,9 @@ export async function runOutsideComfortZoneRecommendationTests() {
         sources: ['test'],
       },
       {
-        songId: new Types.ObjectId().toString(),
+        songId: crypto.randomUUID().toString(),
         songDoc: {
-          _id: new Types.ObjectId().toString(),
+          _id: crypto.randomUUID().toString(),
           title: 'Cyberpunk One',
           artist: 'Artist C',
           genres: ['cyberpunk'],
@@ -518,7 +517,7 @@ export async function runOutsideComfortZoneRecommendationTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 6: Fallback on Insufficient History');
   {
-    const emptyUserId = new Types.ObjectId().toString();
+    const emptyUserId = crypto.randomUUID().toString();
     const result = OutsideComfortZoneRecommendationService.rankOutsideComfortZone({
       userId: emptyUserId,
       candidates: mockCandidates,

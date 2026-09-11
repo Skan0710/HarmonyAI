@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   TemporalPreferenceAggregationService,
   RawTemporalInteractionEvent,
@@ -30,7 +29,7 @@ export async function runTemporalPreferenceLearningTests() {
   console.log('[Temporal Preference Learning Comprehensive Test Suite] Starting tests...');
 
   const now = new Date('2026-09-01T12:00:00.000Z');
-  const userId = new Types.ObjectId().toString();
+  const userId = crypto.randomUUID().toString();
 
   try {
     // =========================================================================
@@ -286,34 +285,34 @@ export async function runTemporalPreferenceLearningTests() {
     {
       // Candidate songs representing short-term obsession vs medium-term vs long-term foundation vs outside genre
       const hyperpopSong = {
-        _id: new Types.ObjectId(),
+        _id: crypto.randomUUID(),
         title: 'Money Machine',
-        genre: { _id: new Types.ObjectId(), name: 'Hyperpop' },
-        artist: { _id: new Types.ObjectId(), name: '100 gecs' },
+        genre: { _id: crypto.randomUUID(), name: 'Hyperpop' },
+        artist: { _id: crypto.randomUUID(), name: '100 gecs' },
         mood: 'Chaotic',
         audioFeatures: { energy: 0.90, tempo: 140 },
       };
       const indieSong = {
-        _id: new Types.ObjectId(),
+        _id: crypto.randomUUID(),
         title: 'Not Strong Enough',
-        genre: { _id: new Types.ObjectId(), name: 'Indie Rock' },
-        artist: { _id: new Types.ObjectId(), name: 'Boygenius' },
+        genre: { _id: crypto.randomUUID(), name: 'Indie Rock' },
+        artist: { _id: crypto.randomUUID(), name: 'Boygenius' },
         mood: 'Melancholic',
         audioFeatures: { energy: 0.65, tempo: 115 },
       };
       const classicRockSong = {
-        _id: new Types.ObjectId(),
+        _id: crypto.randomUUID(),
         title: 'Stairway to Heaven',
-        genre: { _id: new Types.ObjectId(), name: 'Classic Rock' },
-        artist: { _id: new Types.ObjectId(), name: 'Led Zeppelin' },
+        genre: { _id: crypto.randomUUID(), name: 'Classic Rock' },
+        artist: { _id: crypto.randomUUID(), name: 'Led Zeppelin' },
         mood: 'Nostalgic',
         audioFeatures: { energy: 0.70, tempo: 82 },
       };
       const jazzSong = {
-        _id: new Types.ObjectId(),
+        _id: crypto.randomUUID(),
         title: 'Take Five',
-        genre: { _id: new Types.ObjectId(), name: 'Jazz' },
-        artist: { _id: new Types.ObjectId(), name: 'Dave Brubeck' },
+        genre: { _id: crypto.randomUUID(), name: 'Jazz' },
+        artist: { _id: crypto.randomUUID(), name: 'Dave Brubeck' },
         mood: 'Chill',
         audioFeatures: { energy: 0.35, tempo: 120 },
       };
@@ -485,8 +484,8 @@ export async function runTemporalPreferenceLearningTests() {
       // 3. HybridRankingPipeline fallback invariance when temporalProfile is null or empty
       const candidateCatalog: HybridCandidate[] = [
         {
-          songId: new Types.ObjectId().toString(),
-          songDoc: { _id: new Types.ObjectId(), title: 'Sample A', genre: 'Rock' },
+          songId: crypto.randomUUID().toString(),
+          songDoc: { _id: crypto.randomUUID(), title: 'Sample A', genre: 'Rock' },
           contentScore: 0.8,
           collaborativeScore: 0.7,
           userTasteAffinityScore: 0.6,
@@ -495,8 +494,8 @@ export async function runTemporalPreferenceLearningTests() {
           sources: ['CONTENT'],
         },
         {
-          songId: new Types.ObjectId().toString(),
-          songDoc: { _id: new Types.ObjectId(), title: 'Sample B', genre: 'Pop' },
+          songId: crypto.randomUUID().toString(),
+          songDoc: { _id: crypto.randomUUID(), title: 'Sample B', genre: 'Pop' },
           contentScore: 0.6,
           collaborativeScore: 0.6,
           userTasteAffinityScore: 0.5,
@@ -554,13 +553,13 @@ export async function runTemporalPreferenceLearningTests() {
         (ColdStartRecommendationService as any).getColdStartRecommendations = async () => ({
           strategy: 'POPULAR_GENRES',
           songs: [
-            { _id: new Types.ObjectId(), title: 'Cold Start Song 1', playCount: 500 },
-            { _id: new Types.ObjectId(), title: 'Cold Start Song 2', playCount: 400 },
+            { _id: crypto.randomUUID(), title: 'Cold Start Song 1', playCount: 500 },
+            { _id: crypto.randomUUID(), title: 'Cold Start Song 2', playCount: 400 },
           ],
           candidateSources: ['cold_start'],
         });
 
-        const newUserId = new Types.ObjectId().toString();
+        const newUserId = crypto.randomUUID().toString();
         const coldStartResult = await HybridRecommendationService.getHybridRecommendations({
           userId: newUserId,
           limit: 5,

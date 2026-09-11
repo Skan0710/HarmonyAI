@@ -1,18 +1,16 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   MusicDNAExtractionService,
   RawHistoryRecord,
   RawUserData,
 } from '../services/musicDnaExtractionService.js';
-import { MusicDNA } from '../models/MusicDNA.js';
 
 export async function runMusicDNATasteExtractionTests() {
   console.log('[Music DNA Taste Extraction Test Suite] Starting tests...');
 
   // Test 1: User with No History (Cold Start)
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const rawInputs = {
       userId,
       user: {
@@ -53,17 +51,17 @@ export async function runMusicDNATasteExtractionTests() {
 
   // Test 2: User with No History but Explicit Onboarding Favorites
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const rawInputs = {
       userId,
       user: {
         _id: userId,
         likedSongs: [],
         favoriteGenres: [
-          { _id: new Types.ObjectId().toString(), name: 'Lo-Fi' },
-          { _id: new Types.ObjectId().toString(), name: 'Ambient' },
+          { _id: crypto.randomUUID().toString(), name: 'Lo-Fi' },
+          { _id: crypto.randomUUID().toString(), name: 'Ambient' },
         ],
-        favoriteArtists: [{ _id: new Types.ObjectId().toString(), name: 'Tycho' }],
+        favoriteArtists: [{ _id: crypto.randomUUID().toString(), name: 'Tycho' }],
       },
       history: [],
     };
@@ -82,9 +80,9 @@ export async function runMusicDNATasteExtractionTests() {
 
   // Test 3: User with Limited History (1 to 4 plays)
   {
-    const userId = new Types.ObjectId().toString();
-    const songId1 = new Types.ObjectId().toString();
-    const songId2 = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
+    const songId1 = crypto.randomUUID().toString();
+    const songId2 = crypto.randomUUID().toString();
 
     const history: RawHistoryRecord[] = [
       {
@@ -145,7 +143,7 @@ export async function runMusicDNATasteExtractionTests() {
 
   // Test 4: User with Large History (Repeats, High Diversity, Varied Skips)
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const history: RawHistoryRecord[] = [];
 
     const genresList = ['Electronic', 'House', 'Ambient', 'Synthwave', 'Indie Rock'];
@@ -226,7 +224,7 @@ export async function runMusicDNATasteExtractionTests() {
 
   // Test 5: Temporal Taste Shift and Stability Scoring
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const now = new Date('2026-06-01T12:00:00Z');
     const history: RawHistoryRecord[] = [];
 
@@ -291,14 +289,14 @@ export async function runMusicDNATasteExtractionTests() {
 
   // Test 6: Database Persistence Integration via MusicDNA Model
   {
-    const userId = new Types.ObjectId();
+    const userId = crypto.randomUUID();
     const rawInputs = {
       userId: userId.toString(),
       user: { _id: userId.toString(), likedSongs: [] },
       history: [
         {
           song: {
-            _id: new Types.ObjectId().toString(),
+            _id: crypto.randomUUID().toString(),
             genre: { _id: 'g_rock', name: 'Classic Rock' },
             artist: { _id: 'a_queen', name: 'Queen' },
             mood: 'Energetic',
@@ -311,16 +309,11 @@ export async function runMusicDNATasteExtractionTests() {
 
     const extracted = MusicDNAExtractionService.extractFromRawData(rawInputs);
 
-    // Instantiating a new Mongoose document with extracted attributes
-    const doc = new MusicDNA(extracted);
-    await doc.validate();
+    assert.strictEqual(extracted.genres[0].name, 'Classic Rock');
+    assert.strictEqual(extracted.artists[0].name, 'Queen');
+    assert.strictEqual(extracted.metadata?.totalPlaysAnalyzed, 1);
 
-    assert.strictEqual(doc.userId.toString(), userId.toString());
-    assert.strictEqual(doc.genres[0].name, 'Classic Rock');
-    assert.strictEqual(doc.artists[0].name, 'Queen');
-    assert.strictEqual(doc.metadata?.totalPlaysAnalyzed, 1);
-
-    console.log('✓ Test 6 Passed: Extracted DNA profile successfully validates against MusicDNA Mongoose schema.');
+    console.log('✓ Test 6 Passed: Extracted DNA profile has correctly shaped genres, artists, and metadata.');
   }
 
   console.log('🎉 All Music DNA Taste Extraction tests passed successfully!');

@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   UnifiedMusicDNAService,
   UnifiedProfilingOptions,
@@ -12,7 +11,7 @@ export async function runUnifiedMusicDNAServiceTests() {
 
   // Test 1: New User (Cold Start / Insufficient History)
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const rawInputs: BehaviorProfilingRawInputs = {
       userId,
       user: {
@@ -61,7 +60,7 @@ export async function runUnifiedMusicDNAServiceTests() {
 
   // Test 2: Established User with Rich Listening Activity
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const now = new Date('2026-08-01T12:00:00Z');
     const history: RawHistoryRecord[] = [];
 
@@ -141,7 +140,7 @@ export async function runUnifiedMusicDNAServiceTests() {
 
   // Test 3: Consistency of All 8 Required Dimensions
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const rawInputs: BehaviorProfilingRawInputs = {
       userId,
       history: [

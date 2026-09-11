@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   ComfortDiscoveryScoringService,
   ComfortDiscoveryScoreResult,
@@ -22,7 +21,7 @@ export async function runComfortDiscoveryScoringServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 1: Sensible defaults on cold start and insufficient history');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const result = ComfortDiscoveryScoringService.calculateScores({
       userId,
@@ -50,7 +49,7 @@ export async function runComfortDiscoveryScoringServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 2: Loyal Listener with high repeat listening produces high comfortScore');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const mockTwin: any = {
       userId,
@@ -122,7 +121,7 @@ export async function runComfortDiscoveryScoringServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 3: Explorer with broad diversity and emerging tastes produces high discoveryScore');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const mockTwin: any = {
       userId,
@@ -190,7 +189,7 @@ export async function runComfortDiscoveryScoringServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 4: High recent skip rate triggers protective comfort retreat');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const baseTwin: any = {
       userId,
@@ -241,7 +240,7 @@ export async function runComfortDiscoveryScoringServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 5: High positive feedback boosts discovery openness');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const baseTwin: any = {
       userId,
@@ -280,7 +279,7 @@ export async function runComfortDiscoveryScoringServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 6: Taste stability reinforces comfort while drift reinforces discovery');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const stableResult = ComfortDiscoveryScoringService.calculateScores({
       userId,
@@ -321,7 +320,7 @@ export async function runComfortDiscoveryScoringServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 7: Config overrides and dynamic runtime adjustment');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const twin: any = {
       userId,
@@ -368,7 +367,7 @@ export async function runComfortDiscoveryScoringServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 8: getUserComfortDiscoveryScores end-to-end asynchronous resolution');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const originalDna = UnifiedMusicDNAService.getOrGenerateProfile;
     const originalTwin = PersonalMusicTwinService.getOrGenerateTwin;
@@ -432,7 +431,7 @@ export async function runComfortDiscoveryScoringServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 9: Non-finite and out-of-range signals are safely normalized');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const result = ComfortDiscoveryScoringService.calculateScores({
       userId,
       personalMusicTwin: {

@@ -1,8 +1,22 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
-import { ListeningSessionService } from '../services/listeningSessionService.js';
-import { ListeningSession, SessionStatus } from '../models/ListeningSession.js';
+import { ListeningSessionService, SessionStatus } from '../services/listeningSessionService.js';
 import { ContextMood } from '../schemas/contextPreferenceSchema.js';
+import { isValidObjectId } from '../utils/validators.js';
+
+function mockSession(overrides: Record<string, any> = {}): Record<string, any> {
+  const now = new Date();
+  return {
+    status: 'active',
+    startTime: now,
+    lastActivityTime: now,
+    endTime: undefined,
+    tracksPlayed: [],
+    tracksSkipped: [],
+    tracksCompleted: [],
+    sessionEvents: [],
+    ...overrides,
+  };
+}
 
 export function runListeningSessionServiceTests() {
   console.log('[Listening Session Service Test Suite] Starting tests...');
@@ -26,8 +40,8 @@ export function runListeningSessionServiceTests() {
 
   // Test 2: Session Data Structure Formatting & Integrity
   {
-    const userId = new Types.ObjectId().toString();
-    const songId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
+    const songId = crypto.randomUUID().toString();
 
     const mockSessionPayload = {
       userId,
@@ -38,8 +52,8 @@ export function runListeningSessionServiceTests() {
       },
     };
 
-    assert.ok(Types.ObjectId.isValid(mockSessionPayload.userId));
-    assert.ok(Types.ObjectId.isValid(mockSessionPayload.initialSongId));
+    assert.ok(isValidObjectId(mockSessionPayload.userId));
+    assert.ok(isValidObjectId(mockSessionPayload.initialSongId));
     assert.strictEqual(mockSessionPayload.contextSnapshot.mood, ContextMood.Energetic);
 
     console.log('✓ Test 2 Passed: Session payload format & object IDs verified.');
@@ -58,17 +72,17 @@ export function runListeningSessionServiceTests() {
 
   // Test 4: Starting Session & Single Active Session Enforcement
   {
-    const userId = new Types.ObjectId().toString();
-    const songId1 = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
+    const songId1 = crypto.randomUUID().toString();
 
     // Verify parameter validation
     assert.rejects(async () => {
       await ListeningSessionService.startSession({ userId: 'invalid-id' });
     });
 
-    const mockDoc = new ListeningSession({
-      user: new Types.ObjectId(userId),
-      currentTrack: new Types.ObjectId(songId1),
+    const mockDoc = mockSession({
+      user: String(userId),
+      currentTrack: String(songId1),
       status: 'active',
     });
 
@@ -80,16 +94,12 @@ export function runListeningSessionServiceTests() {
 
   // Test 5: Recording Track Plays, Skips, and Completions
   {
-    const userId = new Types.ObjectId().toString();
-    const songId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
+    const songId = crypto.randomUUID().toString();
 
-    const session = new ListeningSession({
-      user: new Types.ObjectId(userId),
-      currentTrack: new Types.ObjectId(songId),
-      tracksPlayed: [],
-      tracksSkipped: [],
-      tracksCompleted: [],
-      sessionEvents: [],
+    const session = mockSession({
+      user: String(userId),
+      currentTrack: String(songId),
       status: 'active',
     });
 
@@ -97,32 +107,32 @@ export function runListeningSessionServiceTests() {
 
     // 1. Play
     session.tracksPlayed.push({
-      song: new Types.ObjectId(songId),
+      song: String(songId),
       playedAt: now,
       playDurationSeconds: 45,
       completed: false,
     });
     session.sessionEvents.push({
-      song: new Types.ObjectId(songId),
+      song: String(songId),
       action: 'play',
       timestamp: now,
     });
 
     // 2. Skip
     session.tracksSkipped.push({
-      song: new Types.ObjectId(songId),
+      song: String(songId),
       skippedAt: now,
       playDurationBeforeSkipSeconds: 45,
       reason: 'disliked_tempo',
     });
     session.sessionEvents.push({
-      song: new Types.ObjectId(songId),
+      song: String(songId),
       action: 'skip',
       timestamp: now,
     });
 
     // 3. Complete another song
-    const song2Id = new Types.ObjectId();
+    const song2Id = crypto.randomUUID();
     session.tracksCompleted.push({
       song: song2Id,
       completedAt: now,
@@ -145,8 +155,8 @@ export function runListeningSessionServiceTests() {
 
   // Test 6: Ending Session & Stale Session Expiration
   {
-    const session = new ListeningSession({
-      user: new Types.ObjectId(),
+    const session = mockSession({
+      user: crypto.randomUUID(),
       status: 'active',
       startTime: new Date(Date.now() - 3600 * 1000), // 1 hour ago
       lastActivityTime: new Date(Date.now() - 3600 * 1000),

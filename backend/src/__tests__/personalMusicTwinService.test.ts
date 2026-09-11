@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   PersonalMusicTwinService,
   TwinSynthesisInputs,
@@ -14,7 +13,7 @@ export async function runPersonalMusicTwinServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('Test 1: Full coherent Personal Music Twin synthesis from multi-source intelligence');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const mockDna: any = {
       userId: userId.toString(),
       dnaVersion: '1.0.0',
@@ -227,7 +226,7 @@ export async function runPersonalMusicTwinServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 2: Cold start and insufficient history safe baseline synthesis');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     // Case A: dna is null
     const coldTwinA = PersonalMusicTwinService.synthesizeTwinFromSignals({
@@ -263,7 +262,7 @@ export async function runPersonalMusicTwinServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 3: Derived representation non-duplication verification');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const twin = PersonalMusicTwinService.synthesizeTwinFromSignals({
       userId,
       dna: {
@@ -287,7 +286,7 @@ export async function runPersonalMusicTwinServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 4: Sanitization and bounds clamping resilience');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const skewedDna: any = {
       userId: userId.toString(),
       interactionsCountAtLastRefresh: 30,
@@ -331,7 +330,7 @@ export async function runPersonalMusicTwinServiceTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 5: Metadata customization and extensible options');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const twinWithOptions = PersonalMusicTwinService.synthesizeTwinFromSignals({
       userId,
       dna: {

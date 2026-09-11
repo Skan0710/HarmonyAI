@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import { AdaptiveSessionScoringService } from '../services/adaptiveSessionScoringService.js';
 import {
   getAdaptiveSessionWeights,
@@ -24,8 +23,8 @@ export function runAdaptiveSessionScoringTests() {
     lastUpdated: new Date(),
   };
 
-  const likedSongId = new Types.ObjectId();
-  const skippedSongId = new Types.ObjectId();
+  const likedSongId = crypto.randomUUID();
+  const skippedSongId = crypto.randomUUID();
 
   const likedSongDoc = {
     _id: likedSongId,
@@ -57,7 +56,7 @@ export function runAdaptiveSessionScoringTests() {
     ];
 
     const candidateSimilarToLiked = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Candidate Synth',
       genre: { name: 'Synthwave' },
       artist: { _id: 'artist_a', name: 'Artist A' },
@@ -66,7 +65,7 @@ export function runAdaptiveSessionScoringTests() {
     };
 
     const candidateSimilarToSkipped = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Candidate Acoustic',
       genre: { name: 'Acoustic' },
       artist: { _id: 'artist_b', name: 'Artist B' },
@@ -96,7 +95,7 @@ export function runAdaptiveSessionScoringTests() {
   // Test 2: Consideration of session genre, artist, mood, energy and tempo preferences
   {
     const candidateMatching = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Matching Track',
       genre: { name: 'Synthwave' },
       artist: { _id: 'artist_a', name: 'Artist A' },
@@ -105,7 +104,7 @@ export function runAdaptiveSessionScoringTests() {
     };
 
     const candidateMismatched = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Mismatched Track',
       genre: { name: 'Classical' },
       artist: { _id: 'artist_z', name: 'Artist Z' },
@@ -137,7 +136,7 @@ export function runAdaptiveSessionScoringTests() {
     ];
 
     const candidateSynth = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Candidate Synth',
       genre: { name: 'Synthwave' },
       artist: { _id: 'artist_a', name: 'Artist A' },

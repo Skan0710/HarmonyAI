@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   MusicTwinEvolutionService,
   DEFAULT_TWIN_EVOLUTION_CONFIG,
@@ -22,7 +21,7 @@ export async function runMusicTwinEvolutionTests() {
   // ---------------------------------------------------------------------------
   console.log('Test 1: Stable personality evolution and overreaction prevention');
   {
-    const userId = new Types.ObjectId();
+    const userId = crypto.randomUUID();
     const baseTwin = getDefaultPersonalMusicTwin(userId);
 
     const previousTwin: PersonalMusicTwinAttributes = {
@@ -102,7 +101,7 @@ export async function runMusicTwinEvolutionTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 2: New user developing personality state and confidence ramp');
   {
-    const userId = new Types.ObjectId();
+    const userId = crypto.randomUUID();
     const newTwin = getDefaultPersonalMusicTwin(userId);
 
     // Initial first-time evolution (previousTwin is null)
@@ -145,7 +144,7 @@ export async function runMusicTwinEvolutionTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 3: Rapidly changing taste detection and responsive trait adaptation');
   {
-    const userId = new Types.ObjectId();
+    const userId = crypto.randomUUID();
     const baseTwin = getDefaultPersonalMusicTwin(userId);
 
     const previousTwin: PersonalMusicTwinAttributes = {
@@ -231,7 +230,7 @@ export async function runMusicTwinEvolutionTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 4: Emerging preferences detection and momentum tracking');
   {
-    const userId = new Types.ObjectId();
+    const userId = crypto.randomUUID();
     const baseTwin = getDefaultPersonalMusicTwin(userId);
 
     const incomingWithEmerging: PersonalMusicTwinAttributes = {
@@ -268,7 +267,7 @@ export async function runMusicTwinEvolutionTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 5: Fading preferences detection on taste departure');
   {
-    const userId = new Types.ObjectId();
+    const userId = crypto.randomUUID();
     const baseTwin = getDefaultPersonalMusicTwin(userId);
 
     // Prior twin had Rock and Jazz in core genres

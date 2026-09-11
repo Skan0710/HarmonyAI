@@ -2,8 +2,7 @@ import assert from 'node:assert';
 import { HybridRankingPipeline } from '../services/hybridRankingPipeline.js';
 import { HybridCandidate } from '../services/candidateGenerationService.js';
 import { SessionTasteProfile } from '../services/sessionTasteProfileService.js';
-import { IListeningSession } from '../models/ListeningSession.js';
-import { Types } from 'mongoose';
+import { IListeningSession } from '../services/listeningSessionService.js';
 
 export function runListeningSessionRecommendationIntegrationTests() {
   console.log('[Listening Session Recommendation Integration Test Suite] Starting tests...');
@@ -80,8 +79,8 @@ export function runListeningSessionRecommendationIntegrationTests() {
   // Test 2: Active session taste profile modifies ranking in real time
   {
     const edmSessionProfile: SessionTasteProfile = {
-      sessionId: new Types.ObjectId().toString(),
-      userId: new Types.ObjectId().toString(),
+      sessionId: crypto.randomUUID().toString(),
+      userId: crypto.randomUUID().toString(),
       totalInteractions: 5,
       preferredGenres: [{ genre: 'EDM', score: 0.80, rawWeight: 4.5 }],
       preferredArtists: [{ artistId: 'artist-edm', name: 'DJ Neon', score: 0.80, rawWeight: 4.0 }],
@@ -120,8 +119,8 @@ export function runListeningSessionRecommendationIntegrationTests() {
   // Test 3: Increase influence of completed/replayed tracks
   {
     const completionSessionProfile: SessionTasteProfile = {
-      sessionId: new Types.ObjectId().toString(),
-      userId: new Types.ObjectId().toString(),
+      sessionId: crypto.randomUUID().toString(),
+      userId: crypto.randomUUID().toString(),
       totalInteractions: 4,
       preferredGenres: [
         { genre: 'EDM', score: 0.70, rawWeight: 3.5 },
@@ -162,10 +161,10 @@ export function runListeningSessionRecommendationIntegrationTests() {
   // Test 4: Skip suppression penalizes skipped tracks
   {
     const mockSessionDoc = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       tracksSkipped: [
         {
-          song: new Types.ObjectId('600000000000000000000001'), // Rock song skipped
+          song: '600000000000000000000001', // Rock song skipped
           skippedAt: new Date(),
         },
       ],
@@ -173,7 +172,7 @@ export function runListeningSessionRecommendationIntegrationTests() {
 
     const rockSkippedProfile: SessionTasteProfile = {
       sessionId: mockSessionDoc._id.toString(),
-      userId: new Types.ObjectId().toString(),
+      userId: crypto.randomUUID().toString(),
       totalInteractions: 4,
       preferredGenres: [{ genre: 'EDM', score: 0.90, rawWeight: 4.0 }],
       preferredArtists: [],
@@ -221,8 +220,8 @@ export function runListeningSessionRecommendationIntegrationTests() {
   // Test 5: Combination of long-term taste, session taste, and contextual preferences
   {
     const multiLayerProfile: SessionTasteProfile = {
-      sessionId: new Types.ObjectId().toString(),
-      userId: new Types.ObjectId().toString(),
+      sessionId: crypto.randomUUID().toString(),
+      userId: crypto.randomUUID().toString(),
       totalInteractions: 3,
       preferredGenres: [{ genre: 'EDM', score: 0.80, rawWeight: 3.0 }],
       preferredArtists: [],

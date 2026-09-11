@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import { SessionProfileService } from '../services/sessionProfileService.js';
 import { SessionCandidateGenerationService } from '../services/sessionCandidateGenerationService.js';
 
@@ -9,8 +8,8 @@ export function runSessionRecommendationEngineTests() {
   // Test 1: Empty Sessions Handling
   {
     const emptySessionDoc: any = {
-      _id: new Types.ObjectId(),
-      user: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
+      user: crypto.randomUUID(),
       status: 'active',
       songsPlayed: [],
     };
@@ -28,10 +27,10 @@ export function runSessionRecommendationEngineTests() {
 
   // Test 2: Single-Song Sessions Handling
   {
-    const singleSongId = new Types.ObjectId();
+    const singleSongId = crypto.randomUUID();
     const singleSongSessionDoc: any = {
-      _id: new Types.ObjectId(),
-      user: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
+      user: crypto.randomUUID(),
       status: 'active',
       songsPlayed: [{ song: singleSongId, playedAt: new Date() }],
     };

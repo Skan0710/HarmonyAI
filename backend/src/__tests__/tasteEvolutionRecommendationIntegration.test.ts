@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   HybridRankingPipeline,
   TasteEvolutionSignal,
@@ -236,7 +235,7 @@ export async function runTasteEvolutionRecommendationIntegrationTests() {
       const output = await AdaptiveRecommendationRankingPipeline.executePipeline({
         candidates: [emergingTrack, fadingTrack, neutralTrack],
         limit: 5,
-        userId: new Types.ObjectId().toString(),
+        userId: crypto.randomUUID().toString(),
         tasteEvolutionSignal: mockEvolutionSignal,
       });
 
@@ -269,7 +268,7 @@ export async function runTasteEvolutionRecommendationIntegrationTests() {
       const transformingOutput = await AdaptiveRecommendationRankingPipeline.executePipeline({
         candidates: [candidate],
         limit: 1,
-        userId: new Types.ObjectId().toString(),
+        userId: crypto.randomUUID().toString(),
         tasteEvolutionSignal: transformingSignal,
         useAdaptiveExploration: true,
       });
@@ -277,7 +276,7 @@ export async function runTasteEvolutionRecommendationIntegrationTests() {
       const stableOutput = await AdaptiveRecommendationRankingPipeline.executePipeline({
         candidates: [candidate],
         limit: 1,
-        userId: new Types.ObjectId().toString(),
+        userId: crypto.randomUUID().toString(),
         tasteEvolutionSignal: stableSignal,
         useAdaptiveExploration: true,
       });

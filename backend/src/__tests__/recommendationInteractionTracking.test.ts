@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { RecommendationActionType } from '../models/RecommendationInteraction.js';
+import { RecommendationActionType } from '../services/recommendationInteractionTrackingService.js';
 
 export function runRecommendationInteractionTrackingTests() {
   console.log('[Recommendation Interaction Tracking Test Suite] Starting tests...');

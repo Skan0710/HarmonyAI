@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import { SmartAutoplayService, AutoplayCandidateResult } from '../services/smartAutoplayService.js';
 import { AdaptiveSessionScoringService } from '../services/adaptiveSessionScoringService.js';
 import { ISessionEvent } from '../services/listeningSessionService.js';
@@ -7,9 +6,9 @@ import { ISessionEvent } from '../services/listeningSessionService.js';
 export function runSmartAutoplayEngineTests() {
   console.log('[Smart Autoplay Engine Test Suite] Starting tests...');
 
-  const likedSongId = new Types.ObjectId();
-  const replayedSongId = new Types.ObjectId();
-  const skippedSongId = new Types.ObjectId();
+  const likedSongId = crypto.randomUUID();
+  const replayedSongId = crypto.randomUUID();
+  const skippedSongId = crypto.randomUUID();
 
   const likedSongDoc = {
     _id: likedSongId,
@@ -50,7 +49,7 @@ export function runSmartAutoplayEngineTests() {
     ];
 
     const candidateSynthwave = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Candidate Synthwave',
       genre: { name: 'Synthwave' },
       artist: { _id: 'artist_1', name: 'Artist 1' },
@@ -59,7 +58,7 @@ export function runSmartAutoplayEngineTests() {
     };
 
     const candidateRock = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Candidate Rock',
       genre: { name: 'Rock' },
       artist: { _id: 'artist_x', name: 'Artist X' },
@@ -91,7 +90,7 @@ export function runSmartAutoplayEngineTests() {
     ];
 
     const candidateAcoustic = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Candidate Acoustic',
       genre: { name: 'Acoustic' },
       artist: { _id: 'artist_3', name: 'Artist 3' },
@@ -118,7 +117,7 @@ export function runSmartAutoplayEngineTests() {
     ];
 
     const candidatePop = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Candidate Pop',
       genre: { name: 'Pop' },
       artist: { _id: 'artist_2', name: 'Artist 2' },

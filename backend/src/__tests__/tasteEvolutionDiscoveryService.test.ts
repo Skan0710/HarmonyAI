@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   TasteEvolutionDiscoveryService,
   TasteEvolutionDiscoveryInputs,
@@ -14,14 +13,14 @@ import { AdaptiveRecommendationRankingPipeline } from '../services/adaptiveRecom
 export async function runTasteEvolutionDiscoveryTests() {
   console.log('[Taste-Evolution-Aware Discovery Test Suite] Starting tests...');
 
-  const mockUserId = new Types.ObjectId().toString();
+  const mockUserId = crypto.randomUUID().toString();
 
-  const songIdEmergingGenre = new Types.ObjectId().toString();
-  const songIdRelatedArtist = new Types.ObjectId().toString();
-  const songIdAdjacentGenre = new Types.ObjectId().toString();
-  const songIdFadingGenre = new Types.ObjectId().toString();
-  const songIdStableAnchor = new Types.ObjectId().toString();
-  const songIdFluke = new Types.ObjectId().toString();
+  const songIdEmergingGenre = crypto.randomUUID().toString();
+  const songIdRelatedArtist = crypto.randomUUID().toString();
+  const songIdAdjacentGenre = crypto.randomUUID().toString();
+  const songIdFadingGenre = crypto.randomUUID().toString();
+  const songIdStableAnchor = crypto.randomUUID().toString();
+  const songIdFluke = crypto.randomUUID().toString();
 
   // Mock candidates covering all evolutionary states
   const mockCandidates: HybridCandidate[] = [
@@ -339,9 +338,9 @@ export async function runTasteEvolutionDiscoveryTests() {
     // Long-term = Classic Rock, Short-term = Synthwave (rising fast)
     const verifiedShortTermCandidates: HybridCandidate[] = [
       {
-        songId: new Types.ObjectId().toString(),
+        songId: crypto.randomUUID().toString(),
         songDoc: {
-          _id: new Types.ObjectId().toString(),
+          _id: crypto.randomUUID().toString(),
           title: 'Comfortably Numb',
           artist: 'Pink Floyd',
           genres: ['classic rock'],
@@ -350,9 +349,9 @@ export async function runTasteEvolutionDiscoveryTests() {
         userTasteAffinityScore: 0.90, // Strong long-term affinity
       } as any,
       {
-        songId: new Types.ObjectId().toString(),
+        songId: crypto.randomUUID().toString(),
         songDoc: {
-          _id: new Types.ObjectId().toString(),
+          _id: crypto.randomUUID().toString(),
           title: 'Resonance',
           artist: 'HOME',
           genres: ['synthwave'],
@@ -408,9 +407,9 @@ export async function runTasteEvolutionDiscoveryTests() {
     // Long-term = Classic Rock, Short-term = 1 fluke play of Polka
     const flukeCandidates: HybridCandidate[] = [
       {
-        songId: new Types.ObjectId().toString(),
+        songId: crypto.randomUUID().toString(),
         songDoc: {
-          _id: new Types.ObjectId().toString(),
+          _id: crypto.randomUUID().toString(),
           title: 'Comfortably Numb',
           artist: 'Pink Floyd',
           genres: ['classic rock'],
@@ -419,9 +418,9 @@ export async function runTasteEvolutionDiscoveryTests() {
         userTasteAffinityScore: 0.90,
       } as any,
       {
-        songId: new Types.ObjectId().toString(),
+        songId: crypto.randomUUID().toString(),
         songDoc: {
-          _id: new Types.ObjectId().toString(),
+          _id: crypto.randomUUID().toString(),
           title: 'Polka Party',
           artist: 'Accordion Kings',
           genres: ['polka'],

@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   MusicDNAProfilingService,
 } from '../services/musicDnaProfilingService.js';
@@ -13,7 +12,7 @@ export async function runDetailedMusicDNAProfilingTests() {
 
   // Test 1: Distinguishing Established vs Emerging Preferences
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const now = new Date('2026-07-01T12:00:00Z');
     const history: RawHistoryRecord[] = [];
 
@@ -115,7 +114,7 @@ export async function runDetailedMusicDNAProfilingTests() {
 
   // Test 2: Genre and Artist Diversity Metrics Calculation
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     // 2A: Monoculture Case (Low Diversity)
     const monocultureHistory: RawHistoryRecord[] = [];
@@ -181,7 +180,7 @@ export async function runDetailedMusicDNAProfilingTests() {
 
   // Test 3: Safe Missing Metadata Handling
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     // History with missing/corrupted metadata:
     // - song is null
@@ -237,7 +236,7 @@ export async function runDetailedMusicDNAProfilingTests() {
 
   // Test 4: Normalized Score Boundaries [0.0, 1.0]
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const history: RawHistoryRecord[] = [
       {
         song: {

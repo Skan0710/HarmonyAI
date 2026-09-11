@@ -1,6 +1,5 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
-import { SessionActionType, ISessionEvent } from '../models/ListeningSession.js';
+import { SessionActionType, ISessionEvent } from '../services/listeningSessionService.js';
 
 export function runRealtimeSessionInteractionTrackingTests() {
   console.log('[Real-Time Session Interaction Tracking Test Suite] Starting tests...');
@@ -18,8 +17,8 @@ export function runRealtimeSessionInteractionTrackingTests() {
 
   // Test 2: Event Storage with Song & Timestamp
   {
-    const songId = new Types.ObjectId();
-    const eventTimestamp = new Date();
+    const songId = crypto.randomUUID();
+    const eventTimestamp = new Date().toISOString();
 
     const mockEvent: ISessionEvent = {
       song: songId,

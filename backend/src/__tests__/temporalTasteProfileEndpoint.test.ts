@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import { getTemporalTasteProfile } from '../controllers/temporalTasteProfileController.js';
 import { LayeredTemporalTasteProfileService } from '../services/layeredTemporalTasteProfileService.js';
 import recommendationRouter from '../routes/recommendationRoutes.js';
@@ -8,7 +7,7 @@ import userRouter from '../routes/userRoutes.js';
 export async function runTemporalTasteProfileEndpointTests() {
   console.log('[Temporal Taste Profile API Endpoint Test Suite] Starting tests...');
 
-  const userId = new Types.ObjectId().toString();
+  const userId = crypto.randomUUID().toString();
   const now = new Date('2026-09-01T12:00:00.000Z');
 
   // Helper to create mock Express request & response
@@ -17,7 +16,7 @@ export async function runTemporalTasteProfileEndpointTests() {
     query?: Record<string, string>;
   } = {}) => {
     const req: any = {
-      user: options.user !== undefined ? options.user : { _id: new Types.ObjectId(userId) },
+      user: options.user !== undefined ? options.user : { _id: String(userId) },
       query: options.query || {},
       params: {},
       body: {},

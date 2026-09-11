@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { ISong } from '../models/Song.js';
+import { ISong } from '../types/domainModels.js';
 
 export function runSongEmbeddingModelTests() {
   console.log('[Song Embedding Model Schema Test Suite] Starting tests...');

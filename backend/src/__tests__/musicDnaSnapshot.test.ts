@@ -1,13 +1,11 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
-import { MusicDNASnapshot } from '../models/MusicDNASnapshot.js';
 import { MusicDNASnapshotService } from '../services/musicDnaSnapshotService.js';
 import { UnifiedMusicDNA } from '../schemas/musicDnaSchema.js';
 
 export async function runMusicDnaSnapshotTests() {
   console.log('[Music DNA Snapshot Test Suite] Starting tests...');
 
-  const userId = new Types.ObjectId().toString();
+  const userId = crypto.randomUUID().toString();
 
   const mockUnifiedDNA: UnifiedMusicDNA = {
     userId,
@@ -208,17 +206,15 @@ export async function runMusicDnaSnapshotTests() {
     console.log('✓ Test 2 Passed: Snapshot validation ensures strictly bounded values [0.0, 1.0].');
   }
 
-  // Test 3: Mongoose Model Instantiation & Schema Validation
+  // Test 3: Snapshot Payload Mapper Field Integrity
   {
     const snapshotData = MusicDNASnapshotService.buildSnapshotDataFromUnifiedDNA(mockUnifiedDNA);
-    const doc = new MusicDNASnapshot(snapshotData);
-    await doc.validate();
 
-    assert.strictEqual(doc.userId.toString(), userId);
-    assert.strictEqual(doc.topGenres.length, 2);
-    assert.strictEqual(doc.listeningBehavior.listenerArchetype, 'Adventurer');
+    assert.strictEqual(snapshotData.userId.toString(), userId);
+    assert.strictEqual(snapshotData.topGenres.length, 2);
+    assert.strictEqual(snapshotData.listeningBehavior.listenerArchetype, 'Adventurer');
 
-    console.log('✓ Test 3 Passed: MusicDNASnapshot document validates against Mongoose schema.');
+    console.log('✓ Test 3 Passed: MusicDNASnapshot payload mapper produces correctly shaped data.');
   }
 
   // Test 4: Historical Immutability (Multiple distinct snapshots can exist without overwriting)
@@ -235,14 +231,10 @@ export async function runMusicDnaSnapshotTests() {
       triggerReason: 'interaction_milestone',
     });
 
-    const doc1 = new MusicDNASnapshot(s1Data);
-    const doc2 = new MusicDNASnapshot(s2Data);
-
-    assert.notStrictEqual(doc1._id.toString(), doc2._id.toString());
-    assert.strictEqual(doc1.timestamp.getTime(), t1.getTime());
-    assert.strictEqual(doc2.timestamp.getTime(), t2.getTime());
-    assert.strictEqual(doc1.triggerReason, 'baseline');
-    assert.strictEqual(doc2.triggerReason, 'interaction_milestone');
+    assert.strictEqual(s1Data.timestamp.getTime(), t1.getTime());
+    assert.strictEqual(s2Data.timestamp.getTime(), t2.getTime());
+    assert.strictEqual(s1Data.triggerReason, 'baseline');
+    assert.strictEqual(s2Data.triggerReason, 'interaction_milestone');
 
     console.log('✓ Test 4 Passed: Multiple immutable historical snapshots coexist without overwriting.');
   }

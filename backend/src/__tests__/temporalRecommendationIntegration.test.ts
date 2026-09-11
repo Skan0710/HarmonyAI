@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   HybridRankingPipeline,
   HybridRankedResult,
@@ -24,41 +23,41 @@ export async function runTemporalRecommendationIntegrationTests() {
 
   try {
     const now = new Date('2026-09-01T12:00:00.000Z');
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     // Reusable candidate catalog
     const synthwaveSong = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Neon Nights',
-      genre: { _id: new Types.ObjectId(), name: 'Synthwave' },
-      artist: { _id: new Types.ObjectId(), name: 'Kavinsky' },
+      genre: { _id: crypto.randomUUID(), name: 'Synthwave' },
+      artist: { _id: crypto.randomUUID(), name: 'Kavinsky' },
       mood: 'Energetic',
       audioFeatures: { energy: 0.85, tempo: 128 },
     };
 
     const electronicSong = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Around the World',
-      genre: { _id: new Types.ObjectId(), name: 'Electronic' },
-      artist: { _id: new Types.ObjectId(), name: 'Daft Punk' },
+      genre: { _id: crypto.randomUUID(), name: 'Electronic' },
+      artist: { _id: crypto.randomUUID(), name: 'Daft Punk' },
       mood: 'Upbeat',
       audioFeatures: { energy: 0.70, tempo: 120 },
     };
 
     const rockSong = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Bohemian Rhapsody',
-      genre: { _id: new Types.ObjectId(), name: 'Rock' },
-      artist: { _id: new Types.ObjectId(), name: 'Queen' },
+      genre: { _id: crypto.randomUUID(), name: 'Rock' },
+      artist: { _id: crypto.randomUUID(), name: 'Queen' },
       mood: 'Classic',
       audioFeatures: { energy: 0.55, tempo: 110 },
     };
 
     const classicalSong = {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       title: 'Moonlight Sonata',
-      genre: { _id: new Types.ObjectId(), name: 'Classical' },
-      artist: { _id: new Types.ObjectId(), name: 'Beethoven' },
+      genre: { _id: crypto.randomUUID(), name: 'Classical' },
+      artist: { _id: crypto.randomUUID(), name: 'Beethoven' },
       mood: 'Calm',
       audioFeatures: { energy: 0.25, tempo: 70 },
     };

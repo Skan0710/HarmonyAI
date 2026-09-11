@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   AdaptiveRecommendationRankingPipeline,
   AdaptivePipelineOptions,
@@ -57,7 +56,7 @@ export async function runAdvancedPersonalizationFullIntegrationTests() {
   // =========================================================================
   {
     console.log('--- Test 1: New Users / Cold Start Flow ---');
-    const newUserId = new Types.ObjectId().toString();
+    const newUserId = crypto.randomUUID().toString();
 
     const candidates = [
       createMockCandidate('song-new-1', 'Universal Track 1', 'Pop Star A', 'Pop', { affinity: 0.3, popularity: 5000 }),
@@ -96,7 +95,7 @@ export async function runAdvancedPersonalizationFullIntegrationTests() {
   // =========================================================================
   {
     console.log('--- Test 2: Users with Strong Established Taste ---');
-    const establishedUserId = new Types.ObjectId().toString();
+    const establishedUserId = crypto.randomUUID().toString();
 
     const candidates = [
       createMockCandidate('song-est-1', 'Comfort Classic', 'Pink Floyd', 'Rock', { affinity: 0.95, content: 0.90 }),
@@ -163,7 +162,7 @@ export async function runAdvancedPersonalizationFullIntegrationTests() {
   // =========================================================================
   {
     console.log('--- Test 3: Highly Exploratory Users ---');
-    const exploratoryUserId = new Types.ObjectId().toString();
+    const exploratoryUserId = crypto.randomUUID().toString();
 
     const candidates = [
       createMockCandidate('song-exp-1', 'Novel Horizon', 'Future Sound', 'Experimental', { affinity: 0.85, content: 0.85 }, { energy: 0.8, tempo: 130 }),
@@ -232,7 +231,7 @@ export async function runAdvancedPersonalizationFullIntegrationTests() {
   // =========================================================================
   {
     console.log('--- Test 4: Comfort-Oriented Users ---');
-    const comfortUserId = new Types.ObjectId().toString();
+    const comfortUserId = crypto.randomUUID().toString();
 
     const candidates = [
       createMockCandidate('song-comf-1', 'Home Sweet Home', 'Comfort Band', 'Acoustic', { affinity: 0.92, content: 0.85 }),
@@ -272,7 +271,7 @@ export async function runAdvancedPersonalizationFullIntegrationTests() {
   // =========================================================================
   {
     console.log('--- Test 5: Users with Emerging Tastes ---');
-    const emergingUserId = new Types.ObjectId().toString();
+    const emergingUserId = crypto.randomUUID().toString();
 
     const candidates = [
       createMockCandidate('song-em-1', 'Neon Lights', 'Kavinsky', 'Synthwave', { affinity: 0.70, content: 0.80 }),
@@ -333,7 +332,7 @@ export async function runAdvancedPersonalizationFullIntegrationTests() {
   // =========================================================================
   {
     console.log('--- Test 6: Users with Rapidly Changing / Volatile Taste ---');
-    const volatileUserId = new Types.ObjectId().toString();
+    const volatileUserId = crypto.randomUUID().toString();
 
     const candidates = [
       createMockCandidate('song-vol-1', 'DnB Roller', 'Sub Focus', 'Drum and Bass', { affinity: 0.75, content: 0.85 }),
@@ -386,7 +385,7 @@ export async function runAdvancedPersonalizationFullIntegrationTests() {
   // =========================================================================
   {
     console.log('--- Test 7: Users with Insufficient History / LIMITED_DATA ---');
-    const sparseUserId = new Types.ObjectId().toString();
+    const sparseUserId = crypto.randomUUID().toString();
 
     // Sparse candidate with minimal fields
     const sparseCandidates: HybridCandidate[] = [
@@ -431,7 +430,7 @@ export async function runAdvancedPersonalizationFullIntegrationTests() {
   {
     console.log('--- Test 8: Full End-to-End Conceptual Flow Verification ---');
     // Flow: User History → Temporal Taste → Music DNA → Taste Evolution → Personal Music Twin → Comfort/Discovery Profile → Taste Boundaries → Candidate Generation → Adaptive Ranking → Novelty/Diversity → Personalized Mode → Final Recommendation → Explanation
-    const fullFlowUserId = new Types.ObjectId().toString();
+    const fullFlowUserId = crypto.randomUUID().toString();
 
     const candidates = [
       createMockCandidate('ff-1', 'Synth Horizon', 'Gunship', 'Synthwave', { affinity: 0.85, content: 0.88, collaborative: 0.80 }),
@@ -514,7 +513,7 @@ export async function runAdvancedPersonalizationFullIntegrationTests() {
   // =========================================================================
   {
     console.log('--- Test 9: Smart Autoplay & Session Intelligence Integration ---');
-    const autoUserId = new Types.ObjectId().toString();
+    const autoUserId = crypto.randomUUID().toString();
 
     const candidates = [
       createMockCandidate('ap-1', 'Track 1', 'Artist 1', 'Pop', { affinity: 0.85 }),
@@ -575,7 +574,7 @@ export async function runAdvancedPersonalizationFullIntegrationTests() {
   // =========================================================================
   {
     console.log('--- Test 11: Edge Cases, Robustness & Missing Metadata ---');
-    const robustUserId = new Types.ObjectId().toString();
+    const robustUserId = crypto.randomUUID().toString();
 
     const edgeCandidates = [
       createMockCandidate('edge-1', 'Normal Song', 'Normal Artist', 'Pop', {}),

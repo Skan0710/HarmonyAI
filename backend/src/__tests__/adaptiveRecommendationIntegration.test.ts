@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   AdaptiveRecommendationRankingPipeline,
   AdaptivePipelineOptions,
@@ -77,7 +76,7 @@ export async function runAdaptiveRecommendationIntegrationTests() {
   // =========================================================================
   {
     console.log('--- Scenario 1: Normal Returning User ---');
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const candidates = [
       createMockCandidate('song-ret-1', 'Returning Hit 1', 'Artist A', 'Electronic', { affinity: 0.90, content: 0.85 }),
@@ -127,7 +126,7 @@ export async function runAdaptiveRecommendationIntegrationTests() {
   // =========================================================================
   {
     console.log('\n--- Scenario 2: New User with Little History (Cold Start) ---');
-    const newUserId = new Types.ObjectId().toString();
+    const newUserId = crypto.randomUUID().toString();
 
     // Catalog fallback candidate pool
     const catalogPool = [
@@ -161,7 +160,7 @@ export async function runAdaptiveRecommendationIntegrationTests() {
   // =========================================================================
   {
     console.log('\n--- Scenario 3: User with Strong Recent Preferences (Taste Pivot) ---');
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     // Simulated Layered Taste Profile: recent surge in Synthwave, historical in Jazz
     const temporalProfile: UnifiedLayeredTasteProfile = {
@@ -259,7 +258,7 @@ export async function runAdaptiveRecommendationIntegrationTests() {
   // =========================================================================
   {
     console.log('\n--- Scenario 4: User with Strong Long-Term Preferences (High Stability) ---');
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     // High stability index (0.90) = heavily established long-term tastes
     const stableTemporalProfile: UnifiedLayeredTasteProfile = {
@@ -344,7 +343,7 @@ export async function runAdaptiveRecommendationIntegrationTests() {
   // =========================================================================
   {
     console.log('\n--- Scenario 5: User Giving Repeated Positive Feedback ---');
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const favoritedSongId = 'song-fav-1';
     const neutralSongId = 'song-neutral-1';
@@ -392,7 +391,7 @@ export async function runAdaptiveRecommendationIntegrationTests() {
   // =========================================================================
   {
     console.log('\n--- Scenario 6: User Giving Repeated Negative Feedback ---');
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const skippedSongId = 'song-skipped-1';
     const cleanSongId = 'song-clean-1';
@@ -436,7 +435,7 @@ export async function runAdaptiveRecommendationIntegrationTests() {
   // =========================================================================
   {
     console.log('\n--- Scenario 7: Recommendation List Requiring Diversity ---');
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     // 4 songs by "Artist Cluster" in "Electro" with nearly identical high scores,
     // plus 1 by "Artist Unique" in "Rock"
@@ -478,7 +477,7 @@ export async function runAdaptiveRecommendationIntegrationTests() {
   // =========================================================================
   {
     console.log('\n--- Scenario 8: Recommendation List Containing Novel Candidates ---');
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     const familiarId = 'song-familiar-1';
     const novelRelevantId = 'song-novel-rel-1';
@@ -552,7 +551,7 @@ export async function runAdaptiveRecommendationIntegrationTests() {
   // =========================================================================
   {
     console.log('\n--- Scenario 9: Smart Autoplay Using Updated Adaptive Ranking ---');
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const currentTrackId = 'song-current-playing';
 
     const autoplayCandidates: HybridCandidate[] = [

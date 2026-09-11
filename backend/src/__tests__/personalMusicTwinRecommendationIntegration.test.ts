@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import { HybridRankingPipeline } from '../services/hybridRankingPipeline.js';
 import { AdaptiveRecommendationRankingPipeline } from '../services/adaptiveRecommendationRankingPipeline.js';
 import { HybridCandidate } from '../services/candidateGenerationService.js';
@@ -34,7 +33,7 @@ export async function runPersonalMusicTwinRecommendationIntegrationTests() {
     recencySignal: 0.50,
     sources: ['test_pool'],
     songDoc: {
-      _id: new Types.ObjectId(),
+      _id: crypto.randomUUID(),
       id,
       title,
       genre: { name: genre },
@@ -60,7 +59,7 @@ export async function runPersonalMusicTwinRecommendationIntegrationTests() {
   // ---------------------------------------------------------------------------
   console.log('Test 1: Meaningfully different ranking behavior between Explorer and Loyal Listener');
   {
-    const userId = new Types.ObjectId();
+    const userId = crypto.randomUUID();
     const baseTwin = getDefaultPersonalMusicTwin(userId);
 
     // Explorer Twin: loves novel genres, low familiarity, high exploration
@@ -170,7 +169,7 @@ export async function runPersonalMusicTwinRecommendationIntegrationTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 2: Discovery Seeker vs Comfort Listener taste evolution alignment');
   {
-    const userId = new Types.ObjectId();
+    const userId = crypto.randomUUID();
     const baseTwin = getDefaultPersonalMusicTwin(userId);
 
     // Discovery Seeker Twin: high discovery appetite and emerging preference for Glitch Hop
@@ -273,7 +272,7 @@ export async function runPersonalMusicTwinRecommendationIntegrationTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 3: Mood Listener prioritizing emotional atmospheric resonance');
   {
-    const userId = new Types.ObjectId();
+    const userId = crypto.randomUUID();
     const baseTwin = getDefaultPersonalMusicTwin(userId);
 
     const moodTwin: PersonalMusicTwinAttributes = {
@@ -368,7 +367,7 @@ export async function runPersonalMusicTwinRecommendationIntegrationTests() {
   // ---------------------------------------------------------------------------
   console.log('\nTest 5: Adaptive recommendation pipeline integration with diagnostics');
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const mockTwin = getDefaultPersonalMusicTwin(userId);
 
     const pipelineRes = await AdaptiveRecommendationRankingPipeline.executePipeline({

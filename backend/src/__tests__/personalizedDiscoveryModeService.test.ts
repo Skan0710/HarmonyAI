@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   PersonalizedDiscoveryModeService,
   PersonalizedDiscoveryModeParams,
@@ -21,13 +20,13 @@ export async function runPersonalizedDiscoveryModeTests() {
   // Always reset configs before and after tests
   resetDiscoveryModeConfigs();
 
-  const mockUserId = new Types.ObjectId().toString();
+  const mockUserId = crypto.randomUUID().toString();
 
-  const songIdComfort = new Types.ObjectId().toString();
-  const songIdDiscover = new Types.ObjectId().toString();
-  const songIdOutside = new Types.ObjectId().toString();
-  const songIdEmerging = new Types.ObjectId().toString();
-  const songIdBalanced = new Types.ObjectId().toString();
+  const songIdComfort = crypto.randomUUID().toString();
+  const songIdDiscover = crypto.randomUUID().toString();
+  const songIdOutside = crypto.randomUUID().toString();
+  const songIdEmerging = crypto.randomUUID().toString();
+  const songIdBalanced = crypto.randomUUID().toString();
 
   // Diverse test candidates
   const mockCandidates: HybridCandidate[] = [

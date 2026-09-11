@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   MusicDNABehaviorProfilingService,
   BehaviorProfilingRawInputs,
@@ -14,7 +13,7 @@ export async function runMusicDNABehaviorProfilingTests() {
 
   // Test 1: The Loyalist / Heavy Repeater Pattern
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const history: RawHistoryRecord[] = [];
 
     // Repeat 3 tracks heavily over 36 plays
@@ -62,7 +61,7 @@ export async function runMusicDNABehaviorProfilingTests() {
 
   // Test 2: The Adventurer / Explorer Pattern
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const history: RawHistoryRecord[] = [];
 
     // 35 completely distinct songs, each by a different artist
@@ -100,7 +99,7 @@ export async function runMusicDNABehaviorProfilingTests() {
 
   // Test 3: The Restless Searcher (High Skip Tendency)
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const history: RawHistoryRecord[] = [];
 
     // 25 plays with 18 skips (rapid skimming)
@@ -131,7 +130,7 @@ export async function runMusicDNABehaviorProfilingTests() {
 
   // Test 4: Marathon Session Listening Intensity
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
 
     // 3 long multi-hour sessions with high track density
     const sessions = [
@@ -182,7 +181,7 @@ export async function runMusicDNABehaviorProfilingTests() {
 
   // Test 5: Preference Stability and Change Rate under Taste Drift
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const now = new Date('2026-08-01T12:00:00Z');
     const history: RawHistoryRecord[] = [];
 
@@ -235,7 +234,7 @@ export async function runMusicDNABehaviorProfilingTests() {
 
   // Test 6: Zero History Handling (No Fake Data)
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const profile = MusicDNABehaviorProfilingService.profileListeningBehaviorFromData({
       userId,
       history: [],
@@ -256,7 +255,7 @@ export async function runMusicDNABehaviorProfilingTests() {
 
   // Test 7: Normalized Boundaries [0.0, 1.0] across all 9 metrics
   {
-    const userId = new Types.ObjectId().toString();
+    const userId = crypto.randomUUID().toString();
     const history: RawHistoryRecord[] = [
       {
         song: {

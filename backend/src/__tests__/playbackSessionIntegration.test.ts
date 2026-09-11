@@ -1,13 +1,12 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 
 export function runPlaybackSessionIntegrationTests() {
   console.log('[Playback Session Integration Test Suite] Starting tests...');
 
   // Test 1: Order Preservation of Played Songs
   {
-    const songId1 = new Types.ObjectId().toString();
-    const songId2 = new Types.ObjectId().toString();
+    const songId1 = crypto.randomUUID().toString();
+    const songId2 = crypto.randomUUID().toString();
 
     const mockSongsPlayed: Array<{ song: string; playedAt: Date }> = [];
 

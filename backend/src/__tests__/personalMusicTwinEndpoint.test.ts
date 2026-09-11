@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   getPersonalMusicTwin,
   refreshPersonalMusicTwin,
@@ -39,8 +38,8 @@ export async function runPersonalMusicTwinEndpointTests() {
   const originalGetOrGenerate = PersonalMusicTwinService.getOrGenerateTwin;
   const originalRefresh = PersonalMusicTwinService.refreshMusicTwin;
 
-  const validUserId = new Types.ObjectId().toString();
-  const otherUserId = new Types.ObjectId().toString();
+  const validUserId = crypto.randomUUID().toString();
+  const otherUserId = crypto.randomUUID().toString();
 
   const mockTwinAttributes = {
     ...getDefaultPersonalMusicTwin(validUserId),

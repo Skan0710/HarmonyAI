@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   StandardListeningSituation,
   STANDARD_SITUATIONS,
@@ -7,7 +6,6 @@ import {
   validateAndSanitizeRecommendationContext,
   RecommendationContextAttributes,
 } from '../schemas/recommendationContextSchema.js';
-import { RecommendationContext } from '../models/RecommendationContext.js';
 
 export function runRecommendationContextModelTests() {
   console.log('[Recommendation Context Model Test Suite] Starting tests...');
@@ -129,31 +127,23 @@ export function runRecommendationContextModelTests() {
     console.log('✓ Test 4 Passed: Numeric clamping and error detection validated.');
   }
 
-  // Test 5: Mongoose Model Instantiation & Schema Defaults
+  // Test 5: Sanitized context normalizes situation aliases the same way a stored preset would
   {
-    const userId = new Types.ObjectId();
-    const contextDoc = new RecommendationContext({
-      user: userId,
-      name: 'Evening Coding Focus',
-      situation: 'coding', // will trigger pre-save / set to 'work'
+    const result = validateAndSanitizeRecommendationContext({
+      situation: 'coding',
       mood: 'Deep Focus',
       desiredEnergy: 0.65,
       desiredTempo: 120,
       preferredGenres: ['Ambient', 'Lo-Fi'],
       discoveryLevel: 0.20,
-      isPreset: true,
-      metadata: { ide: 'VSCode' },
     });
 
-    assert.strictEqual(contextDoc.situation, StandardListeningSituation.Work);
-    assert.strictEqual(contextDoc.mood, 'Deep Focus');
-    assert.strictEqual(contextDoc.desiredEnergy, 0.65);
-    assert.strictEqual(contextDoc.desiredTempo, 120);
-    assert.strictEqual(contextDoc.isPreset, true);
-    assert.strictEqual(contextDoc.user?.toString(), userId.toString());
-    assert.strictEqual(contextDoc.metadata?.ide, 'VSCode');
+    assert.strictEqual(result.sanitized.situation, StandardListeningSituation.Work);
+    assert.strictEqual(result.sanitized.mood, 'Deep Focus');
+    assert.strictEqual(result.sanitized.desiredEnergy, 0.65);
+    assert.strictEqual(result.sanitized.desiredTempo, 120);
 
-    console.log('✓ Test 5 Passed: Mongoose model instantiation, hooks, and defaults verified.');
+    console.log('✓ Test 5 Passed: Situation alias normalization and sanitized defaults verified.');
   }
 
   // Test 6: Verify No Hardcoded Recommendation Results in Context Representation

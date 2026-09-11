@@ -1,6 +1,5 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
-import { RecommendationEvaluation } from '../models/RecommendationEvaluation.js';
+import { computeRecommendationEvaluationScore } from '../services/recommendationQualityMetricsService.js';
 import {
   RecommendationQualityMetricsService,
 } from '../services/recommendationQualityMetricsService.js';
@@ -27,10 +26,10 @@ import {
 export async function runRecommendationIntelligenceTests() {
   console.log('[Recommendation Intelligence & Evaluation Test Suite] Starting tests...');
 
-  const sampleUserId = new Types.ObjectId().toString();
-  const songId1 = new Types.ObjectId().toString();
-  const songId2 = new Types.ObjectId().toString();
-  const songId3 = new Types.ObjectId().toString();
+  const sampleUserId = crypto.randomUUID().toString();
+  const songId1 = crypto.randomUUID().toString();
+  const songId2 = crypto.randomUUID().toString();
+  const songId3 = crypto.randomUUID().toString();
 
   try {
     // =========================================================================
@@ -40,7 +39,7 @@ export async function runRecommendationIntelligenceTests() {
       console.log('\n--- 1. Recommendation Evaluation Model & Score Computation ---');
 
       // 1a. Full positive engagement (played + liked + saved + 100% completion)
-      const fullScore = RecommendationEvaluation.computeScore({
+      const fullScore = computeRecommendationEvaluationScore({
         played: true,
         liked: true,
         saved: true,
@@ -49,7 +48,7 @@ export async function runRecommendationIntelligenceTests() {
       assert.strictEqual(fullScore, 1.0, 'Full positive engagement score should be 1.0');
 
       // 1b. Skipped song (negative signal)
-      const skippedScore = RecommendationEvaluation.computeScore({
+      const skippedScore = computeRecommendationEvaluationScore({
         played: false,
         skipped: true,
         completionRate: 0.1,
@@ -57,14 +56,14 @@ export async function runRecommendationIntelligenceTests() {
       assert.ok(skippedScore <= 0.05, `Skipped song score should be near 0, got ${skippedScore}`);
 
       // 1c. Moderate completion played without like/save
-      const playOnlyScore = RecommendationEvaluation.computeScore({
+      const playOnlyScore = computeRecommendationEvaluationScore({
         played: true,
         completionRate: 0.5,
       });
       assert.ok(playOnlyScore > 0.2 && playOnlyScore < 0.6, `Play-only score expected ~0.325, got ${playOnlyScore}`);
 
       // 1d. Missing optional completionRate defaults gracefully
-      const missingCompScore = RecommendationEvaluation.computeScore({
+      const missingCompScore = computeRecommendationEvaluationScore({
         played: true,
         liked: false,
         saved: false,
@@ -117,7 +116,7 @@ export async function runRecommendationIntelligenceTests() {
         },
         {
           userId: sampleUserId,
-          songId: new Types.ObjectId().toString(),
+          songId: crypto.randomUUID().toString(),
           source: 'collaborative',
           signals: ['collaborative'],
           played: false,

@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   AdaptiveRecommendationRankingPipeline,
   AdaptivePipelineOptions,
@@ -13,32 +12,32 @@ import { HybridCandidate } from '../services/candidateGenerationService.js';
 export async function runRecommendationPipelineOptimizationTests(): Promise<void> {
   console.log('[Pipeline Optimization Test Suite] Starting tests...');
 
-  const userId = new Types.ObjectId().toString();
+  const userId = crypto.randomUUID().toString();
   const testSong1 = {
-    _id: new Types.ObjectId(),
+    _id: crypto.randomUUID(),
     title: 'Neon Skyline',
-    artist: { _id: new Types.ObjectId(), name: 'Synth Wave' },
-    genre: { _id: new Types.ObjectId(), name: 'Synthpop' },
+    artist: { _id: crypto.randomUUID(), name: 'Synth Wave' },
+    genre: { _id: crypto.randomUUID(), name: 'Synthpop' },
     energy: 0.8,
     danceability: 0.75,
     valence: 0.6,
   };
 
   const testSong2 = {
-    _id: new Types.ObjectId(),
+    _id: crypto.randomUUID(),
     title: 'Midnight Echoes',
-    artist: { _id: new Types.ObjectId(), name: 'Echo Park' },
-    genre: { _id: new Types.ObjectId(), name: 'Indie Rock' },
+    artist: { _id: crypto.randomUUID(), name: 'Echo Park' },
+    genre: { _id: crypto.randomUUID(), name: 'Indie Rock' },
     energy: 0.5,
     danceability: 0.4,
     valence: 0.3,
   };
 
   const testSong3 = {
-    _id: new Types.ObjectId(),
+    _id: crypto.randomUUID(),
     title: 'Solar Flare',
-    artist: { _id: new Types.ObjectId(), name: 'Sunburst' },
-    genre: { _id: new Types.ObjectId(), name: 'Electronic' },
+    artist: { _id: crypto.randomUUID(), name: 'Sunburst' },
+    genre: { _id: crypto.randomUUID(), name: 'Electronic' },
     energy: 0.9,
     danceability: 0.85,
     valence: 0.9,

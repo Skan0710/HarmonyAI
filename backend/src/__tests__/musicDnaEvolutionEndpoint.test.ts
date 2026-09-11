@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Types } from 'mongoose';
 import {
   getEvolutionOverview,
   getEvolutionTimeline,
@@ -42,8 +41,8 @@ function createMockResponse(): MockResponse {
 export async function runMusicDnaEvolutionEndpointTests() {
   console.log('[Music DNA Evolution API Endpoint Test Suite] Starting tests...\n');
 
-  const testUserId = new Types.ObjectId().toString();
-  const foreignUserId = new Types.ObjectId().toString();
+  const testUserId = crypto.randomUUID().toString();
+  const foreignUserId = crypto.randomUUID().toString();
 
   // Save original service functions
   const originalGetOrGenerate = UnifiedMusicDNAService.getOrGenerateProfile;
@@ -88,8 +87,8 @@ export async function runMusicDnaEvolutionEndpointTests() {
 
     MusicDNASnapshotService.getSnapshots = async () => [
       {
-        _id: new Types.ObjectId().toString(),
-        userId: new Types.ObjectId(testUserId),
+        _id: crypto.randomUUID().toString(),
+        userId: String(testUserId),
         snapshotVersion: '1.0.0',
         triggerReason: 'periodic_evolution_checkpoint',
         createdAt: new Date(),
@@ -99,8 +98,8 @@ export async function runMusicDnaEvolutionEndpointTests() {
         preferredMoods: [{ mood: 'Euphoric', affinityScore: 0.8 }],
       } as any,
       {
-        _id: new Types.ObjectId().toString(),
-        userId: new Types.ObjectId(testUserId),
+        _id: crypto.randomUUID().toString(),
+        userId: String(testUserId),
         snapshotVersion: '1.0.0',
         triggerReason: 'initial_checkpoint',
         createdAt: new Date(Date.now() - 7 * 86400000),
@@ -112,8 +111,8 @@ export async function runMusicDnaEvolutionEndpointTests() {
     ];
 
     MusicDNASnapshotService.getLatestSnapshot = async () => ({
-      _id: new Types.ObjectId().toString(),
-      userId: new Types.ObjectId(testUserId),
+      _id: crypto.randomUUID().toString(),
+      userId: String(testUserId),
       snapshotVersion: '1.0.0',
       triggerReason: 'periodic_evolution_checkpoint',
       createdAt: new Date(),
@@ -124,8 +123,8 @@ export async function runMusicDnaEvolutionEndpointTests() {
     } as any);
 
     MusicDNASnapshotService.captureCurrentSnapshot = async (userId: string, opts?: any) => ({
-      _id: new Types.ObjectId().toString(),
-      userId: new Types.ObjectId(userId),
+      _id: crypto.randomUUID().toString(),
+      userId: String(userId),
       snapshotVersion: '1.0.0',
       triggerReason: opts?.triggerReason || 'manual_api_request',
       createdAt: new Date(),
