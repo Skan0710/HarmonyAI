@@ -1,6 +1,6 @@
-import { Types } from 'mongoose';
-import { ListeningHistory } from '../models/ListeningHistory.js';
-import { User } from '../models/User.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 
 export interface GenreStat {
   genre: {
@@ -38,40 +38,45 @@ export interface UserListeningProfile {
   frequentlyPlayedSongs: SongStat[];
 }
 
+const SONG_JOIN_SELECT =
+  '*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)';
+
 export class ListeningProfileService {
   static async getUserListeningProfile(userId: string): Promise<UserListeningProfile> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
 
-    const userObjectId = new Types.ObjectId(userId);
+    // 1. Fetch Listening History with full song population
+    const { data: historyRows, error: historyError } = await supabase
+      .from('listening_history')
+      .select(`played_at, songs(${SONG_JOIN_SELECT})`)
+      .eq('user_id', userId)
+      .order('played_at', { ascending: false });
 
-    // 1. Fetch Listening History with full population
-    const historyEntries = await ListeningHistory.find({ user: userObjectId })
-      .populate({
-        path: 'song',
-        populate: [
-          { path: 'artist', select: 'name profileImage avatar verified' },
-          { path: 'album', select: 'title coverImage releaseYear' },
-          { path: 'genre', select: 'name slug coverImage' },
-        ],
-      })
-      .sort({ playedAt: -1 })
-      .lean();
+    if (historyError) {
+      throw new Error(`Failed to fetch listening history: ${historyError.message}`);
+    }
+
+    // Preserve one entry per history row (including rows whose song was deleted), matching
+    // the original Mongoose behavior of counting all history entries before filtering nulls.
+    const historyEntries = (historyRows || []).map((row: any) =>
+      row.songs ? mapSongRow(row.songs) : null
+    );
 
     // 2. Fetch User Liked Songs
-    const userDoc = await User.findById(userObjectId)
-      .populate({
-        path: 'likedSongs',
-        populate: [
-          { path: 'artist', select: 'name profileImage avatar verified' },
-          { path: 'album', select: 'title coverImage releaseYear' },
-          { path: 'genre', select: 'name slug coverImage' },
-        ],
-      })
-      .lean();
+    const { data: likedRows, error: likedError } = await supabase
+      .from('user_liked_songs')
+      .select(`songs(${SONG_JOIN_SELECT})`)
+      .eq('user_id', userId);
 
-    const likedSongs = userDoc?.likedSongs || [];
+    if (likedError) {
+      throw new Error(`Failed to fetch liked songs: ${likedError.message}`);
+    }
+
+    const likedSongs = (likedRows || [])
+      .map((row: any) => (row.songs ? mapSongRow(row.songs) : null))
+      .filter(Boolean) as any[];
 
     // 3. Basic Listening Statistics
     const totalPlays = historyEntries.length;
@@ -82,8 +87,7 @@ export class ListeningProfileService {
     const genrePlayMap = new Map<string, { genre: any; count: number }>();
 
     // Process history entries
-    for (const entry of historyEntries) {
-      const song = entry.song as any;
+    for (const song of historyEntries) {
       if (!song || !_idToStr(song._id)) continue;
 
       totalListeningTimeSecs += song.duration || 0;
@@ -118,7 +122,7 @@ export class ListeningProfileService {
     }
 
     // Process liked songs to give additional weight to user preferences
-    for (const song of likedSongs as any[]) {
+    for (const song of likedSongs) {
       if (!song || !_idToStr(song._id)) continue;
 
       // Add artist weight from liked songs

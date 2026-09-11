@@ -1,10 +1,9 @@
-import { Types } from 'mongoose';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
 import {
   NoveltyScoringWeights,
   getNoveltyConfigWeights,
 } from '../config/recommendationConfig.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
-import { RecommendationInteraction } from '../models/RecommendationInteraction.js';
 import { HybridRankedResult } from './hybridRankingPipeline.js';
 
 export type UserFamiliarityCategory =
@@ -210,7 +209,7 @@ export class NoveltyScoringService {
     const encounterCounts = new Map<string, number>();
     let totalCount = 0;
 
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       return {
         userId: userId || '',
         songEncounterCounts: encounterCounts,
@@ -224,28 +223,28 @@ export class NoveltyScoringService {
 
     try {
       // 1. Query listening history
-      const historyRecords = await ListeningHistory.find({ user: userId })
-        .select('song completed skipped progressPercent')
-        .lean()
-        .exec();
+      const { data: historyRecords } = await supabase
+        .from('listening_history')
+        .select('song_id, completed, skipped, progress_percent')
+        .eq('user_id', userId);
 
-      for (const record of historyRecords) {
-        if (!record.song) continue;
-        const songId = record.song.toString();
+      for (const record of historyRecords || []) {
+        if (!record.song_id) continue;
+        const songId = record.song_id;
         const current = encounterCounts.get(songId) || 0;
         encounterCounts.set(songId, current + 1);
         totalCount++;
       }
 
       // 2. Query recommendation interaction data
-      const interactions = await RecommendationInteraction.find({ user: userId })
-        .select('song action')
-        .lean()
-        .exec();
+      const { data: interactions } = await supabase
+        .from('recommendation_interactions')
+        .select('song_id, action')
+        .eq('user_id', userId);
 
-      for (const inter of interactions) {
-        if (!inter.song) continue;
-        const songId = inter.song.toString();
+      for (const inter of interactions || []) {
+        if (!inter.song_id) continue;
+        const songId = inter.song_id;
         const current = encounterCounts.get(songId) || 0;
         const weight = inter.action === 'play' || inter.action === 'like' ? 1 : 0.5;
         encounterCounts.set(songId, current + weight);

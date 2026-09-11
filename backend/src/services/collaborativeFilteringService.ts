@@ -1,5 +1,6 @@
-import { Types } from 'mongoose';
-import { Song } from '../models/Song.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 import { UserSongInteractionMatrixService } from './interactionMatrixService.js';
 import { UserSimilarityService } from './userSimilarityService.js';
 
@@ -19,7 +20,7 @@ export class CollaborativeFilteringService {
    * Generates Collaborative Filtering song recommendations for a target user ID.
    * Finds similar users (KNN), accumulates predicted scores using user similarity & interaction strength,
    * and excludes songs the target user has already interacted with.
-   * 
+   *
    * @param userId Target user ObjectId string
    * @param limit Maximum number of recommended songs to return (default 10)
    * @param neighborLimit Maximum number of similar neighbors to evaluate (default 20)
@@ -31,7 +32,7 @@ export class CollaborativeFilteringService {
     neighborLimit = 20,
     debug = false
   ): Promise<any | { recommendations: any[]; diagnostics: CollaborativeDiagnostics }> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
 
@@ -117,14 +118,20 @@ export class CollaborativeFilteringService {
     const topCandidates = candidateScores.slice(0, Math.max(1, limit));
     const topSongIds = topCandidates.map((c) => c.songId);
 
-    // 5. Fetch populated Song documents from MongoDB
-    const songs = await Song.find({ _id: { $in: topSongIds }, isPublished: true })
-      .populate('artist', 'name profileImage avatar verified')
-      .populate('album', 'title coverImage releaseYear')
-      .populate('genre', 'name slug')
-      .lean();
+    // 5. Fetch joined Song rows from Supabase
+    let songs: any[] = [];
+    if (topSongIds.length > 0) {
+      const { data: songRows, error } = await supabase
+        .from('songs')
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .in('id', topSongIds)
+        .eq('is_published', true);
 
-    const songMap = new Map<string, any>(songs.map((s) => [s._id.toString(), s]));
+      if (error) throw new Error(`Failed to fetch songs: ${error.message}`);
+      songs = (songRows || []).map(mapSongRow);
+    }
+
+    const songMap = new Map<string, any>(songs.map((s) => [s._id, s]));
 
     // Preserve candidate score ordering and attach recommendationScore
     const results: any[] = [];

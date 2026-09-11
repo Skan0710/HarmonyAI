@@ -1,6 +1,5 @@
-import { Types } from 'mongoose';
-import { RecommendationInteraction } from '../models/RecommendationInteraction.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
 import {
   RecommendationRepetitionConfig,
   getRepetitionConfig,
@@ -42,25 +41,31 @@ export class RecommendationHistoryService {
     songIds: string[],
     recommendationSource = 'hybrid'
   ): Promise<number> {
-    if (!Types.ObjectId.isValid(userId) || !Array.isArray(songIds) || songIds.length === 0) {
+    if (!isValidObjectId(userId) || !Array.isArray(songIds) || songIds.length === 0) {
       return 0;
     }
 
-    const userObjId = new Types.ObjectId(userId);
-    const validDocs = songIds
-      .filter((id) => Types.ObjectId.isValid(id))
+    const validRows = songIds
+      .filter((id) => isValidObjectId(id))
       .map((id) => ({
-        user: userObjId,
-        song: new Types.ObjectId(id),
+        user_id: userId,
+        song_id: id,
         action: 'impression' as const,
-        recommendationSource,
-        timestamp: new Date(),
+        metadata: { recommendationSource },
       }));
 
-    if (validDocs.length === 0) return 0;
+    if (validRows.length === 0) return 0;
 
-    const res = await RecommendationInteraction.insertMany(validDocs);
-    return res.length;
+    const { data, error } = await supabase
+      .from('recommendation_interactions')
+      .insert(validRows)
+      .select('id');
+
+    if (error) {
+      throw new Error(`Failed to record recommendation impressions: ${error.message}`);
+    }
+
+    return (data || []).length;
   }
 
   /**
@@ -71,7 +76,7 @@ export class RecommendationHistoryService {
     windowHours?: number
   ): Promise<Map<string, RecentRecommendationRecord>> {
     const recommendedMap = new Map<string, RecentRecommendationRecord>();
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       return recommendedMap;
     }
 
@@ -79,22 +84,26 @@ export class RecommendationHistoryService {
     const hours = windowHours || config.cooldownWindowHours;
     const cutoffDate = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    const interactions = await RecommendationInteraction.find({
-      user: new Types.ObjectId(userId),
-      action: { $in: ['impression', 'click', 'play'] },
-      timestamp: { $gte: cutoffDate },
-    })
-      .sort({ timestamp: -1 })
-      .limit(config.maxRecentHistoryLookback)
-      .lean();
+    const { data: interactions, error } = await supabase
+      .from('recommendation_interactions')
+      .select('song_id, created_at')
+      .eq('user_id', userId)
+      .in('action', ['impression', 'click', 'play'])
+      .gte('created_at', cutoffDate.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(config.maxRecentHistoryLookback);
+
+    if (error || !interactions) {
+      return recommendedMap;
+    }
 
     for (const record of interactions) {
-      const sId = record.song.toString();
+      const sId = record.song_id;
       const existing = recommendedMap.get(sId);
       if (!existing) {
         recommendedMap.set(sId, {
           songId: sId,
-          timestamp: record.timestamp,
+          timestamp: record.created_at ? new Date(record.created_at) : new Date(),
           count: 1,
         });
       } else {
@@ -114,7 +123,7 @@ export class RecommendationHistoryService {
     windowHours?: number
   ): Promise<Set<string>> {
     const skippedSet = new Set<string>();
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       return skippedSet;
     }
 
@@ -122,29 +131,25 @@ export class RecommendationHistoryService {
     const hours = windowHours || config.skippedCooldownWindowHours;
     const cutoffDate = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    const userObjId = new Types.ObjectId(userId);
-
     // 1. Check recommendation skips
-    const recSkips = await RecommendationInteraction.find({
-      user: userObjId,
-      action: 'skip',
-      timestamp: { $gte: cutoffDate },
-    })
-      .select('song')
-      .lean();
+    const { data: recSkips } = await supabase
+      .from('recommendation_interactions')
+      .select('song_id')
+      .eq('user_id', userId)
+      .eq('action', 'skip')
+      .gte('created_at', cutoffDate.toISOString());
 
-    recSkips.forEach((r) => skippedSet.add(r.song.toString()));
+    (recSkips || []).forEach((r) => skippedSet.add(r.song_id));
 
     // 2. Check listening history skips (preserves existing history functionality)
-    const historySkips = await ListeningHistory.find({
-      user: userObjId,
-      skipped: true,
-      playedAt: { $gte: cutoffDate },
-    })
-      .select('song')
-      .lean();
+    const { data: historySkips } = await supabase
+      .from('listening_history')
+      .select('song_id')
+      .eq('user_id', userId)
+      .eq('skipped', true)
+      .gte('played_at', cutoffDate.toISOString());
 
-    historySkips.forEach((h) => skippedSet.add(h.song.toString()));
+    (historySkips || []).forEach((h) => skippedSet.add(h.song_id));
 
     return skippedSet;
   }

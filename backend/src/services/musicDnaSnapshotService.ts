@@ -1,6 +1,6 @@
-import { Types } from 'mongoose';
-import {
-  MusicDNASnapshot,
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import type {
   IMusicDNASnapshot,
   ISnapshotTasteItem,
   ISnapshotMoodItem,
@@ -76,7 +76,7 @@ export class MusicDNASnapshotService {
     };
 
     return {
-      userId: new Types.ObjectId(dna.userId),
+      userId: dna.userId,
       snapshotVersion: dna.dnaVersion || '1.0.0',
       timestamp,
       triggerReason,
@@ -102,6 +102,54 @@ export class MusicDNASnapshotService {
   }
 
   /**
+   * Maps a `music_dna_snapshots` row back into the old Mongoose-shaped
+   * `IMusicDNASnapshot` interface that downstream consumers (change
+   * detection, taste evolution timeline, stability transformation, etc.)
+   * still expect.
+   *
+   * The Postgres table only has `genres` / `artists` / `moods` / `tendencies`
+   * / `listening_patterns` (jsonb) + `snapshot_date` / `created_at` columns —
+   * there's no dedicated column for `snapshotVersion`, `triggerReason`,
+   * `confidenceScore`, `interactionsCount`, `genreDiversity`,
+   * `artistDiversity`, or free-form `metadata` the way the old Mongoose
+   * schema had. Those scalar extras are folded into the `tendencies` jsonb
+   * blob on write (see `captureCurrentSnapshot`) and unpacked back out here;
+   * `listening_patterns` is reused to hold the 9-metric listening-behavior
+   * profile since the snapshot table has no separate column for it.
+   */
+  private static mapSnapshotRow(row: any): IMusicDNASnapshot {
+    const t = row.tendencies || {};
+    const createdAt = row.created_at ? new Date(row.created_at) : new Date();
+
+    const mapped = {
+      _id: row.id,
+      userId: row.user_id,
+      snapshotVersion: t.snapshotVersion || '1.0.0',
+      timestamp: row.snapshot_date ? new Date(row.snapshot_date) : createdAt,
+      triggerReason: t.triggerReason || 'interaction_update',
+      topGenres: (row.genres || []) as ISnapshotTasteItem[],
+      topArtists: (row.artists || []) as ISnapshotTasteItem[],
+      preferredMoods: (row.moods || []) as ISnapshotMoodItem[],
+      listeningBehavior: (row.listening_patterns || {}) as ISnapshotListeningBehavior,
+      tendencies: {
+        discoveryTendency: t.discoveryTendency ?? 0.5,
+        familiarityPreference: t.familiarityPreference ?? 0.5,
+        diversityPreference: t.diversityPreference ?? 0.5,
+        explorationPreference: t.explorationPreference ?? 0.5,
+      },
+      confidenceScore: t.confidenceScore ?? 0.1,
+      interactionsCount: t.interactionsCount ?? 0,
+      genreDiversity: t.genreDiversity ?? 0.5,
+      artistDiversity: t.artistDiversity ?? 0.5,
+      metadata: t.metadata || {},
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    return mapped as unknown as IMusicDNASnapshot;
+  }
+
+  /**
    * Captures the current Music DNA for a user and creates a new immutable historical snapshot.
    * Never overwrites existing snapshots.
    */
@@ -109,7 +157,7 @@ export class MusicDNASnapshotService {
     userId: string,
     options: CreateSnapshotOptions = {}
   ): Promise<IMusicDNASnapshot> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error(`Invalid userId provided for snapshot: ${userId}`);
     }
 
@@ -118,12 +166,38 @@ export class MusicDNASnapshotService {
       forceRefresh: options.forceGenerate,
     });
 
-    // 2. Build snapshot document payload
+    // 2. Build snapshot payload (pure mapper)
     const snapshotPayload = this.buildSnapshotDataFromUnifiedDNA(currentDNA, options);
 
-    // 3. Save as a new snapshot (strictly append-only / immutable)
-    const snapshot = new MusicDNASnapshot(snapshotPayload);
-    return await snapshot.save();
+    // 3. Insert as a new snapshot row (strictly append-only / immutable —
+    // no unique constraint on user_id, unlike `music_dna`).
+    const { data: inserted, error } = await (supabase.from('music_dna_snapshots') as any)
+      .insert({
+        user_id: String(snapshotPayload.userId),
+        snapshot_date: snapshotPayload.timestamp.toISOString(),
+        genres: snapshotPayload.topGenres as any,
+        artists: snapshotPayload.topArtists as any,
+        moods: snapshotPayload.preferredMoods as any,
+        listening_patterns: snapshotPayload.listeningBehavior as any,
+        tendencies: {
+          ...snapshotPayload.tendencies,
+          confidenceScore: snapshotPayload.confidenceScore,
+          interactionsCount: snapshotPayload.interactionsCount,
+          genreDiversity: snapshotPayload.genreDiversity,
+          artistDiversity: snapshotPayload.artistDiversity,
+          snapshotVersion: snapshotPayload.snapshotVersion,
+          triggerReason: snapshotPayload.triggerReason,
+          metadata: snapshotPayload.metadata,
+        } as any,
+      })
+      .select()
+      .single();
+
+    if (error || !inserted) {
+      throw new Error(`Failed to capture Music DNA snapshot: ${error?.message || 'unknown error'}`);
+    }
+
+    return this.mapSnapshotRow(inserted);
   }
 
   /**
@@ -133,51 +207,69 @@ export class MusicDNASnapshotService {
     userId: string,
     options: GetSnapshotsOptions = {}
   ): Promise<IMusicDNASnapshot[]> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error(`Invalid userId provided: ${userId}`);
     }
 
-    const uid = new Types.ObjectId(userId);
-    const query: any = { userId: uid };
+    let q = supabase.from('music_dna_snapshots').select('*').eq('user_id', userId);
 
-    if (options.startDate || options.endDate) {
-      query.timestamp = {};
-      if (options.startDate) query.timestamp.$gte = options.startDate;
-      if (options.endDate) query.timestamp.$lte = options.endDate;
+    if (options.startDate) {
+      q = q.gte('snapshot_date', options.startDate.toISOString());
+    }
+    if (options.endDate) {
+      q = q.lte('snapshot_date', options.endDate.toISOString());
     }
 
-    const sortDirection = options.sortAsc ? 1 : -1;
-    const dbQuery = MusicDNASnapshot.find(query).sort({ timestamp: sortDirection });
+    q = q.order('snapshot_date', { ascending: Boolean(options.sortAsc) });
 
     if (options.limit && options.limit > 0) {
-      dbQuery.limit(options.limit);
+      q = q.limit(options.limit);
     }
 
-    return await dbQuery.exec();
+    const { data, error } = await q;
+    if (error) {
+      throw new Error(`Failed to fetch Music DNA snapshots: ${error.message}`);
+    }
+
+    return (data || []).map((row) => this.mapSnapshotRow(row));
   }
 
   /**
    * Returns the most recent snapshot for a user.
    */
   static async getLatestSnapshot(userId: string): Promise<IMusicDNASnapshot | null> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       return null;
     }
-    return await MusicDNASnapshot.findLatestByUserId(userId);
+
+    const { data, error } = await supabase
+      .from('music_dna_snapshots')
+      .select('*')
+      .eq('user_id', userId)
+      .order('snapshot_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return this.mapSnapshotRow(data);
   }
 
   /**
    * Retrieves the two most recent snapshots (latest and previous) for change detection comparison.
    */
   static async getSnapshotPair(userId: string): Promise<SnapshotPairResult> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       return { latest: null, previous: null, hasSufficientHistory: false };
     }
 
-    const snapshots = await MusicDNASnapshot.find({ userId: new Types.ObjectId(userId) })
-      .sort({ timestamp: -1 })
-      .limit(2)
-      .exec();
+    const { data, error } = await supabase
+      .from('music_dna_snapshots')
+      .select('*')
+      .eq('user_id', userId)
+      .order('snapshot_date', { ascending: false })
+      .limit(2);
+
+    const snapshots = error ? [] : (data || []).map((row) => this.mapSnapshotRow(row));
 
     const latest = snapshots.length > 0 ? snapshots[0] : null;
     const previous = snapshots.length > 1 ? snapshots[1] : null;

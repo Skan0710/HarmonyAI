@@ -1,6 +1,6 @@
-import { Types } from 'mongoose';
-import { User } from '../models/User.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 import { getRecencyConfig } from '../config/recommendationConfig.js';
 
 export interface GenreAffinity {
@@ -67,7 +67,7 @@ export class UserTasteProfileService {
     userId: string,
     options: { shortTermDays?: number; longTermDays?: number; halfLifeDays?: number } = {}
   ): Promise<UserTasteProfile> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
 
@@ -76,42 +76,44 @@ export class UserTasteProfileService {
     const longTermDays = options.longTermDays || 180;
     const halfLifeDays = options.halfLifeDays || config.halfLifeDays || 30;
 
-    const userObjectId = new Types.ObjectId(userId);
     const now = new Date();
     const shortTermCutoff = new Date(now.getTime() - shortTermDays * 24 * 60 * 60 * 1000);
     const longTermCutoff = new Date(now.getTime() - longTermDays * 24 * 60 * 60 * 1000);
 
-    // 1. Concurrently fetch User Document and User Listening History
-    const [userDoc, historyRecords] = await Promise.all([
-      User.findById(userObjectId)
-        .populate({
-          path: 'likedSongs',
-          populate: [
-            { path: 'genre', select: 'name slug' },
-            { path: 'artist', select: 'name' },
-          ],
-        })
-        .populate('favoriteGenres', 'name slug')
-        .populate('favoriteArtists', 'name')
-        .lean(),
-      ListeningHistory.find({
-        user: userObjectId,
-        playedAt: { $gte: longTermCutoff },
-      })
-        .populate({
-          path: 'song',
-          populate: [
-            { path: 'genre', select: 'name slug' },
-            { path: 'artist', select: 'name' },
-          ],
-        })
-        .sort({ playedAt: -1 })
-        .lean(),
+    const songJoin = '*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)';
+
+    // 1. Concurrently fetch the user row, liked songs, favorite genres/artists, and listening history
+    const [userRowRes, likedRes, favGenreRes, favArtistRes, historyRes] = await Promise.all([
+      supabase.from('users').select('id').eq('id', userId).maybeSingle(),
+      supabase.from('user_liked_songs').select(`songs(${songJoin})`).eq('user_id', userId),
+      supabase.from('user_favorite_genres').select('genres(id, name, slug)').eq('user_id', userId),
+      supabase.from('user_favorite_artists').select('artists(id, name)').eq('user_id', userId),
+      supabase
+        .from('listening_history')
+        .select('played_at, completed, skipped, progress_percent, ' + `songs(${songJoin})`)
+        .eq('user_id', userId)
+        .gte('played_at', longTermCutoff.toISOString())
+        .order('played_at', { ascending: false }),
     ]);
 
-    if (!userDoc) {
+    if (!userRowRes.data) {
       throw new Error('User not found');
     }
+
+    const likedSongs = (likedRes.data || [])
+      .map((r: any) => mapSongRow(r.songs))
+      .filter(Boolean) as any[];
+
+    const favoriteGenres = (favGenreRes.data || []).map((r: any) => r.genres).filter(Boolean) as any[];
+    const favoriteArtists = (favArtistRes.data || []).map((r: any) => r.artists).filter(Boolean) as any[];
+
+    const historyRecords = (historyRes.data || []).map((r: any) => ({
+      playedAt: r.played_at,
+      completed: r.completed,
+      skipped: r.skipped,
+      progressPercent: r.progress_percent,
+      song: mapSongRow(r.songs),
+    }));
 
     // Intermediate accumulation maps: ID -> { shortTerm: number, longTerm: number, name?: string }
     const genreRawScores = new Map<string, { shortTerm: number; longTerm: number; name?: string }>();
@@ -137,24 +139,24 @@ export class UserTasteProfileService {
     };
 
     // Seed explicit user preferences (Favorite Genres & Artists)
-    for (const fg of (userDoc.favoriteGenres as any[]) || []) {
+    for (const fg of favoriteGenres) {
       if (!fg) continue;
-      const gId = fg._id ? fg._id.toString() : fg.toString();
+      const gId = fg.id;
       const gAcc = getOrCreateGenre(gId, fg.name);
       gAcc.longTerm += 10;
       gAcc.shortTerm += 10;
     }
 
-    for (const fa of (userDoc.favoriteArtists as any[]) || []) {
+    for (const fa of favoriteArtists) {
       if (!fa) continue;
-      const aId = fa._id ? fa._id.toString() : fa.toString();
+      const aId = fa.id;
       const aAcc = getOrCreateArtist(aId, fa.name);
       aAcc.longTerm += 10;
       aAcc.shortTerm += 10;
     }
 
     // Process Liked Songs (Base weight +5 per liked track)
-    for (const song of (userDoc.likedSongs as any[]) || []) {
+    for (const song of likedSongs) {
       if (!song) continue;
 
       const likedWeight = 5;

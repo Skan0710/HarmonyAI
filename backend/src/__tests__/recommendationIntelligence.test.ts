@@ -83,8 +83,8 @@ export async function runRecommendationIntelligenceTests() {
 
       const mockEvaluations = [
         {
-          userId: new Types.ObjectId(sampleUserId),
-          songId: new Types.ObjectId(songId1),
+          userId: sampleUserId,
+          songId: songId1,
           source: 'hybrid',
           signals: ['hybrid', 'temporal'],
           played: true,
@@ -94,8 +94,8 @@ export async function runRecommendationIntelligenceTests() {
           completionRate: 0.95,
         },
         {
-          userId: new Types.ObjectId(sampleUserId),
-          songId: new Types.ObjectId(songId2),
+          userId: sampleUserId,
+          songId: songId2,
           source: 'hybrid',
           signals: ['hybrid', 'collaborative'],
           played: false,
@@ -105,8 +105,8 @@ export async function runRecommendationIntelligenceTests() {
           completionRate: 0.05,
         },
         {
-          userId: new Types.ObjectId(sampleUserId),
-          songId: new Types.ObjectId(songId3),
+          userId: sampleUserId,
+          songId: songId3,
           source: 'temporal',
           signals: ['temporal', 'content'],
           played: true,
@@ -116,8 +116,8 @@ export async function runRecommendationIntelligenceTests() {
           completionRate: 0.80,
         },
         {
-          userId: new Types.ObjectId(sampleUserId),
-          songId: new Types.ObjectId(),
+          userId: sampleUserId,
+          songId: new Types.ObjectId().toString(),
           source: 'collaborative',
           signals: ['collaborative'],
           played: false,
@@ -185,8 +185,8 @@ export async function runRecommendationIntelligenceTests() {
       // 3b. Missing optional interaction fields (evaluations with no completionRate)
       const partialEvaluations = [
         {
-          userId: new Types.ObjectId(sampleUserId),
-          songId: new Types.ObjectId(songId1),
+          userId: sampleUserId,
+          songId: songId1,
           source: 'hybrid',
           played: true,
           skipped: false,

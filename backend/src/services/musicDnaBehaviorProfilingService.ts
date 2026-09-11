@@ -1,8 +1,5 @@
-import { Types } from 'mongoose';
-import { User } from '../models/User.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
-import { ListeningSession } from '../models/ListeningSession.js';
-import { RecommendationInteraction } from '../models/RecommendationInteraction.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { fetchMusicDnaRawInputs } from './musicDnaDataFetchService.js';
 import {
   RawHistoryRecord,
   RawUserData,
@@ -182,53 +179,21 @@ export class MusicDNABehaviorProfilingService {
   }
 
   /**
-   * Fetches user history, active/past sessions, feedback, and user profile from MongoDB
-   * to build the complete Music DNA Listening Behavior Profile.
+   * Fetches user history, recent sessions, recent recommendation feedback, and
+   * user profile from Supabase to build the complete Music DNA Listening
+   * Behavior Profile.
    */
   static async profileListeningBehavior(
     userId: string,
     options: ExtractionOptions = {}
   ): Promise<MusicDNAListeningBehaviorProfile> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
 
-    const userObjectId = new Types.ObjectId(userId);
-
-    // 1. Concurrently fetch User, Listening History, Sessions, and Interactions
-    const [userDoc, historyDocs, sessionDocs, feedbackDocs] = await Promise.all([
-      User.findById(userObjectId)
-        .select('likedSongs favoriteGenres favoriteArtists')
-        .lean(),
-      ListeningHistory.find({ user: userObjectId })
-        .populate({
-          path: 'song',
-          select: 'title genre artist mood duration audioFeatures',
-          populate: [
-            { path: 'genre', select: 'name' },
-            { path: 'artist', select: 'name' },
-          ],
-        })
-        .sort({ playedAt: -1 })
-        .lean(),
-      ListeningSession.find({ user: userObjectId })
-        .sort({ startTime: -1 })
-        .limit(50)
-        .lean(),
-      RecommendationInteraction.find({ user: userObjectId })
-        .sort({ timestamp: -1 })
-        .limit(100)
-        .lean(),
-    ]);
-
-    const rawInputs: BehaviorProfilingRawInputs = {
-      userId,
-      user: userDoc as any,
-      history: historyDocs as any,
-      sessions: sessionDocs as any,
-      feedback: feedbackDocs as any,
+    const rawInputs: BehaviorProfilingRawInputs = await fetchMusicDnaRawInputs(userId, {
       referenceDate: options.referenceDate,
-    };
+    });
 
     return this.profileListeningBehaviorFromData(rawInputs, options);
   }

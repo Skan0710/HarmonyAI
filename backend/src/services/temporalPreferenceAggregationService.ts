@@ -1,12 +1,8 @@
-import { Types } from 'mongoose';
+import { supabase } from '../config/supabase.js';
 import {
-  TemporalPreference,
   TemporalTimeWindow,
   TimeWindow,
 } from '../models/TemporalPreference.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
-import { ListeningSession } from '../models/ListeningSession.js';
-import { User } from '../models/User.js';
 import {
   TemporalPreferenceAggregationConfig,
   getTemporalAggregationConfig,
@@ -518,77 +514,83 @@ export class TemporalPreferenceAggregationService {
   }
 
   /**
-   * Persists aggregated temporal preferences into the TemporalPreference collection.
+   * Persists aggregated temporal preferences into the Supabase `temporal_preferences` table.
+   *
+   * SCHEMA RESHAPE NOTE (Mongoose -> Supabase):
+   * The old Mongoose `TemporalPreference` collection stored one small document per
+   * (userId, type['genre'|'artist'|'mood'], timeWindow, genre|artist|mood) tuple via
+   * `bulkWrite` upserts - i.e. up to dozens of documents per user per aggregation run
+   * (one per genre, one per artist, one per mood, times 3 recency windows). The
+   * Postgres `temporal_preferences` table instead has exactly one row per
+   * (user_id, day_type, time_slot), with `preferred_genres` / `preferred_moods` as
+   * jsonb columns that hold *all* genres/artists/moods for that bucket at once, plus
+   * a `unique(user_id, day_type, time_slot)` constraint to upsert against.
+   *
+   * `day_type` / `time_slot` read as if they were meant for real day-of-week /
+   * time-of-day dayparting (e.g. day_type='weekday', time_slot='morning'), but
+   * nothing in this service - nor the original Mongoose model/aggregation logic -
+   * ever computed real dayparts from event timestamps. The only temporal axis this
+   * service has ever tracked is the short/medium/long-term recency window
+   * (`TimeWindow`). To satisfy the new composite key while preserving 100% of the
+   * original information content (nothing invented, nothing dropped), we map:
+   *   day_type  -> constant 'all'          (no day-of-week granularity exists yet)
+   *   time_slot -> the recency window      ('short_term' | 'medium_term' | 'long_term')
+   * This consolidates what used to be many small per-genre/per-artist documents into
+   * exactly 3 rows per user (one per recency window). Real day-of-week/time-of-day
+   * dayparting can replace this mapping later without touching the aggregation math.
+   *
+   * The new schema also has no dedicated `artist` column, so artist affinities are
+   * nested inside the `preferred_genres` jsonb payload alongside genres (shaped as
+   * `{ genres: [...], artists: [...] }`) rather than being dropped.
+   *
+   * `audio_feature_targets` is left null here: the original bulkWrite never
+   * persisted acoustic/audio-feature data either - that's only ever computed
+   * downstream (see LayeredTemporalTasteProfileService.extractAcousticTargets).
    */
   static async persistTemporalPreferences(
     userId: string,
     result: UserTemporalPreferenceAggregationResult
   ): Promise<number> {
-    if (!Types.ObjectId.isValid(userId)) return 0;
-    const userObjId = new Types.ObjectId(userId);
+    if (!userId) return 0;
 
-    const operations: any[] = [];
+    const DAY_TYPE = 'all';
 
-    const addBatchOps = (
-      scores: TemporalPreferenceScore[],
-      type: 'genre' | 'artist' | 'mood',
-      timeWindow: TemporalTimeWindow
-    ) => {
-      for (const item of scores) {
-        const filter: any = {
-          userId: userObjId,
-          type,
-          timeWindow,
-        };
+    const toJsonScore = (item: TemporalPreferenceScore) => ({
+      id: item.id,
+      name: item.name,
+      score: item.preferenceScore,
+      interactionCount: item.interactionCount,
+      lastInteractionAt: new Date(item.lastInteractionAt).toISOString(),
+    });
 
-        const updateData: any = {
-          userId: userObjId,
-          type,
-          preferenceScore: item.preferenceScore,
-          interactionCount: item.interactionCount,
-          lastInteractionAt: item.lastInteractionAt,
-          timeWindow,
-        };
+    const buildRow = (window: WindowPreferences) => ({
+      user_id: userId,
+      day_type: DAY_TYPE,
+      time_slot: window.timeWindow,
+      preferred_genres: {
+        genres: window.genres.map(toJsonScore),
+        artists: window.artists.map(toJsonScore),
+      },
+      preferred_moods: window.moods.map(toJsonScore),
+      updated_at: new Date().toISOString(),
+    });
 
-        if (type === 'genre') {
-          filter.genre = item.id || item.name;
-          updateData.genre = item.id || item.name;
-        } else if (type === 'artist') {
-          filter.artist = item.id || item.name;
-          updateData.artist = item.id || item.name;
-        } else if (type === 'mood') {
-          filter.mood = item.name;
-          updateData.mood = item.name;
-        }
+    const rows = [
+      buildRow(result.shortTerm),
+      buildRow(result.mediumTerm),
+      buildRow(result.longTerm),
+    ];
 
-        operations.push({
-          updateOne: {
-            filter,
-            update: { $set: updateData },
-            upsert: true,
-          },
-        });
-      }
-    };
+    const { error } = await (supabase.from('temporal_preferences') as any).upsert(
+      rows as any,
+      { onConflict: 'user_id,day_type,time_slot' }
+    );
 
-    // Save short, medium, and long term
-    addBatchOps(result.shortTerm.genres, 'genre', TimeWindow.SHORT_TERM);
-    addBatchOps(result.shortTerm.artists, 'artist', TimeWindow.SHORT_TERM);
-    addBatchOps(result.shortTerm.moods, 'mood', TimeWindow.SHORT_TERM);
-
-    addBatchOps(result.mediumTerm.genres, 'genre', TimeWindow.MEDIUM_TERM);
-    addBatchOps(result.mediumTerm.artists, 'artist', TimeWindow.MEDIUM_TERM);
-    addBatchOps(result.mediumTerm.moods, 'mood', TimeWindow.MEDIUM_TERM);
-
-    addBatchOps(result.longTerm.genres, 'genre', TimeWindow.LONG_TERM);
-    addBatchOps(result.longTerm.artists, 'artist', TimeWindow.LONG_TERM);
-    addBatchOps(result.longTerm.moods, 'mood', TimeWindow.LONG_TERM);
-
-    if (operations.length > 0) {
-      await TemporalPreference.bulkWrite(operations);
+    if (error) {
+      throw new Error(`Failed to persist temporal preferences: ${error.message}`);
     }
 
-    return operations.length;
+    return rows.length;
   }
 
   /**
@@ -598,7 +600,7 @@ export class TemporalPreferenceAggregationService {
     userId: string,
     options: AggregateTemporalOptions = {}
   ): Promise<UserTemporalPreferenceAggregationResult> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!userId) {
       throw new Error(`Invalid userId for temporal preference aggregation: ${userId}`);
     }
 
@@ -609,100 +611,110 @@ export class TemporalPreferenceAggregationService {
     const refDate = options.referenceDate || new Date();
     const maxLookbackMs = config.longTermDays * 24 * 60 * 60 * 1000;
     const earliestAllowedDate = new Date(refDate.getTime() - maxLookbackMs);
+    const earliestAllowedIso = earliestAllowedDate.toISOString();
 
-    // 1. Concurrently fetch Listening History, User Favorites, and Session Events
-    const [historyDocs, userDoc, sessionDocs] = await Promise.all([
-      ListeningHistory.find({
-        user: userId,
-        playedAt: { $gte: earliestAllowedDate },
-      })
-        .populate({
-          path: 'song',
-          select: 'genre artist mood title audioFeatures',
-          populate: [
-            { path: 'genre', select: 'name' },
-            { path: 'artist', select: 'name' },
-          ],
-        })
-        .lean(),
-      User.findById(userId)
-        .populate('favoriteGenres', 'name')
-        .populate('favoriteArtists', 'name')
-        .populate('likedSongs', 'genre artist mood')
-        .lean(),
-      ListeningSession.find({
-        user: userId,
-        startTime: { $gte: earliestAllowedDate },
-      })
-        .select('sessionEvents tracksPlayed tracksSkipped tracksCompleted')
-        .lean(),
-    ]);
+    // 1. Concurrently fetch Listening History (joined to song/genre/artist), User
+    // Favorites (the `users` table has no embedded favoriteGenres/favoriteArtists/
+    // likedSongs arrays like the old Mongoose model - they live in junction tables,
+    // see userService.ts for the established join pattern), the user's own
+    // createdAt (used as a fallback timestamp for favorite events, same as the
+    // original code), and Session Events.
+    const [historyResult, favGenresResult, favArtistsResult, userRowResult, sessionResult] =
+      await Promise.all([
+        supabase
+          .from('listening_history')
+          .select(
+            'song_id, played_at, completed, skipped, progress_percent, songs(id, title, mood, genre_id, artist_id, genres(id, name), artists(id, name))'
+          )
+          .eq('user_id', userId)
+          .gte('played_at', earliestAllowedIso),
+        supabase
+          .from('user_favorite_genres')
+          .select('genre_id, genres(id, name)')
+          .eq('user_id', userId),
+        supabase
+          .from('user_favorite_artists')
+          .select('artist_id, artists(id, name)')
+          .eq('user_id', userId),
+        supabase.from('users').select('created_at').eq('id', userId).maybeSingle(),
+        supabase
+          .from('listening_sessions')
+          .select('songs_played, tracks_skipped, tracks_completed, session_events, session_start')
+          .eq('user_id', userId)
+          .gte('session_start', earliestAllowedIso),
+      ]);
+
+    const historyDocs: any[] = historyResult.data || [];
+    const favGenreDocs: any[] = favGenresResult.data || [];
+    const favArtistDocs: any[] = favArtistsResult.data || [];
+    const userCreatedAt = (userRowResult.data as any)?.created_at
+      ? new Date((userRowResult.data as any).created_at)
+      : undefined;
+    const sessionDocs: any[] = sessionResult.data || [];
 
     const rawEvents: RawTemporalInteractionEvent[] = [];
 
     // Process Listening History
     for (const h of historyDocs) {
-      const songDoc = h.song as any;
+      const songDoc = h.songs as any;
       if (!songDoc) continue;
 
-      const genreId = songDoc.genre?._id ? songDoc.genre._id.toString() : songDoc.genre?.toString();
-      const genreName = songDoc.genre?.name || (typeof songDoc.genre === 'string' ? songDoc.genre : undefined);
-      const artistId = songDoc.artist?._id ? songDoc.artist._id.toString() : songDoc.artist?.toString();
-      const artistName = songDoc.artist?.name || (typeof songDoc.artist === 'string' ? songDoc.artist : undefined);
+      const genreId = songDoc.genres?.id || songDoc.genre_id;
+      const genreName = songDoc.genres?.name;
+      const artistId = songDoc.artists?.id || songDoc.artist_id;
+      const artistName = songDoc.artists?.name;
 
       let action = 'play';
       if (h.skipped) {
         action = 'skip';
-      } else if (h.completed || (h.progressPercent && h.progressPercent >= 90)) {
+      } else if (h.completed || (h.progress_percent && h.progress_percent >= 90)) {
         action = 'complete';
       }
 
       rawEvents.push({
-        songId: songDoc._id ? songDoc._id.toString() : undefined,
+        songId: songDoc.id,
         genreId,
         genreName,
         artistId,
         artistName,
         mood: songDoc.mood,
         action,
-        timestamp: h.playedAt || new Date(),
+        timestamp: h.played_at ? new Date(h.played_at) : new Date(),
       });
     }
 
-    // Process User Favorites
-    if (userDoc) {
-      if (userDoc.favoriteGenres) {
-        for (const g of userDoc.favoriteGenres as any[]) {
-          rawEvents.push({
-            genreId: g._id ? g._id.toString() : g.toString(),
-            genreName: g.name || (typeof g === 'string' ? g : undefined),
-            action: 'favorite',
-            timestamp: userDoc.createdAt || new Date(refDate.getTime() - 90 * 86400000),
-          });
-        }
-      }
-      if (userDoc.favoriteArtists) {
-        for (const a of userDoc.favoriteArtists as any[]) {
-          rawEvents.push({
-            artistId: a._id ? a._id.toString() : a.toString(),
-            artistName: a.name || (typeof a === 'string' ? a : undefined),
-            action: 'favorite',
-            timestamp: userDoc.createdAt || new Date(refDate.getTime() - 90 * 86400000),
-          });
-        }
-      }
+    // Process User Favorites (from the user_favorite_genres / user_favorite_artists
+    // junction tables, in place of the old User.favoriteGenres/favoriteArtists populate)
+    const favoriteTimestamp = userCreatedAt || new Date(refDate.getTime() - 90 * 86400000);
+    for (const g of favGenreDocs) {
+      const genre = g.genres as any;
+      rawEvents.push({
+        genreId: genre?.id || g.genre_id,
+        genreName: genre?.name,
+        action: 'favorite',
+        timestamp: favoriteTimestamp,
+      });
+    }
+    for (const a of favArtistDocs) {
+      const artist = a.artists as any;
+      rawEvents.push({
+        artistId: artist?.id || a.artist_id,
+        artistName: artist?.name,
+        action: 'favorite',
+        timestamp: favoriteTimestamp,
+      });
     }
 
-    // Process Session Events
+    // Process Session Events (the `session_events` jsonb column added by the
+    // 20260911b migration mirrors the old Mongoose embedded `sessionEvents` array)
     for (const sess of sessionDocs) {
-      if (sess.sessionEvents) {
-        for (const ev of sess.sessionEvents as any[]) {
-          rawEvents.push({
-            songId: ev.song ? ev.song.toString() : undefined,
-            action: ev.action || 'play',
-            timestamp: ev.timestamp || new Date(),
-          });
-        }
+      const events = (sess.session_events as any[]) || [];
+      for (const ev of events) {
+        rawEvents.push({
+          songId: ev.song ? String(ev.song) : undefined,
+          action: ev.action || 'play',
+          timestamp: ev.timestamp ? new Date(ev.timestamp) : new Date(),
+        });
       }
     }
 

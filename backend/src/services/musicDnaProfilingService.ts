@@ -1,7 +1,6 @@
-import { Types } from 'mongoose';
-import { User } from '../models/User.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
-import { MusicDNA } from '../models/MusicDNA.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { fetchMusicDnaRawInputs } from './musicDnaDataFetchService.js';
 import {
   MusicDNAExtractionService,
   ExtractionRawInputs,
@@ -123,66 +122,42 @@ export class MusicDNAProfilingService {
   }
 
   /**
-   * Fetches user profile and listening history from MongoDB and generates the Detailed Music DNA Profile.
+   * Fetches user profile and listening history from Supabase and generates the Detailed Music DNA Profile.
    */
   static async generateDetailedProfile(
     userId: string,
     options: ExtractionOptions = {}
   ): Promise<DetailedMusicDNAProfile> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
 
-    const userObjectId = new Types.ObjectId(userId);
-
-    const [userDoc, historyDocs] = await Promise.all([
-      User.findById(userObjectId)
-        .populate({
-          path: 'likedSongs',
-          populate: [
-            { path: 'genre', select: 'name' },
-            { path: 'artist', select: 'name' },
-          ],
-        })
-        .populate('favoriteGenres', 'name')
-        .populate('favoriteArtists', 'name')
-        .lean(),
-      ListeningHistory.find({ user: userObjectId })
-        .populate({
-          path: 'song',
-          populate: [
-            { path: 'genre', select: 'name' },
-            { path: 'artist', select: 'name' },
-          ],
-        })
-        .sort({ playedAt: -1 })
-        .lean(),
-    ]);
-
-    const inputs: ExtractionRawInputs = {
-      userId,
-      user: userDoc as any,
-      history: historyDocs as any,
+    const inputs: ExtractionRawInputs = await fetchMusicDnaRawInputs(userId, {
       referenceDate: options.referenceDate,
-    };
+    });
 
     const detailedProfile = this.generateDetailedProfileFromData(inputs, options);
 
-    // If persistence requested, attach detailed profile snapshot into user's MusicDNA metadata
+    // If persistence requested, record that a detailed profile was (re)computed.
+    //
+    // Note: unlike the old Mongoose `MusicDNA` model, the Postgres `music_dna`
+    // table has no free-form `metadata` column, so there's nowhere to cache
+    // `detailedProfileSnapshot` (genre/artist diversity + emerging lists) the
+    // way the old code did via `musicDnaDoc.metadata.detailedProfileSnapshot`.
+    // We only touch `last_calculated_at` on the existing row (mirroring the
+    // old "only persist if a MusicDNA doc already exists" guard); the
+    // detailed profile itself is still returned to the caller either way.
     if (options.persist) {
-      const musicDnaDoc = await MusicDNA.findByUserId(userId);
-      if (musicDnaDoc) {
-        musicDnaDoc.metadata = {
-          ...musicDnaDoc.metadata,
-          detailedProfileSnapshot: {
-            genreDiversity: detailedProfile.genreDiversity,
-            artistDiversity: detailedProfile.artistDiversity,
-            emergingGenres: detailedProfile.emergingGenres.map((g) => g.name),
-            emergingArtists: detailedProfile.emergingArtists.map((a) => a.name),
-            generatedAt: detailedProfile.generatedAt,
-          },
-        };
-        await musicDnaDoc.save();
+      const { data: existing } = await supabase
+        .from('music_dna')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (existing) {
+        await (supabase.from('music_dna') as any)
+          .update({ last_calculated_at: new Date().toISOString() })
+          .eq('user_id', userId);
       }
     }
 

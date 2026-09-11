@@ -1,6 +1,7 @@
-import { Types } from 'mongoose';
 import { IListeningSession } from '../models/ListeningSession.js';
-import { Song } from '../models/Song.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 
 export interface TemporarySessionProfile {
   sessionId: string;
@@ -37,16 +38,18 @@ export class SessionProfileService {
     }
 
     const songsPlayed = sessionDoc.songsPlayed;
-    const songIds = songsPlayed.map((sp) => sp.song);
+    const songIds = songsPlayed.map((sp) => sp.song.toString());
 
-    // Populate song details (genre, artist, audioFeatures, mood)
-    const songDocs = await Song.find({ _id: { $in: songIds } })
-      .populate('artist', 'name')
-      .populate('genre', 'name')
-      .lean();
+    // Fetch song details (genre, artist, audioFeatures, mood)
+    const { data: songRows } = await supabase
+      .from('songs')
+      .select('id, mood, audio_features, artists!songs_artist_id_fkey(id, name), genres!songs_genre_id_fkey(id, name)')
+      .in('id', songIds);
+
+    const songDocs = (songRows || []).map(mapSongRow);
 
     const songMap = new Map<string, any>();
-    songDocs.forEach((s) => songMap.set(s._id.toString(), s));
+    songDocs.forEach((s: any) => songMap.set(s._id.toString(), s));
 
     let totalWeightSum = 0;
     let weightedEnergySum = 0;
@@ -162,7 +165,7 @@ export class SessionProfileService {
   static async getActiveSessionProfileForUser(
     userId: string
   ): Promise<TemporarySessionProfile | null> {
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       return null;
     }
 

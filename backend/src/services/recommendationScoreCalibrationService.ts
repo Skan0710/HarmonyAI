@@ -1,9 +1,7 @@
-import { Types } from 'mongoose';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
 import { HybridRankedResult } from './hybridRankingPipeline.js';
 import { HybridCandidate } from './candidateGenerationService.js';
-import { RecommendationEvaluation } from '../models/RecommendationEvaluation.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
-import { User } from '../models/User.js';
 import {
   getRecommendationCalibrationConfig,
   RecommendationCalibrationConfig,
@@ -11,6 +9,7 @@ import {
 import {
   RecommendationQualityMetricsService,
   SignalQualityMetrics,
+  findRecommendationEvaluationsByUser,
 } from './recommendationQualityMetricsService.js';
 
 export interface UserFeedbackProfile {
@@ -36,9 +35,7 @@ export class RecommendationScoreCalibrationService {
   /**
    * Builds an in-memory profile of historical user feedback to calibrate recommendation scores.
    */
-  static async buildUserFeedbackProfile(
-    userId: string | Types.ObjectId
-  ): Promise<UserFeedbackProfile> {
+  static async buildUserFeedbackProfile(userId: string): Promise<UserFeedbackProfile> {
     const profile: UserFeedbackProfile = {
       likedSongIds: new Set<string>(),
       savedSongIds: new Set<string>(),
@@ -51,18 +48,22 @@ export class RecommendationScoreCalibrationService {
       signalPerformance: {},
     };
 
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       return profile;
     }
 
-    const uid = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
+    const uid = userId;
 
-    // 1. Fetch user's liked songs from User model
+    // 1. Fetch user's liked songs from the user_liked_songs junction table
     try {
-      const userDoc = await User.findById(uid).select('likedSongs').lean().exec();
-      if (userDoc && Array.isArray((userDoc as any).likedSongs)) {
-        for (const s of (userDoc as any).likedSongs) {
-          if (s) profile.likedSongIds.add(s.toString());
+      const { data: likedRows, error } = await supabase
+        .from('user_liked_songs')
+        .select('song_id')
+        .eq('user_id', uid);
+
+      if (!error && likedRows) {
+        for (const row of likedRows) {
+          if (row.song_id) profile.likedSongIds.add(row.song_id);
         }
       }
     } catch {
@@ -71,14 +72,14 @@ export class RecommendationScoreCalibrationService {
 
     // 2. Fetch evaluation records for user
     try {
-      const evaluations = await RecommendationEvaluation.findByUser(uid, { limit: 200 });
+      const evaluations = await findRecommendationEvaluationsByUser(uid, { limit: 200 });
       if (evaluations && evaluations.length > 0) {
         // Calculate signal performance from evaluations
         profile.signalPerformance =
           RecommendationQualityMetricsService.calculateMetricsBySource(evaluations);
 
         for (const ev of evaluations) {
-          const sid = ev.songId ? ev.songId.toString() : '';
+          const sid = ev.songId || '';
           if (!sid) continue;
 
           if (ev.liked) profile.likedSongIds.add(sid);
@@ -98,44 +99,46 @@ export class RecommendationScoreCalibrationService {
 
     // 3. Fallback/enrich with recent listening history for skips and completions
     try {
-      const recentHistory = await ListeningHistory.find({ user: uid })
-        .sort({ playedAt: -1 })
-        .limit(100)
-        .populate({ path: 'song', select: 'genre artist' })
-        .lean()
-        .exec();
+      const { data: recentHistory, error } = await supabase
+        .from('listening_history')
+        .select('song_id, skipped, completed, progress_percent, songs(genre_id, artist_id)')
+        .eq('user_id', uid)
+        .order('played_at', { ascending: false })
+        .limit(100);
 
-      for (const h of recentHistory) {
-        const songDoc = (h as any).song;
-        const sid = songDoc?._id ? songDoc._id.toString() : (h as any).song?.toString();
-        if (!sid) continue;
+      if (!error && recentHistory) {
+        for (const h of recentHistory as any[]) {
+          const songDoc = h.songs;
+          const sid = h.song_id;
+          const genreId = songDoc?.genre_id;
+          const artistId = songDoc?.artist_id;
 
-        const genreId = songDoc?.genre?.toString();
-        const artistId = songDoc?.artist?.toString();
+          if (h.skipped) {
+            if (sid) {
+              const count = profile.skippedSongIds.get(sid) || 0;
+              profile.skippedSongIds.set(sid, count + 1);
+            }
 
-        if (h.skipped) {
-          const count = profile.skippedSongIds.get(sid) || 0;
-          profile.skippedSongIds.set(sid, count + 1);
-
-          if (genreId) {
-            profile.genreSkipCounts.set(genreId, (profile.genreSkipCounts.get(genreId) || 0) + 1);
-          }
-          if (artistId) {
-            profile.artistSkipCounts.set(artistId, (profile.artistSkipCounts.get(artistId) || 0) + 1);
-          }
-        } else if (h.completed || ((h as any).progressPercent && (h as any).progressPercent >= 70)) {
-          profile.highCompletionSongIds.add(sid);
-          if (genreId) {
-            profile.genrePositiveScores.set(
-              genreId,
-              (profile.genrePositiveScores.get(genreId) || 0) + 1
-            );
-          }
-          if (artistId) {
-            profile.artistPositiveScores.set(
-              artistId,
-              (profile.artistPositiveScores.get(artistId) || 0) + 1
-            );
+            if (genreId) {
+              profile.genreSkipCounts.set(genreId, (profile.genreSkipCounts.get(genreId) || 0) + 1);
+            }
+            if (artistId) {
+              profile.artistSkipCounts.set(artistId, (profile.artistSkipCounts.get(artistId) || 0) + 1);
+            }
+          } else if (h.completed || (h.progress_percent && h.progress_percent >= 70)) {
+            if (sid) profile.highCompletionSongIds.add(sid);
+            if (genreId) {
+              profile.genrePositiveScores.set(
+                genreId,
+                (profile.genrePositiveScores.get(genreId) || 0) + 1
+              );
+            }
+            if (artistId) {
+              profile.artistPositiveScores.set(
+                artistId,
+                (profile.artistPositiveScores.get(artistId) || 0) + 1
+              );
+            }
           }
         }
       }

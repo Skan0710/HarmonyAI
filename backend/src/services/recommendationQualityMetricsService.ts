@@ -1,10 +1,29 @@
-import { Types } from 'mongoose';
-import { RecommendationEvaluation, IRecommendationEvaluation } from '../models/RecommendationEvaluation.js';
-import { RecommendationInteraction } from '../models/RecommendationInteraction.js';
+import { supabase } from '../config/supabase.js';
 import {
   getRecommendationQualityConfig,
   RecommendationQualityConfig,
 } from '../config/recommendationConfig.js';
+
+/**
+ * Plain-object replacement for the old Mongoose `IRecommendationEvaluation` document.
+ * `recommendation_evaluations` rows store these fields inside a single `metrics` jsonb
+ * column rather than as discrete columns, so this shape is reconstructed in `mapEvaluationRow`.
+ */
+export interface RecommendationEvaluationRecord {
+  userId: string;
+  songId: string;
+  source: string;
+  signals: string[];
+  recommendationScore?: number;
+  componentScores?: Record<string, number>;
+  played: boolean;
+  skipped: boolean;
+  liked: boolean;
+  saved: boolean;
+  completionRate?: number;
+  evaluationScore?: number;
+  timestamp: Date;
+}
 
 export interface QualityMetricRate {
   rate: number;          // 0.0 to 1.0 (rounded to 4 decimal places)
@@ -51,6 +70,62 @@ export interface RecommendationQualityMetrics {
   dataAvailable: boolean;
 }
 
+/**
+ * Reconstructs a `RecommendationEvaluationRecord` from a `recommendation_evaluations` row,
+ * pulling the discrete fields back out of the `metrics` jsonb blob.
+ */
+function mapEvaluationRow(row: any): RecommendationEvaluationRecord {
+  const metrics = row.metrics || {};
+  return {
+    userId: row.user_id,
+    songId: metrics.songId || metrics.song_id || '',
+    source: metrics.source || 'hybrid',
+    signals: Array.isArray(metrics.signals) ? metrics.signals : [],
+    recommendationScore: typeof metrics.recommendationScore === 'number' ? metrics.recommendationScore : undefined,
+    componentScores: metrics.componentScores || undefined,
+    played: Boolean(metrics.played),
+    skipped: Boolean(metrics.skipped),
+    liked: Boolean(metrics.liked),
+    saved: Boolean(metrics.saved),
+    completionRate: typeof metrics.completionRate === 'number' ? metrics.completionRate : undefined,
+    evaluationScore: typeof metrics.evaluationScore === 'number' ? metrics.evaluationScore : undefined,
+    timestamp: row.evaluated_at ? new Date(row.evaluated_at) : new Date(),
+  };
+}
+
+/**
+ * Replacement for the old Mongoose `RecommendationEvaluation.findByUser` static method.
+ * Queries the `recommendation_evaluations` table directly and reconstructs plain records
+ * from the `metrics` jsonb column.
+ */
+export async function findRecommendationEvaluationsByUser(
+  userId: string,
+  options: { limit?: number; skip?: number; since?: Date } = {}
+): Promise<RecommendationEvaluationRecord[]> {
+  let query = supabase
+    .from('recommendation_evaluations')
+    .select('id, user_id, metrics, evaluated_at')
+    .eq('user_id', userId)
+    .order('evaluated_at', { ascending: false });
+
+  if (options.since) {
+    query = query.gte('evaluated_at', options.since.toISOString());
+  }
+
+  if (options.limit) {
+    const from = options.skip || 0;
+    const to = from + options.limit - 1;
+    query = query.range(from, to);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Failed to fetch recommendation evaluations: ${error.message}`);
+  }
+
+  return (data || []).map(mapEvaluationRow);
+}
+
 export class RecommendationQualityMetricsService {
   /**
    * Computes engagement score using configurable weights.
@@ -93,7 +168,7 @@ export class RecommendationQualityMetricsService {
    * Calculates quality metrics in-memory from a collection of evaluation records.
    */
   static calculateMetricsFromEvaluations(
-    evaluations: Array<Partial<IRecommendationEvaluation>>,
+    evaluations: Array<Partial<RecommendationEvaluationRecord>>,
     options: { windowDays?: number; config?: RecommendationQualityConfig } = {}
   ): RecommendationQualityMetrics {
     const total = evaluations ? evaluations.length : 0;
@@ -208,7 +283,7 @@ export class RecommendationQualityMetricsService {
    * Groups evaluations by source/signals and computes metrics per signal.
    */
   static calculateMetricsBySource(
-    evaluations: Array<Partial<IRecommendationEvaluation>>,
+    evaluations: Array<Partial<RecommendationEvaluationRecord>>,
     config: RecommendationQualityConfig = getRecommendationQualityConfig()
   ): Record<string, SignalQualityMetrics> {
     const map = new Map<
@@ -342,49 +417,56 @@ export class RecommendationQualityMetricsService {
    * Calculates recommendation quality metrics for a given user from database records.
    */
   static async calculateMetricsForUser(
-    userId: string | Types.ObjectId,
+    userId: string,
     options: { windowDays?: number } = {}
   ): Promise<RecommendationQualityMetrics> {
-    const uid = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
+    const uid = userId;
     const since = options.windowDays
       ? new Date(Date.now() - options.windowDays * 24 * 60 * 60 * 1000)
       : undefined;
 
-    // 1. First fetch evaluations from RecommendationEvaluation
-    let evaluations: Array<Partial<IRecommendationEvaluation>> = [];
+    // 1. First fetch evaluations from recommendation_evaluations
+    let evaluations: Array<Partial<RecommendationEvaluationRecord>> = [];
     try {
-      evaluations = await RecommendationEvaluation.findByUser(uid, { since });
+      evaluations = await findRecommendationEvaluationsByUser(uid, { since });
     } catch {
       evaluations = [];
     }
 
-    // 2. If no direct evaluations exist, gracefully derive metrics from RecommendationInteraction
+    // 2. If no direct evaluations exist, gracefully derive metrics from recommendation_interactions
     if (evaluations.length === 0) {
       try {
-        const query: any = { user: uid };
+        let query = supabase
+          .from('recommendation_interactions')
+          .select('song_id, action, metadata, created_at')
+          .eq('user_id', uid);
+
         if (since) {
-          query.timestamp = { $gte: since };
+          query = query.gte('created_at', since.toISOString());
         }
-        const interactions = await RecommendationInteraction.find(query).exec();
+
+        const { data: interactions, error } = await query;
+        if (error) throw new Error(error.message);
 
         if (interactions && interactions.length > 0) {
           // Synthesize evaluation entries grouped by song
-          const songMap = new Map<string, Partial<IRecommendationEvaluation>>();
-          for (const inter of interactions) {
-            const sid = inter.song?.toString();
+          const songMap = new Map<string, Partial<RecommendationEvaluationRecord>>();
+          for (const inter of interactions as any[]) {
+            const sid = inter.song_id;
             if (!sid) continue;
             let entry = songMap.get(sid);
             if (!entry) {
+              const source = (inter.metadata && inter.metadata.source) || 'hybrid';
               entry = {
                 userId: uid,
-                songId: inter.song,
-                source: inter.recommendationSource || 'hybrid',
-                signals: [inter.recommendationSource || 'hybrid'],
+                songId: sid,
+                source,
+                signals: [source],
                 played: false,
                 skipped: false,
                 liked: false,
                 saved: false,
-                timestamp: inter.timestamp,
+                timestamp: inter.created_at ? new Date(inter.created_at) : new Date(),
               };
               songMap.set(sid, entry);
             }

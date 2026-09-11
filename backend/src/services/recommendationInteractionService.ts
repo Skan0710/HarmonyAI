@@ -1,6 +1,5 @@
-import { Types } from 'mongoose';
-import { User } from '../models/User.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
 
 export interface InteractionWeights {
   LIKE: number; // 5
@@ -68,30 +67,33 @@ export class RecommendationInteractionService {
 
   /**
    * Aggregates user activity (liked songs and listening history) into weighted song interaction scores.
-   * 
-   * @param userId Target user ObjectId string
+   *
+   * @param userId Target user id
    * @param customWeights Optional custom interaction weight overrides
    */
   static async getUserWeightedInteractions(
     userId: string,
     customWeights?: Partial<InteractionWeights>
   ): Promise<Map<string, SongInteractionScore>> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
 
-    const userObjectId = new Types.ObjectId(userId);
     const activeWeights = { ...this.weights, ...customWeights };
 
     // 1. Fetch User Liked Songs
-    const user = await User.findById(userObjectId).select('likedSongs').lean();
-    const likedSongIds = new Set<string>((user?.likedSongs || []).map((id) => id.toString()));
+    const { data: likedRows } = await supabase
+      .from('user_liked_songs')
+      .select('song_id')
+      .eq('user_id', userId);
+    const likedSongIds = new Set<string>((likedRows || []).map((r: any) => r.song_id));
 
     // 2. Fetch User Listening History Records
-    const historyRecords = await ListeningHistory.find({ user: userObjectId })
-      .select('song playedAt completed skipped progressPercent')
-      .sort({ playedAt: -1 })
-      .lean();
+    const { data: historyRecords } = await supabase
+      .from('listening_history')
+      .select('song_id, played_at, completed, skipped, progress_percent')
+      .eq('user_id', userId)
+      .order('played_at', { ascending: false });
 
     const scoreMap = new Map<string, SongInteractionScore>();
 
@@ -110,9 +112,9 @@ export class RecommendationInteractionService {
     }
 
     // Process listening history events
-    for (const record of historyRecords) {
-      if (!record.song) continue;
-      const songId = record.song.toString();
+    for (const record of historyRecords || []) {
+      if (!record.song_id) continue;
+      const songId = record.song_id;
       const isLiked = likedSongIds.has(songId);
 
       let item = scoreMap.get(songId);
@@ -135,7 +137,10 @@ export class RecommendationInteractionService {
       if (record.skipped) {
         item.skips += 1;
         item.weightedScore += activeWeights.SKIP;
-      } else if (record.completed !== false && (record.progressPercent === undefined || record.progressPercent >= 80)) {
+      } else if (
+        record.completed !== false &&
+        (record.progress_percent === undefined || record.progress_percent === null || record.progress_percent >= 80)
+      ) {
         item.completedPlays += 1;
         item.weightedScore += activeWeights.COMPLETED_PLAYBACK;
       } else {

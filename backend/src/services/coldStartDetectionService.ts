@@ -1,6 +1,5 @@
-import { Types } from 'mongoose';
-import { User } from '../models/User.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
 
 export type UserClassificationType = 'NEW' | 'LIMITED_DATA' | 'ACTIVE' | 'WELL_ESTABLISHED';
 
@@ -57,7 +56,7 @@ export class ColdStartDetectionService {
     userId: string,
     customThresholds?: Partial<ColdStartThresholds>
   ): Promise<ColdStartStatusResult> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
 
@@ -66,33 +65,42 @@ export class ColdStartDetectionService {
       ...customThresholds,
     };
 
-    const userObjId = new Types.ObjectId(userId);
+    // 0. Verify user exists
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
 
-    // 1. Fetch User Document (Liked songs, explicit favorite genres & artists)
-    const userDoc = await User.findById(userObjId)
-      .populate({
-        path: 'likedSongs',
-        select: 'genre artist',
-      })
-      .select('likedSongs favoriteGenres favoriteArtists')
-      .lean();
-
-    if (!userDoc) {
+    if (!userRow) {
       throw new Error('User not found');
     }
 
-    const likedSongs = (userDoc.likedSongs as any[]) || [];
-    const favoriteGenres = userDoc.favoriteGenres || [];
-    const favoriteArtists = userDoc.favoriteArtists || [];
+    // 1. Fetch liked songs (genre/artist), explicit favorite genres & artists
+    const [likedSongsRes, favoriteGenresRes, favoriteArtistsRes, historyRes] = await Promise.all([
+      supabase
+        .from('user_liked_songs')
+        .select('songs(genre_id, artist_id)')
+        .eq('user_id', userId),
+      supabase
+        .from('user_favorite_genres')
+        .select('genre_id')
+        .eq('user_id', userId),
+      supabase
+        .from('user_favorite_artists')
+        .select('artist_id')
+        .eq('user_id', userId),
+      // 2. Fetch User Listening History
+      supabase
+        .from('listening_history')
+        .select('completed, skipped, songs(genre_id, artist_id)')
+        .eq('user_id', userId),
+    ]);
 
-    // 2. Fetch User Listening History
-    const historyDocs = await ListeningHistory.find({ user: userObjId })
-      .populate({
-        path: 'song',
-        select: 'genre artist',
-      })
-      .select('song completed skipped')
-      .lean();
+    const likedSongs = ((likedSongsRes.data || []) as any[]).map((row) => row.songs).filter(Boolean);
+    const favoriteGenres = ((favoriteGenresRes.data || []) as any[]).map((row) => row.genre_id).filter(Boolean);
+    const favoriteArtists = ((favoriteArtistsRes.data || []) as any[]).map((row) => row.artist_id).filter(Boolean);
+    const historyDocs = (historyRes.data || []) as any[];
 
     // Accumulate distinct genres and distinct artists
     const distinctArtists = new Set<string>();
@@ -107,25 +115,17 @@ export class ColdStartDetectionService {
 
     for (const song of likedSongs) {
       if (!song) continue;
-      if (song.artist) {
-        distinctArtists.add(typeof song.artist === 'object' ? song.artist._id.toString() : song.artist.toString());
-      }
-      if (song.genre) {
-        distinctGenres.add(typeof song.genre === 'object' ? song.genre._id.toString() : song.genre.toString());
-      }
+      if (song.artist_id) distinctArtists.add(song.artist_id.toString());
+      if (song.genre_id) distinctGenres.add(song.genre_id.toString());
     }
 
     let completedCount = 0;
     for (const rec of historyDocs) {
       if (rec.completed) completedCount++;
-      if (rec.song && typeof rec.song === 'object') {
-        const song = rec.song as any;
-        if (song.artist) {
-          distinctArtists.add(typeof song.artist === 'object' ? song.artist._id.toString() : song.artist.toString());
-        }
-        if (song.genre) {
-          distinctGenres.add(typeof song.genre === 'object' ? song.genre._id.toString() : song.genre.toString());
-        }
+      const song = rec.songs;
+      if (song && typeof song === 'object') {
+        if (song.artist_id) distinctArtists.add(song.artist_id.toString());
+        if (song.genre_id) distinctGenres.add(song.genre_id.toString());
       }
     }
 

@@ -289,10 +289,16 @@ export type Database = {
           device_context: Json | null
           id: string
           initial_intent: string | null
+          last_activity_time: string
           session_dynamics: Json | null
           session_end: string | null
+          session_events: Json
           session_start: string | null
+          status: string
+          tracks_completed: Json
           tracks_played: Json | null
+          tracks_skipped: Json
+          songs_played: Json
           updated_at: string | null
           user_id: string
         }
@@ -301,10 +307,16 @@ export type Database = {
           device_context?: Json | null
           id?: string
           initial_intent?: string | null
+          last_activity_time?: string
           session_dynamics?: Json | null
           session_end?: string | null
+          session_events?: Json
           session_start?: string | null
+          status?: string
+          tracks_completed?: Json
           tracks_played?: Json | null
+          tracks_skipped?: Json
+          songs_played?: Json
           updated_at?: string | null
           user_id: string
         }
@@ -313,10 +325,16 @@ export type Database = {
           device_context?: Json | null
           id?: string
           initial_intent?: string | null
+          last_activity_time?: string
           session_dynamics?: Json | null
           session_end?: string | null
+          session_events?: Json
           session_start?: string | null
+          status?: string
+          tracks_completed?: Json
           tracks_played?: Json | null
+          tracks_skipped?: Json
+          songs_played?: Json
           updated_at?: string | null
           user_id?: string
         }

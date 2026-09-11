@@ -1,7 +1,6 @@
-import { Types } from 'mongoose';
-import { User } from '../models/User.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
-import { MusicDNA, IMusicDNA } from '../models/MusicDNA.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { fetchMusicDnaRawInputs } from './musicDnaDataFetchService.js';
 import {
   MusicDNAGenrePreference,
   MusicDNAArtistPreference,
@@ -130,80 +129,62 @@ export class MusicDNAExtractionService {
   }
 
   /**
-   * Fetches user profile and listening history from MongoDB and extracts Music DNA.
+   * Fetches user profile and listening history from Supabase and extracts Music DNA.
    */
   static async extractMusicDNA(
     userId: string,
     options: ExtractionOptions = {}
   ): Promise<MusicDNAProfileAttributes> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
 
-    const userObjectId = new Types.ObjectId(userId);
-
-    // 1. Concurrently fetch User and Listening History
-    const [userDoc, historyDocs] = await Promise.all([
-      User.findById(userObjectId)
-        .populate({
-          path: 'likedSongs',
-          populate: [
-            { path: 'genre', select: 'name' },
-            { path: 'artist', select: 'name' },
-          ],
-        })
-        .populate('favoriteGenres', 'name')
-        .populate('favoriteArtists', 'name')
-        .lean(),
-      ListeningHistory.find({ user: userObjectId })
-        .populate({
-          path: 'song',
-          populate: [
-            { path: 'genre', select: 'name' },
-            { path: 'artist', select: 'name' },
-          ],
-        })
-        .sort({ playedAt: -1 })
-        .lean(),
-    ]);
-
-    const rawInputs: ExtractionRawInputs = {
-      userId,
-      user: userDoc as any,
-      history: historyDocs as any,
-      referenceDate: options.referenceDate,
-    };
+    const rawInputs = await fetchMusicDnaRawInputs(userId, { referenceDate: options.referenceDate });
 
     return this.extractFromRawData(rawInputs, options);
   }
 
   /**
-   * Extracts Music DNA and persists/updates the user's MusicDNA model document in MongoDB.
+   * Extracts Music DNA and upserts it into the user's `music_dna` row in Supabase.
+   *
+   * Note: the Postgres `music_dna` table only has columns for
+   * `genres`/`artists`/`moods`/`listening_patterns`/`tendencies`/`temporal_taste`
+   * (jsonb, preserved verbatim from the old Mongoose shape) plus a numeric
+   * `version` and `last_calculated_at` — there is no `confidenceScore`,
+   * `dnaVersion` (string), or free-form `metadata` column like the old
+   * Mongoose model had. Those fields are still returned to the caller as
+   * part of the computed `MusicDNAProfileAttributes`, just not persisted.
    */
   static async extractAndPersistMusicDNA(
     userId: string,
     options: ExtractionOptions = {}
-  ): Promise<IMusicDNA> {
+  ): Promise<MusicDNAProfileAttributes> {
     const extracted = await this.extractMusicDNA(userId, options);
 
-    const existing = await MusicDNA.findByUserId(userId);
-    if (existing) {
-      existing.genres = extracted.genres as any;
-      existing.artists = extracted.artists as any;
-      existing.moods = extracted.moods as any;
-      existing.listeningPatterns = extracted.listeningPatterns as any;
-      existing.tendencies = extracted.tendencies as any;
-      existing.temporalTaste = extracted.temporalTaste as any;
-      existing.confidenceScore = extracted.confidenceScore;
-      existing.metadata = {
-        ...existing.metadata,
-        ...extracted.metadata,
-      };
-      return await existing.save();
+    const versionNumber = Number.parseInt(String(extracted.dnaVersion).split('.')[0], 10) || 1;
+    const nowIso = new Date().toISOString();
+
+    const { error } = await (supabase.from('music_dna') as any).upsert(
+      {
+        user_id: userId,
+        genres: extracted.genres as any,
+        artists: extracted.artists as any,
+        moods: extracted.moods as any,
+        listening_patterns: extracted.listeningPatterns as any,
+        tendencies: extracted.tendencies as any,
+        temporal_taste: extracted.temporalTaste as any,
+        version: versionNumber,
+        last_calculated_at: nowIso,
+        updated_at: nowIso,
+      },
+      { onConflict: 'user_id' }
+    );
+
+    if (error) {
+      throw new Error(`Failed to persist Music DNA profile: ${error.message}`);
     }
 
-    const newDoc = new MusicDNA(extracted);
-    return await newDoc.save();
+    return extracted;
   }
 
   /**

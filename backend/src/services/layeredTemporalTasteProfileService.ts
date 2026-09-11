@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { supabase } from '../config/supabase.js';
 import {
   TemporalPreferenceAggregationService,
   UserTemporalPreferenceAggregationResult,
@@ -9,7 +9,6 @@ import {
   getTemporalAggregationConfig,
   TemporalPreferenceAggregationConfig,
 } from '../config/recommendationConfig.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
 
 export interface TasteAffinityItem {
   id?: string;
@@ -572,7 +571,7 @@ export class LayeredTemporalTasteProfileService {
     userId: string,
     options: LayeredTasteProfileOptions = {}
   ): Promise<UnifiedLayeredTasteProfile> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!userId) {
       throw new Error(`Invalid userId for layered temporal taste profile: ${userId}`);
     }
 
@@ -594,23 +593,26 @@ export class LayeredTemporalTasteProfileService {
     const mediumTermCutoff = new Date(refDate.getTime() - config.mediumTermDays * 86400000);
     const longTermCutoff = new Date(refDate.getTime() - config.longTermDays * 86400000);
 
-    const historyDocs = await ListeningHistory.find({
-      user: userId,
-      playedAt: { $gte: longTermCutoff },
-    })
-      .populate('song', 'audioFeatures')
-      .lean();
+    const { data: historyRows } = await supabase
+      .from('listening_history')
+      .select('played_at, songs(audio_features)')
+      .eq('user_id', userId)
+      .gte('played_at', longTermCutoff.toISOString());
+
+    const historyDocs: any[] = historyRows || [];
 
     const shortSongs: any[] = [];
     const mediumSongs: any[] = [];
     const longSongs: any[] = [];
 
     for (const h of historyDocs) {
-      if (!h.song) continue;
-      const t = new Date(h.playedAt).getTime();
-      if (t >= shortTermCutoff.getTime()) shortSongs.push(h.song);
-      if (t >= mediumTermCutoff.getTime()) mediumSongs.push(h.song);
-      longSongs.push(h.song);
+      const song = h.songs as any;
+      if (!song) continue;
+      const mapped = { audioFeatures: song.audio_features };
+      const t = new Date(h.played_at).getTime();
+      if (t >= shortTermCutoff.getTime()) shortSongs.push(mapped);
+      if (t >= mediumTermCutoff.getTime()) mediumSongs.push(mapped);
+      longSongs.push(mapped);
     }
 
     const acousticTargets = {

@@ -1,6 +1,4 @@
-import { User } from '../models/User.js';
-import { Song } from '../models/Song.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
+import { supabase } from '../config/supabase.js';
 import {
   RecommendationInteractionService,
   InteractionWeights,
@@ -129,7 +127,7 @@ export class SparseInteractionMatrix {
 
 export class UserSongInteractionMatrixService {
   /**
-   * Builds an efficient sparse User-Song Interaction Matrix from MongoDB user activity and catalog data.
+   * Builds an efficient sparse User-Song Interaction Matrix from Supabase user activity and catalog data.
    */
   static async buildInteractionMatrix(options: {
     userIds?: string[];
@@ -143,27 +141,35 @@ export class UserSongInteractionMatrixService {
 
     // 1. Fetch user IDs and song IDs if not explicitly provided
     let userIds = options.userIds;
-    let usersWithLikes: any[];
 
     if (!userIds || userIds.length === 0) {
-      // Single query fetches both user IDs and likedSongs simultaneously, eliminating repeated User collection scan
-      usersWithLikes = await User.find({}).select('_id likedSongs').lean();
-      userIds = usersWithLikes.map((u) => u._id.toString());
-    } else {
-      usersWithLikes = await User.find({ _id: { $in: userIds } })
-        .select('_id likedSongs')
-        .lean();
+      const { data: allUsers } = await supabase.from('users').select('id');
+      userIds = (allUsers || []).map((u) => u.id);
     }
 
     let songIds = options.songIds;
     if (!songIds || songIds.length === 0) {
-      const songs = await Song.find({}).select('_id').lean();
-      songIds = songs.map((s) => s._id.toString());
+      const { data: allSongs } = await supabase.from('songs').select('id');
+      songIds = (allSongs || []).map((s) => s.id);
     }
 
     const sparseMatrix = new SparseInteractionMatrix(userIds, songIds);
 
-    // 2. User liked songs already fetched in step 1 without redundant database round-trip
+    // 2. Fetch liked songs (junction table) for the target users in bulk
+    const likedByUser = new Map<string, Set<string>>();
+    if (userIds.length > 0) {
+      const { data: likedRows } = await supabase
+        .from('user_liked_songs')
+        .select('user_id, song_id')
+        .in('user_id', userIds);
+
+      for (const row of likedRows || []) {
+        if (!likedByUser.has(row.user_id)) {
+          likedByUser.set(row.user_id, new Set());
+        }
+        likedByUser.get(row.user_id)!.add(row.song_id);
+      }
+    }
 
     // Intermediate tracking map: userIndex -> Map<songIndex, { count, isLiked, completed, partial, skips }>
     const rawAggregates = new Map<
@@ -183,12 +189,15 @@ export class UserSongInteractionMatrixService {
     };
 
     // Process liked songs
-    for (const uDoc of usersWithLikes) {
-      const uIdx = sparseMatrix.userIndexMap.get(uDoc._id.toString());
+    for (const uId of userIds) {
+      const uIdx = sparseMatrix.userIndexMap.get(uId);
       if (uIdx === undefined) continue;
 
-      for (const songObjId of uDoc.likedSongs || []) {
-        const sIdx = sparseMatrix.songIndexMap.get(songObjId.toString());
+      const likedSet = likedByUser.get(uId);
+      if (!likedSet) continue;
+
+      for (const songId of likedSet) {
+        const sIdx = sparseMatrix.songIndexMap.get(songId);
         if (sIdx !== undefined) {
           const agg = getOrCreateAgg(uIdx, sIdx);
           agg.isLiked = true;
@@ -197,14 +206,19 @@ export class UserSongInteractionMatrixService {
     }
 
     // 3. Fetch Listening History in bulk
-    const historyRecords = await ListeningHistory.find({ user: { $in: userIds } })
-      .select('user song completed skipped progressPercent')
-      .lean();
+    let historyRecords: { user_id: string; song_id: string; completed: boolean | null; skipped: boolean | null; progress_percent: number | null }[] = [];
+    if (userIds.length > 0) {
+      const { data } = await supabase
+        .from('listening_history')
+        .select('user_id, song_id, completed, skipped, progress_percent')
+        .in('user_id', userIds);
+      historyRecords = data || [];
+    }
 
     for (const record of historyRecords) {
-      if (!record.user || !record.song) continue;
-      const uIdx = sparseMatrix.userIndexMap.get(record.user.toString());
-      const sIdx = sparseMatrix.songIndexMap.get(record.song.toString());
+      if (!record.user_id || !record.song_id) continue;
+      const uIdx = sparseMatrix.userIndexMap.get(record.user_id);
+      const sIdx = sparseMatrix.songIndexMap.get(record.song_id);
 
       if (uIdx !== undefined && sIdx !== undefined) {
         const agg = getOrCreateAgg(uIdx, sIdx);
@@ -212,7 +226,10 @@ export class UserSongInteractionMatrixService {
 
         if (record.skipped) {
           agg.skips += 1;
-        } else if (record.completed !== false && (record.progressPercent === undefined || record.progressPercent >= 80)) {
+        } else if (
+          record.completed !== false &&
+          (record.progress_percent === undefined || record.progress_percent === null || record.progress_percent >= 80)
+        ) {
           agg.completed += 1;
         } else {
           agg.partial += 1;

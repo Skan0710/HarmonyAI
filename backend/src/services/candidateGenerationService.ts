@@ -1,8 +1,6 @@
-import { Types } from 'mongoose';
-import { Song } from '../models/Song.js';
-import { User } from '../models/User.js';
-import { Genre } from '../models/Genre.js';
-import { Artist } from '../models/Artist.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 import { ContentRecommendationService } from './recommendationService.js';
 import { CollaborativeFilteringService } from './collaborativeFilteringService.js';
 import { TrendingService } from './trendingService.js';
@@ -34,13 +32,16 @@ export class CandidateGenerationService {
   }): Promise<HybridCandidate[]> {
     const { userId, seedSongId, candidateLimit = 50, musicDnaProfile } = params;
 
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
 
     // 1. Identify songs target user has already strongly interacted with (to exclude)
-    const userDoc = await User.findById(userId).select('likedSongs').lean();
-    const excludedSongIds = new Set<string>((userDoc?.likedSongs || []).map((id) => id.toString()));
+    const { data: likedRows } = await supabase
+      .from('user_liked_songs')
+      .select('song_id')
+      .eq('user_id', userId);
+    const excludedSongIds = new Set<string>((likedRows || []).map((r) => r.song_id));
 
     if (seedSongId) {
       excludedSongIds.add(seedSongId);
@@ -113,7 +114,7 @@ export class CandidateGenerationService {
     };
 
     // 2. Candidate Source 1: Content-Based Recommendations
-    if (seedSongId && Types.ObjectId.isValid(seedSongId)) {
+    if (seedSongId && isValidObjectId(seedSongId)) {
       try {
         const contentResults = await ContentRecommendationService.getRecommendationsForSong(
           seedSongId,
@@ -160,42 +161,49 @@ export class CandidateGenerationService {
           .map((a: any) => a.name || '')
           .filter(Boolean);
 
-        const genreIds: any[] = [];
-        const artistIds: any[] = [];
+        const genreIds: string[] = [];
+        const artistIds: string[] = [];
 
+        // Case-insensitive EXACT name match (equivalent to the old ^name$ /i RegExp $in).
+        // ilike with no wildcards performs an exact case-insensitive comparison, so an
+        // .or() of `name.ilike.<value>` clauses reproduces the regex-$in match.
         if (topGenres.length > 0) {
-          const matchedGenreDocs = await Genre.find({
-            name: { $in: topGenres.slice(0, 3).map((n: string) => new RegExp(`^${n}$`, 'i')) },
-          }).select('_id').lean();
-          genreIds.push(...matchedGenreDocs.map((g) => g._id));
+          const orFilter = topGenres
+            .slice(0, 3)
+            .map((n: string) => `name.ilike.${n}`)
+            .join(',');
+          const { data: matchedGenreDocs } = await supabase.from('genres').select('id').or(orFilter);
+          genreIds.push(...(matchedGenreDocs || []).map((g) => g.id));
         }
 
         if (topArtists.length > 0) {
-          const matchedArtistDocs = await Artist.find({
-            name: { $in: topArtists.slice(0, 3).map((n: string) => new RegExp(`^${n}$`, 'i')) },
-          }).select('_id').lean();
-          artistIds.push(...matchedArtistDocs.map((a) => a._id));
+          const orFilter = topArtists
+            .slice(0, 3)
+            .map((n: string) => `name.ilike.${n}`)
+            .join(',');
+          const { data: matchedArtistDocs } = await supabase.from('artists').select('id').or(orFilter);
+          artistIds.push(...(matchedArtistDocs || []).map((a) => a.id));
         }
 
-        const matchConditions: any[] = [];
+        const orParts: string[] = [];
         if (genreIds.length > 0) {
-          matchConditions.push({ genre: { $in: genreIds } });
+          orParts.push(`genre_id.in.(${genreIds.join(',')})`);
         }
         if (artistIds.length > 0) {
-          matchConditions.push({ artist: { $in: artistIds } });
+          orParts.push(`artist_id.in.(${artistIds.join(',')})`);
         }
 
-        if (matchConditions.length > 0) {
+        if (orParts.length > 0) {
           const dnaLimit = Math.min(candidateLimit, 15);
-          const dnaSongs = await Song.find({ isPublished: true, $or: matchConditions })
-            .populate('artist', 'name profileImage avatar verified')
-            .populate('album', 'title coverImage releaseYear')
-            .populate('genre', 'name slug')
-            .sort({ playCount: -1 })
-            .limit(dnaLimit)
-            .lean();
+          const { data: dnaSongRows } = await supabase
+            .from('songs')
+            .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+            .eq('is_published', true)
+            .or(orParts.join(','))
+            .order('play_count', { ascending: false })
+            .limit(dnaLimit);
 
-          for (const song of dnaSongs) {
+          for (const song of (dnaSongRows || []).map(mapSongRow)) {
             mergeCandidate(song, 'music_dna', 0.85);
           }
         }
@@ -206,16 +214,15 @@ export class CandidateGenerationService {
 
     // 6. Catalog Fallback if candidate pool is small
     if (candidateMap.size < candidateLimit) {
-      const catalogSongs = await Song.find({ isPublished: true })
-        .populate('artist', 'name profileImage avatar verified')
-        .populate('album', 'title coverImage releaseYear')
-        .populate('genre', 'name slug')
-        .sort({ playCount: -1 })
-        .limit(candidateLimit)
-        .lean();
+      const { data: catalogSongRows } = await supabase
+        .from('songs')
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .eq('is_published', true)
+        .order('play_count', { ascending: false })
+        .limit(candidateLimit);
 
-      for (const song of catalogSongs) {
-        mergeCandidate(song, 'trending', song.playCount || 0);
+      for (const song of (catalogSongRows || []).map(mapSongRow)) {
+        mergeCandidate(song, 'trending', song?.playCount || 0);
       }
     }
 

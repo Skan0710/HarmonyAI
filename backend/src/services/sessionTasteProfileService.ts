@@ -1,8 +1,8 @@
-import { Types } from 'mongoose';
 import { IListeningSession } from '../models/ListeningSession.js';
 import { ListeningSessionService } from './listeningSessionService.js';
-import { Song } from '../models/Song.js';
-import { User } from '../models/User.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 
 import {
   getSessionAdaptationConfig,
@@ -141,14 +141,17 @@ export class SessionTasteProfileService {
       if (tc.song) allSongIdSet.add(tc.song.toString());
     });
 
-    const songIds = Array.from(allSongIdSet).filter((id) => Types.ObjectId.isValid(id));
-    const songDocs = await Song.find({ _id: { $in: songIds } })
-      .populate('artist', 'name')
-      .populate('genre', 'name')
-      .lean();
+    const songIds = Array.from(allSongIdSet).filter((id) => isValidObjectId(id));
+
+    const { data: songRows } = await supabase
+      .from('songs')
+      .select('id, mood, audio_features, artists!songs_artist_id_fkey(id, name), genres!songs_genre_id_fkey(id, name)')
+      .in('id', songIds);
+
+    const songDocs = (songRows || []).map(mapSongRow);
 
     const songMap = new Map<string, any>();
-    songDocs.forEach((s) => songMap.set(s._id.toString(), s));
+    songDocs.forEach((s: any) => songMap.set(s._id.toString(), s));
 
     // Interaction counters
     let playsCount = songsPlayed.length;
@@ -226,10 +229,13 @@ export class SessionTasteProfileService {
     // Fetch user's long-term top genres to calculate discovery ratio without modifying them
     let userTopGenres = new Set<string>();
     try {
-      const userDoc: any = await User.findById(sessionDoc.user).populate('favoriteGenres', 'name').lean();
-      if (userDoc && Array.isArray(userDoc.favoriteGenres)) {
-        userDoc.favoriteGenres.forEach((g: any) => {
-          const name = typeof g === 'object' && g && 'name' in g ? g.name : g;
+      const { data: favGenreRows } = await supabase
+        .from('user_favorite_genres')
+        .select('genres(name)')
+        .eq('user_id', sessionDoc.user.toString());
+      if (Array.isArray(favGenreRows)) {
+        favGenreRows.forEach((row: any) => {
+          const name = row.genres?.name;
           if (name) userTopGenres.add(String(name).toLowerCase());
         });
       }
@@ -575,7 +581,7 @@ export class SessionTasteProfileService {
    * Retrieves the user's active listening session and calculates their temporary session taste profile.
    */
   static async getActiveSessionTasteProfile(userId: string): Promise<SessionTasteProfile | null> {
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       return null;
     }
 
