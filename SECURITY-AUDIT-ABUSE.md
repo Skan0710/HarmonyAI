@@ -1,7 +1,5 @@
 # Cost & Abuse Audit — HarmonyAI
 
-> **Update:** the app has since been migrated off Gemini onto Groq (see `backend/src/services/llmClient.ts`). Every "Gemini call" in the findings below is now a Groq call instead — the routes, auth gaps, and missing rate limits are **unchanged and still exploitable**; only the provider name changed. Groq's free tier still has real per-minute/per-day token limits, so an unauthenticated flood still breaks the feature for real users (denial of service) even though it may no longer produce a dollar bill the same way a paid Gemini tier would. Treat every CRITICAL/HIGH finding below as still open.
-
 Scope: every route file under `backend/src/routes/`, `backend/src/index.ts` (global middleware), every controller that calls into `GeminiEmbeddingProvider`/`GEMINI_API_KEY`-backed services, and `authController`/`authService`.
 Method: traced each route's middleware chain (`protect` / `optionalAuth` / none) and cross-referenced it against what the underlying controller/service actually does — an LLM call, a DB write, an unbounded query, etc. — rather than assuming "has a rate limiter" means "is protected."
 

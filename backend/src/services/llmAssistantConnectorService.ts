@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 import { ToolRegistry, ToolDefinitionDTO } from '../tools/toolRegistry.js';
 import { AssistantToolContext, ToolExecutionResult } from '../tools/toolTypes.js';
 import { ToolCallIntent, AssistantIntentService } from './assistantIntentService.js';
-import { hasGroqKey, generateGroqCompletion, extractJsonObject } from './llmClient.js';
 
 dotenv.config();
 
@@ -23,17 +22,20 @@ export interface ILLMToolSelectorProvider {
 }
 
 /**
- * Groq-based Structured Tool Selector
+ * Gemini-based Structured Tool Selector
  */
-export class GroqToolSelectorProvider implements ILLMToolSelectorProvider {
-  name = 'groq';
+export class GeminiToolSelectorProvider implements ILLMToolSelectorProvider {
+  name = 'gemini';
 
   async selectTool(
     prompt: string,
     toolDefinitions: ToolDefinitionDTO[],
     minimalContext: { userId?: string }
   ): Promise<LLMToolCallPayload | null> {
-    if (!hasGroqKey()) return null;
+    const apiKey = process.env.GEMINI_API_KEY;
+    const modelName = process.env.LLM_MODEL || 'gemini-1.5-flash';
+
+    if (!apiKey) return null;
 
     const toolSchemasJson = JSON.stringify(toolDefinitions, null, 2);
     const systemInstruction = `You are the HarmonyAI Music Assistant Tool Selector.
@@ -52,25 +54,43 @@ CRITICAL RULES:
   "explanation": string
 }`;
 
-    let rawText: string;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: systemInstruction },
+                { text: `User Context: userId=${minimalContext.userId || 'anonymous'}\nUser Request: "${prompt}"` },
+              ],
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) return null;
+
+    const data: any = await response.json();
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) return null;
+
     try {
-      rawText = await generateGroqCompletion(
-        systemInstruction,
-        `User Context: userId=${minimalContext.userId || 'anonymous'}\nUser Request: "${prompt}"`
-      );
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        type: parsed.type === 'tool_call' ? 'tool_call' : 'unfulfillable',
+        toolName: parsed.toolName || undefined,
+        input: parsed.input || {},
+        explanation: parsed.explanation || '',
+      };
     } catch {
       return null;
     }
-
-    const parsed = extractJsonObject(rawText);
-    if (!parsed) return null;
-
-    return {
-      type: parsed.type === 'tool_call' ? 'tool_call' : 'unfulfillable',
-      toolName: parsed.toolName || undefined,
-      input: parsed.input || {},
-      explanation: parsed.explanation || '',
-    };
   }
 }
 
@@ -103,7 +123,7 @@ export class DeterministicToolSelectorProvider implements ILLMToolSelectorProvid
  */
 export class LLMAssistantConnectorService {
   private static providers: ILLMToolSelectorProvider[] = [
-    new GroqToolSelectorProvider(),
+    new GeminiToolSelectorProvider(),
     new DeterministicToolSelectorProvider(),
   ];
 

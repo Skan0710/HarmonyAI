@@ -1,8 +1,5 @@
 # Secrets Audit — HarmonyAI
 
-> **Update:** the app has since been migrated off Gemini onto Groq (see `backend/src/services/llmClient.ts`). `GEMINI_API_KEY` is no longer read anywhere in the codebase — the rotation note for it below is now moot (nothing depends on it any more). `GROQ_API_KEY` is the new key to protect; nothing in this audit found it hardcoded or committed anywhere, since it didn't exist yet at audit time.
-
-
 Scope: `frontend/`, `backend/`, full git history (`git log --all`), build output.
 Method: pattern search for key/token/password/connection-string formats across source, `.env*` files, and every commit that ever touched an `.env*` path; manual review of every `process.env.*` read site; check of what `VITE_*` variables ship into the browser bundle.
 

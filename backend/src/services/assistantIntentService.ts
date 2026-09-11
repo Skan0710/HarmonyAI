@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 import { ToolRegistry } from '../tools/toolRegistry.js';
 import { AssistantToolContext, ToolExecutionResult } from '../tools/toolTypes.js';
-import { hasGroqKey, generateGroqCompletion, extractJsonObject } from './llmClient.js';
 
 dotenv.config();
 
@@ -168,7 +167,10 @@ export class AssistantIntentService {
       };
     }
 
-    if (!hasGroqKey()) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    const modelName = process.env.LLM_MODEL || 'gemini-1.5-flash';
+
+    if (!apiKey) {
       return this.selectIntentRuleBased(trimmedPrompt, context);
     }
 
@@ -192,28 +194,47 @@ CRITICAL RULES:
   "explanation": string
 }`;
 
-      const rawText = await generateGroqCompletion(
-        systemInstruction,
-        `User Context: userId=${context.userId || 'anonymous'}\nUser Request: "${trimmedPrompt}"`
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: systemInstruction },
+                  { text: `User Context: userId=${context.userId || 'anonymous'}\nUser Request: "${trimmedPrompt}"` },
+                ],
+              },
+            ],
+          }),
+        }
       );
-      const parsed = extractJsonObject(rawText);
 
-      if (parsed) {
-        if (parsed.type === 'tool_call' && parsed.toolName) {
-          // Verify tool is registered
-          if (ToolRegistry.getTool(parsed.toolName)) {
+      if (response.ok) {
+        const data: any = await response.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.type === 'tool_call' && parsed.toolName) {
+            // Verify tool is registered
+            if (ToolRegistry.getTool(parsed.toolName)) {
+              return {
+                type: 'tool_call',
+                toolName: parsed.toolName,
+                input: parsed.input || {},
+                explanation: parsed.explanation || `Selected tool ${parsed.toolName}`,
+              };
+            }
+          } else if (parsed.type === 'unfulfillable') {
             return {
-              type: 'tool_call',
-              toolName: parsed.toolName,
-              input: parsed.input || {},
-              explanation: parsed.explanation || `Selected tool ${parsed.toolName}`,
+              type: 'unfulfillable',
+              explanation: parsed.explanation || 'I can only assist with music search, recommendations, playlists, and playback queue.',
             };
           }
-        } else if (parsed.type === 'unfulfillable') {
-          return {
-            type: 'unfulfillable',
-            explanation: parsed.explanation || 'I can only assist with music search, recommendations, playlists, and playback queue.',
-          };
         }
       }
 
