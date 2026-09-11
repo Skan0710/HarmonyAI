@@ -4,6 +4,7 @@ import { AudioLines, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
 import { AnimatedLink } from '../components/ui/AnimatedLink';
+import AnimatedButton from '../components/ui/animated-button';
 
 export const LoginPage: React.FC = () => {
   const { isAuthenticated, isInitializing, login, isLoading, error } = useAuth();
@@ -114,10 +115,10 @@ export const LoginPage: React.FC = () => {
           <div className="flex-grow border-t border-border-subtle"></div>
         </div>
 
-        <Button type="button" variant="secondary" onClick={handleDemoLogin} disabled={isLoading} className="w-full">
+        <AnimatedButton type="button" onClick={handleDemoLogin} disabled={isLoading} className="w-full">
           <Zap size={13} className="text-gold" />
           Quick Demo Login
-        </Button>
+        </AnimatedButton>
 
         <div className="text-center text-xs text-text-tertiary">
           Don't have an account?{' '}

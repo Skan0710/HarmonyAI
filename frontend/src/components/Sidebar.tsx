@@ -143,7 +143,7 @@ const SidebarContent: React.FC<{ onNavigate?: () => void }> = ({ onNavigate }) =
 export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose }) => {
   return (
     <>
-      <aside className="hidden md:flex w-60 shrink-0 flex-col bg-surface-1 border-r border-border-subtle">
+      <aside className="hidden md:flex w-60 shrink-0 flex-col bg-surface-1/85 backdrop-blur-xl border-r border-border-subtle">
         <div className="px-6 pt-7 pb-6">
           <Wordmark />
         </div>
@@ -166,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose })
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-              className="md:hidden fixed top-0 left-0 bottom-0 z-50 w-72 flex flex-col bg-surface-1 border-r border-border-subtle"
+              className="md:hidden fixed top-0 left-0 bottom-0 z-50 w-72 flex flex-col bg-surface-1/85 backdrop-blur-xl border-r border-border-subtle"
             >
               <div className="px-6 pt-6 pb-6 flex items-center justify-between">
                 <Wordmark onClick={onClose} />

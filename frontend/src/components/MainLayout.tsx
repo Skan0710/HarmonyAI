@@ -6,6 +6,7 @@ import { MiniPlayer } from './MiniPlayer';
 import { QueueDrawer } from './QueueDrawer';
 import { FullPlayer } from './FullPlayer';
 import { AmbientBackground } from './ui/AmbientBackground';
+import { CommandPalette } from './CommandPalette';
 
 export const MainLayout: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -24,6 +25,7 @@ export const MainLayout: React.FC = () => {
       <MiniPlayer onExpand={() => setFullPlayerOpen(true)} />
       <QueueDrawer />
       <FullPlayer isOpen={fullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
+      <CommandPalette />
     </div>
   );
 };

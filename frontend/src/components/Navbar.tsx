@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, Search, LogOut } from 'lucide-react';
+import { Menu, Search, LogOut, Command } from 'lucide-react';
 import { searchGlobal } from '../services/searchService';
 import type { GroupedSearchResults } from '../services/searchService';
 import { SearchSuggestionsDropdown } from './SearchSuggestionsDropdown';
 import { useRecentSearchesStore } from '../store/useRecentSearchesStore';
 import { Button } from './ui/Button';
 import { Wordmark } from './Wordmark';
+import { useCommandPaletteStore } from '../store/useCommandPaletteStore';
 
 interface NavbarProps {
   onMenuClick?: () => void;
@@ -17,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const addSearch = useRecentSearchesStore((state) => state.addSearch);
+  const openCommandPalette = useCommandPaletteStore((state) => state.open);
 
   const [navSearch, setNavSearch] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -128,6 +130,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
       </div>
 
       <div className="flex items-center gap-3 text-sm shrink-0">
+        <button
+          onClick={openCommandPalette}
+          aria-label="Open command palette"
+          title="Open command palette"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-pill)] bg-surface-2 hover:bg-surface-3 text-text-tertiary hover:text-text-primary transition-colors cursor-pointer"
+        >
+          <Command size={13} strokeWidth={1.75} />
+          <kbd className="flex items-center gap-0.5 font-sans text-[11px] font-medium">
+            <span className="leading-none">⌘</span>K
+          </kbd>
+        </button>
+
         {isAuthenticated && user ? (
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2">

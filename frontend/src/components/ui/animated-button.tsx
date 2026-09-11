@@ -35,11 +35,10 @@ const AnimatedButton: React.FC<AnimatedButtonProps> = ({
         damping: 30,
         mass: 0.5,
       }}
-      // Set a CSS variable `--shine` that we override for dark mode via Tailwind.
       className={cn(
-        "group inline-flex items-center justify-center px-6 py-2 rounded-md relative overflow-hidden bg-neutral-50 dark:bg-black border border-neutral-200 dark:border-[#222]",
-        "text-neutral-900 dark:text-neutral-100 font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-950 disabled:pointer-events-none disabled:opacity-50",
-        "[--shine:rgba(0,0,0,.66)] dark:[--shine:rgba(255,255,255,.66)]",
+        "group inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-[var(--radius-pill)] relative overflow-hidden bg-surface-2 border border-border-default cursor-pointer",
+        "text-text-primary font-medium transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border-strong disabled:pointer-events-none disabled:opacity-50",
+        "[--shine:rgba(255,106,67,.55)]",
         className,
       )}
     >
@@ -66,7 +65,7 @@ const AnimatedButton: React.FC<AnimatedButtonProps> = ({
 
       {/* Border shine effect uses the --shine variable so it adapts to theme */}
       <motion.span
-        className="block absolute inset-0 rounded-md p-px"
+        className="block absolute inset-0 rounded-[var(--radius-pill)] p-px"
         style={{
           background:
             "linear-gradient(-75deg, transparent 30%, var(--shine) 50%, transparent 70%)",
