@@ -126,6 +126,38 @@ export async function findRecommendationEvaluationsByUser(
   return (data || []).map(mapEvaluationRow);
 }
 
+/**
+ * Replacement for the old Mongoose `RecommendationEvaluation.computeScore` static.
+ * A skip without high completion is a strong negative signal; otherwise the score is
+ * a weighted composite of played/liked/saved flags plus completion rate.
+ */
+export function computeRecommendationEvaluationScore(data: {
+  played?: boolean;
+  skipped?: boolean;
+  liked?: boolean;
+  saved?: boolean;
+  completionRate?: number;
+}): number {
+  if (data.skipped) {
+    const completion = Math.max(0, Math.min(1, data.completionRate ?? 0));
+    return Math.max(0, Math.round(completion * 0.2 * 1000) / 1000);
+  }
+
+  let score = 0;
+  if (data.played) score += 0.25;
+  if (data.liked) score += 0.35;
+  if (data.saved) score += 0.25;
+
+  if (typeof data.completionRate === 'number' && !isNaN(data.completionRate)) {
+    const comp = Math.max(0, Math.min(1, data.completionRate));
+    score += comp * 0.15;
+  } else if (data.played) {
+    score += 0.1;
+  }
+
+  return Math.min(1, Math.max(0, Math.round(score * 1000) / 1000));
+}
+
 export class RecommendationQualityMetricsService {
   /**
    * Computes engagement score using configurable weights.

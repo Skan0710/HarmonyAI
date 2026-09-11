@@ -1,8 +1,5 @@
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
-import { Song } from '../models/Song.js';
-import { User } from '../models/User.js';
-import { ListeningHistory } from '../models/ListeningHistory.js';
+import { supabase } from '../config/supabase.js';
 import { ContentRecommendationService } from '../services/recommendationService.js';
 import { CollaborativeFilteringService } from '../services/collaborativeFilteringService.js';
 import { HybridRecommendationService } from '../services/hybridRecommendationService.js';
@@ -31,19 +28,18 @@ export const evaluateRecommendationStrategy = controllerWrapper(async (req: Requ
   let seedSongId = q.seedSongId;
 
   // 1. Fetch User Liked Songs & History (Ground Truth Relevant Items) concurrently
-  const [userDoc, historyDocs] = await Promise.all([
-    User.findById(targetUserId).select('likedSongs').lean(),
-    ListeningHistory.find({
-      user: new Types.ObjectId(targetUserId),
-      completed: true,
-    })
-      .select('song')
-      .limit(50)
-      .lean(),
+  const [{ data: likedRows }, { data: historyRows }] = await Promise.all([
+    supabase.from('user_liked_songs').select('song_id').eq('user_id', targetUserId),
+    supabase
+      .from('listening_history')
+      .select('song_id')
+      .eq('user_id', targetUserId)
+      .eq('completed', true)
+      .limit(50),
   ]);
 
-  const likedSongIds = ((userDoc as any)?.likedSongs || []).map((id: any) => id.toString());
-  const historySongIds = historyDocs.map((h) => h.song.toString());
+  const likedSongIds = (likedRows || []).map((r) => r.song_id).filter(Boolean);
+  const historySongIds = (historyRows || []).map((r) => r.song_id).filter(Boolean);
   const relevantSet = new Set<string>([...likedSongIds, ...historySongIds]);
   const relevantSongIds = Array.from(relevantSet);
 
@@ -89,14 +85,18 @@ export const evaluateRecommendationStrategy = controllerWrapper(async (req: Requ
   );
 
   // 4. Compute Diversity, Novelty, and Catalog Coverage Metrics
-  const [totalCatalogCount, topPopularSong] = await Promise.all([
-    Song.countDocuments({ isPublished: true }),
-    Song.findOne({ isPublished: true })
-      .sort({ playCount: -1 })
-      .select('playCount')
-      .lean(),
+  const [{ count: totalCatalogCountRaw }, { data: topPopularSong }] = await Promise.all([
+    supabase.from('songs').select('*', { count: 'exact', head: true }).eq('is_published', true),
+    supabase
+      .from('songs')
+      .select('play_count')
+      .eq('is_published', true)
+      .order('play_count', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
-  const maxCatalogPlayCount = topPopularSong?.playCount || 1000;
+  const totalCatalogCount = totalCatalogCountRaw || 0;
+  const maxCatalogPlayCount = topPopularSong?.play_count || 1000;
 
   const diversityInputItems: DiversitySongItem[] = recommendedSongDocs.map((s) => ({
     songId: s._id?.toString() || '',

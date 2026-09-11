@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import { UserTasteProfile, UserTasteProfileService } from './userTasteProfileService.js';
 import { NoveltyScoringService } from './noveltyScoringService.js';
 import { GenreDiversityFilteringService } from './genreDiversityFilteringService.js';
@@ -148,7 +148,7 @@ export class RecommendationPostRankingPipeline {
 
     // 1. Fetch User Taste Profile if not explicitly provided
     let tasteProfile = options.tasteProfile;
-    if (!tasteProfile && userId && Types.ObjectId.isValid(userId)) {
+    if (!tasteProfile && userId && isValidObjectId(userId)) {
       try {
         tasteProfile = await UserTasteProfileService.generateTasteProfile(userId);
       } catch (err) {
@@ -160,7 +160,7 @@ export class RecommendationPostRankingPipeline {
     let recentlyRecommendedMap = new Map();
     let recentlySkippedSet = new Set<string>();
 
-    if (userId && Types.ObjectId.isValid(userId)) {
+    if (userId && isValidObjectId(userId)) {
       try {
         const [recMap, skipSet] = await Promise.all([
           RecommendationHistoryService.getRecentlyRecommendedMap(
@@ -301,7 +301,7 @@ export class RecommendationPostRankingPipeline {
       };
     });
 
-    if (autoRecordImpressions && userId && Types.ObjectId.isValid(userId)) {
+    if (autoRecordImpressions && userId && isValidObjectId(userId)) {
       const songIds = finalResults.map((r) => r.song?._id?.toString()).filter(Boolean);
       if (songIds.length > 0) {
         RecommendationHistoryService.recordRecommendationImpressions(

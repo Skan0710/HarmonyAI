@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import {
   PersonalMusicTwin,
   IPersonalMusicTwin,
@@ -53,7 +53,7 @@ export interface TwinGenerationOptions {
 }
 
 export interface TwinSynthesisInputs {
-  userId: string | Types.ObjectId;
+  userId: string;
   dna?: UnifiedMusicDNA | null;
   snapshots?: IMusicDNASnapshot[];
   stabilityMetrics?: TasteStabilityTransformationMetrics | null;
@@ -365,11 +365,11 @@ export class PersonalMusicTwinService {
    * upstream intelligence systems and persisting the result in MongoDB.
    */
   static async generateMusicTwin(
-    userId: string | Types.ObjectId,
+    userId: string,
     options: TwinGenerationOptions = {}
   ): Promise<IPersonalMusicTwin> {
     const userIdStr = userId.toString();
-    if (!Types.ObjectId.isValid(userIdStr)) {
+    if (!isValidObjectId(userIdStr)) {
       throw new Error(`Invalid userId: ${userIdStr}`);
     }
 
@@ -430,7 +430,7 @@ export class PersonalMusicTwinService {
    * Explicitly refreshes an existing Music Twin or generates a new one if none exists.
    */
   static async refreshMusicTwin(
-    userId: string | Types.ObjectId,
+    userId: string,
     options: TwinGenerationOptions = {}
   ): Promise<IPersonalMusicTwin> {
     return this.generateMusicTwin(userId, { ...options, forceRefresh: true });
@@ -440,11 +440,11 @@ export class PersonalMusicTwinService {
    * Retrieves the user's Personal Music Twin, generating or refreshing it if missing or expired.
    */
   static async getOrGenerateTwin(
-    userId: string | Types.ObjectId,
+    userId: string,
     options: TwinGenerationOptions = {}
   ): Promise<IPersonalMusicTwin> {
     const userIdStr = userId.toString();
-    if (!Types.ObjectId.isValid(userIdStr)) {
+    if (!isValidObjectId(userIdStr)) {
       throw new Error(`Invalid userId: ${userIdStr}`);
     }
 

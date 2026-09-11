@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
 import { LayeredTemporalTasteProfileService } from '../services/layeredTemporalTasteProfileService.js';
 import { controllerWrapper, ensureAuth, ControllerError, sendSuccess } from '../utils/controllerHelpers.js';
-import { extractQueryParams } from '../utils/validators.js';
+import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
 
 /**
  * Controller for retrieving the user's temporal taste profile.
@@ -17,7 +16,7 @@ export const getTemporalTasteProfile = controllerWrapper(async (req: Request, re
   if (!user) return;
 
   const userId = user._id ? user._id.toString() : '';
-  if (!userId || !Types.ObjectId.isValid(userId)) {
+  if (!userId || !isValidObjectId(userId)) {
     throw new ControllerError(400, 'Invalid user ID in authentication token');
   }
 

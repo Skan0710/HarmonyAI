@@ -1,5 +1,7 @@
-import { Types } from 'mongoose';
-import { Song, ISong } from '../models/Song.js';
+import { ISong } from '../models/Song.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 import { generateSongSemanticText } from '../utils/semanticSearchUtils.js';
 import { EmbeddingService } from './embeddingService.js';
 
@@ -17,22 +19,21 @@ export class MusicEmbeddingGenerationService {
    * Handles missing metadata safely and fails gracefully without crashing.
    */
   static async generateAndSaveSongEmbedding(
-    songId: string | Types.ObjectId
+    songId: string
   ): Promise<ISong | null> {
-    if (!songId || !Types.ObjectId.isValid(String(songId))) {
+    if (!songId || !isValidObjectId(String(songId))) {
       return null;
     }
 
     try {
-      const songObjId = new Types.ObjectId(String(songId));
+      // 1. Fetch Song Row with Related Artist/Album/Genre
+      const { data: songRow } = await supabase
+        .from('songs')
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .eq('id', String(songId))
+        .maybeSingle();
 
-      // 1. Fetch Song Document with Populated Relations
-      const songDoc = await Song.findById(songObjId)
-        .populate('artist', 'name')
-        .populate('featuredArtists', 'name')
-        .populate('album', 'title')
-        .populate('genre', 'name slug');
-
+      const songDoc = mapSongRow(songRow) as any;
       if (!songDoc) {
         return null;
       }
@@ -42,7 +43,6 @@ export class MusicEmbeddingGenerationService {
         _id: songDoc._id,
         title: songDoc.title || 'Untitled',
         artist: songDoc.artist,
-        featuredArtists: songDoc.featuredArtists,
         album: songDoc.album,
         genre: songDoc.genre,
         mood: songDoc.mood,
@@ -64,15 +64,25 @@ export class MusicEmbeddingGenerationService {
         return songDoc;
       }
 
-      // 4. Update Song Document with Embedding Vector & Metadata
-      songDoc.vectorEmbedding = embeddingVector;
-      songDoc.embeddingGeneratedAt = new Date();
-      songDoc.embeddingProvider = provider.name || 'local_deterministic';
-      songDoc.embeddingDimension = embeddingVector.length;
+      // 4. Update Song Row with Embedding Vector & Metadata
+      const nowIso = new Date().toISOString();
+      const { data: updatedRow, error } = await supabase
+        .from('songs')
+        .update({
+          vector_embedding: embeddingVector as any,
+          embedding_generated_at: nowIso,
+          embedding_provider: provider.name || 'local_deterministic',
+          embedding_dimension: embeddingVector.length,
+        } as any)
+        .eq('id', String(songId))
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .single();
 
-      // 5. Save and Return Document
-      await songDoc.save();
-      return songDoc;
+      if (error || !updatedRow) {
+        return songDoc;
+      }
+
+      return mapSongRow(updatedRow) as any;
     } catch (error: any) {
       console.warn(`[MusicEmbeddingGenerationService Warning]: Failed to generate embedding for song ${songId}: ${error.message}`);
       return null;
@@ -84,7 +94,7 @@ export class MusicEmbeddingGenerationService {
    * Does not block application execution if an individual song fails.
    */
   static async generateAndSaveBatchEmbeddings(
-    songIds: (string | Types.ObjectId)[]
+    songIds: string[]
   ): Promise<BatchEmbeddingResult> {
     if (!Array.isArray(songIds) || songIds.length === 0) {
       return { processed: 0, succeeded: 0, failed: 0 };

@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
 import { UnifiedMusicDNAService } from '../services/unifiedMusicDnaService.js';
 import { MusicDNASnapshotService } from '../services/musicDnaSnapshotService.js';
 import { MusicDNAChangeDetectionService } from '../services/musicDnaChangeDetectionService.js';
@@ -7,7 +6,7 @@ import { EmergingTasteDetectionService } from '../services/emergingTasteDetectio
 import { TasteEvolutionTimelineService } from '../services/tasteEvolutionTimelineService.js';
 import { TasteStabilityTransformationService } from '../services/tasteStabilityTransformationService.js';
 import { controllerWrapper, ensureAuth, ControllerError, sendSuccess } from '../utils/controllerHelpers.js';
-import { extractQueryParams } from '../utils/validators.js';
+import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
 
 /**
  * Controller for retrieving comprehensive Music DNA Evolution and Taste Change Intelligence.
@@ -26,7 +25,7 @@ export const getEvolutionOverview = controllerWrapper(async (req: Request, res: 
   if (!user) return;
 
   const userId = user._id ? user._id.toString() : '';
-  if (!userId || !Types.ObjectId.isValid(userId)) {
+  if (!userId || !isValidObjectId(userId)) {
     throw new ControllerError(400, 'Invalid user ID in authentication token');
   }
 
@@ -148,7 +147,7 @@ export const getEvolutionTimeline = controllerWrapper(async (req: Request, res: 
   if (!user) return;
 
   const userId = user._id ? user._id.toString() : '';
-  if (!userId || !Types.ObjectId.isValid(userId)) {
+  if (!userId || !isValidObjectId(userId)) {
     throw new ControllerError(400, 'Invalid user ID in authentication token');
   }
 
@@ -211,7 +210,7 @@ export const getTasteStability = controllerWrapper(async (req: Request, res: Res
   if (!user) return;
 
   const userId = user._id ? user._id.toString() : '';
-  if (!userId || !Types.ObjectId.isValid(userId)) {
+  if (!userId || !isValidObjectId(userId)) {
     throw new ControllerError(400, 'Invalid user ID in authentication token');
   }
 
@@ -231,7 +230,7 @@ export const getEmergingTastes = controllerWrapper(async (req: Request, res: Res
   if (!user) return;
 
   const userId = user._id ? user._id.toString() : '';
-  if (!userId || !Types.ObjectId.isValid(userId)) {
+  if (!userId || !isValidObjectId(userId)) {
     throw new ControllerError(400, 'Invalid user ID in authentication token');
   }
 
@@ -251,7 +250,7 @@ export const getTasteChanges = controllerWrapper(async (req: Request, res: Respo
   if (!user) return;
 
   const userId = user._id ? user._id.toString() : '';
-  if (!userId || !Types.ObjectId.isValid(userId)) {
+  if (!userId || !isValidObjectId(userId)) {
     throw new ControllerError(400, 'Invalid user ID in authentication token');
   }
 
@@ -274,7 +273,7 @@ export const getSnapshots = controllerWrapper(async (req: Request, res: Response
   if (!user) return;
 
   const userId = user._id ? user._id.toString() : '';
-  if (!userId || !Types.ObjectId.isValid(userId)) {
+  if (!userId || !isValidObjectId(userId)) {
     throw new ControllerError(400, 'Invalid user ID in authentication token');
   }
 
@@ -303,7 +302,7 @@ export const createSnapshot = controllerWrapper(async (req: Request, res: Respon
   if (!user) return;
 
   const userId = user._id ? user._id.toString() : '';
-  if (!userId || !Types.ObjectId.isValid(userId)) {
+  if (!userId || !isValidObjectId(userId)) {
     throw new ControllerError(400, 'Invalid user ID in authentication token');
   }
 

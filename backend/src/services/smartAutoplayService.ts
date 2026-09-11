@@ -1,4 +1,4 @@
-import mongoose, { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import { ListeningSessionService, IListeningSession } from './listeningSessionService.js';
 import {
   SessionTasteProfile,
@@ -174,16 +174,15 @@ export class SmartAutoplayService {
       isDebugMode = false,
     } = params;
 
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       throw new Error('Invalid user ID provided for adaptive queue generation');
     }
 
     const desiredSize = Math.max(1, Math.min(30, requestedQueueSize || limit || 5));
 
     // 1. Resolve Active Session, Current Track, and Session Profile
-    const isDbConnected = mongoose.connection?.readyState === 1;
     let session = params.sessionDoc;
-    if (!session && isDbConnected) {
+    if (!session) {
       try {
         session = (await ListeningSessionService.getActiveSession(userId)) || undefined;
       } catch {

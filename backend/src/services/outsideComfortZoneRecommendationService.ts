@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import {
   OutsideComfortZoneConfig,
   getOutsideComfortZoneConfig,
@@ -41,7 +41,7 @@ export interface OutsideComfortZoneRankedResult extends HybridRankedResult {
 }
 
 export interface OutsideComfortZoneRankingInputs {
-  userId: string | Types.ObjectId;
+  userId: string;
   candidates: HybridCandidate[];
   limit?: number;
   tasteBoundaries?: TasteBoundaryProfile | null;
@@ -471,7 +471,7 @@ export class OutsideComfortZoneRecommendationService {
    * End-to-end asynchronous helper: Fetches user profiles and generates outside-comfort-zone recommendations.
    */
   static async getOutsideComfortZoneRecommendations(params: {
-    userId: string | Types.ObjectId;
+    userId: string;
     candidates?: HybridCandidate[];
     limit?: number;
     configOverride?: Partial<OutsideComfortZoneConfig>;

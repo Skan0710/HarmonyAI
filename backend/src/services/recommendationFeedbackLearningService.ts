@@ -1,9 +1,9 @@
-import { Types } from 'mongoose';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
 import {
-  RecommendationEvaluation,
-  IRecommendationEvaluation,
-} from '../models/RecommendationEvaluation.js';
-import { RecommendationInteraction } from '../models/RecommendationInteraction.js';
+  RecommendationEvaluationRecord,
+  computeRecommendationEvaluationScore,
+} from './recommendationQualityMetricsService.js';
 import { TemporalPreferenceAggregationService } from './temporalPreferenceAggregationService.js';
 import { ListeningSessionService } from './listeningSessionService.js';
 import { type UserFeedbackProfile } from './recommendationScoreCalibrationService.js';
@@ -22,7 +22,7 @@ export interface RecommendationFeedbackEvent {
 
 export interface FeedbackProcessingResult {
   success: boolean;
-  evaluation: IRecommendationEvaluation;
+  evaluation: RecommendationEvaluationRecord;
   evaluationScore: number;
   preferencesUpdated: boolean;
   sessionUpdated: boolean;
@@ -46,79 +46,118 @@ export class RecommendationFeedbackLearningService {
   ): Promise<FeedbackProcessingResult> {
     const { userId, songId, action } = event;
 
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
-    if (!Types.ObjectId.isValid(songId)) {
+    if (!isValidObjectId(songId)) {
       throw new Error('Invalid song ID');
     }
 
-    const userObjId = new Types.ObjectId(userId);
-    const songObjId = new Types.ObjectId(songId);
     const source = event.recommendationSource || 'hybrid';
     const timestamp = event.timestamp || new Date();
 
-    // 1. Locate existing recent evaluation or create new one
-    let evaluation = await RecommendationEvaluation.findOne({
-      userId: userObjId,
-      songId: songObjId,
-      timestamp: { $gte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
-    }).sort({ timestamp: -1 });
+    // 1. Locate existing recent evaluation row for this user+song, or start a new one.
+    // songId isn't a discrete column (it lives inside the `metrics` jsonb blob), so the
+    // 48h window is queried by user and then filtered client-side for a matching song.
+    const { data: recentRows } = await supabase
+      .from('recommendation_evaluations')
+      .select('id, user_id, metrics, evaluated_at')
+      .eq('user_id', userId)
+      .gte('evaluated_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+      .order('evaluated_at', { ascending: false });
 
-    if (!evaluation) {
-      evaluation = new RecommendationEvaluation({
-        userId: userObjId,
-        songId: songObjId,
-        source,
-        signals: [source],
-        recommendationId: event.recommendationRef,
-        played: false,
-        skipped: false,
-        liked: false,
-        saved: false,
-        timestamp,
-      });
-    }
+    const existingRow = (recentRows || []).find((row) => (row.metrics as any)?.songId === songId);
+
+    const metrics: Record<string, any> = existingRow
+      ? { ...(existingRow.metrics as any) }
+      : {
+          songId,
+          source,
+          signals: [source],
+          recommendationId: event.recommendationRef,
+          played: false,
+          skipped: false,
+          liked: false,
+          saved: false,
+        };
 
     // 2. Update flags based on action
     const normalizedAction = action.toLowerCase().trim();
     if (normalizedAction === 'play' || normalizedAction === 'replay') {
-      evaluation.played = true;
+      metrics.played = true;
     } else if (normalizedAction === 'skip') {
-      evaluation.skipped = true;
+      metrics.skipped = true;
     } else if (normalizedAction === 'like' || normalizedAction === 'thumbs_up') {
-      evaluation.liked = true;
+      metrics.liked = true;
     } else if (normalizedAction === 'save') {
-      evaluation.saved = true;
+      metrics.saved = true;
     } else if (normalizedAction === 'complete') {
-      evaluation.played = true;
-      evaluation.completionRate = 1.0;
+      metrics.played = true;
+      metrics.completionRate = 1.0;
     }
 
     if (typeof event.listeningDurationSeconds === 'number' && event.listeningDurationSeconds >= 0) {
-      evaluation.listeningDuration = event.listeningDurationSeconds;
+      metrics.listeningDuration = event.listeningDurationSeconds;
     }
 
     if (typeof event.completionRate === 'number') {
       const comp = Math.max(0, Math.min(1, event.completionRate > 1 ? event.completionRate / 100 : event.completionRate));
-      evaluation.completionRate = comp;
+      metrics.completionRate = comp;
     }
 
     // Compute updated composite evaluation score
-    evaluation.evaluationScore = RecommendationEvaluation.computeScore({
-      played: evaluation.played,
-      skipped: evaluation.skipped,
-      liked: evaluation.liked,
-      saved: evaluation.saved,
-      completionRate: evaluation.completionRate,
+    metrics.evaluationScore = computeRecommendationEvaluationScore({
+      played: metrics.played,
+      skipped: metrics.skipped,
+      liked: metrics.liked,
+      saved: metrics.saved,
+      completionRate: metrics.completionRate,
     });
-    evaluation.evaluatedAt = new Date();
 
     if (event.metadata) {
-      evaluation.metadata = { ...(evaluation.metadata || {}), ...event.metadata };
+      metrics.metadata = { ...(metrics.metadata || {}), ...event.metadata };
     }
 
-    await evaluation.save();
+    const nowIso = new Date().toISOString();
+    let savedRow: any;
+    if (existingRow) {
+      const { data, error } = await supabase
+        .from('recommendation_evaluations')
+        .update({ metrics: metrics as any, evaluated_at: nowIso } as any)
+        .eq('id', existingRow.id)
+        .select()
+        .single();
+      if (error || !data) {
+        throw new Error(`Failed to update recommendation evaluation: ${error?.message}`);
+      }
+      savedRow = data;
+    } else {
+      const { data, error } = await supabase
+        .from('recommendation_evaluations')
+        .insert({ user_id: userId, metrics: metrics as any, evaluated_at: timestamp.toISOString() } as any)
+        .select()
+        .single();
+      if (error || !data) {
+        throw new Error(`Failed to create recommendation evaluation: ${error?.message}`);
+      }
+      savedRow = data;
+    }
+
+    const evaluation: RecommendationEvaluationRecord = {
+      userId: savedRow.user_id,
+      songId,
+      source: metrics.source,
+      signals: metrics.signals || [source],
+      recommendationScore: metrics.recommendationScore,
+      componentScores: metrics.componentScores,
+      played: Boolean(metrics.played),
+      skipped: Boolean(metrics.skipped),
+      liked: Boolean(metrics.liked),
+      saved: Boolean(metrics.saved),
+      completionRate: metrics.completionRate,
+      evaluationScore: metrics.evaluationScore,
+      timestamp: new Date(savedRow.evaluated_at || nowIso),
+    };
 
     // 3. Trigger Temporal Preference Update
     let preferencesUpdated = false;
@@ -170,7 +209,7 @@ export class RecommendationFeedbackLearningService {
     return {
       success: true,
       evaluation,
-      evaluationScore: evaluation.evaluationScore,
+      evaluationScore: evaluation.evaluationScore ?? 0,
       preferencesUpdated,
       sessionUpdated,
       message: `Feedback loop successfully processed ${action} on song ${songId}`,
@@ -189,7 +228,7 @@ export class RecommendationFeedbackLearningService {
     impactType: 'positive' | 'negative' | 'neutral';
     recommendationAction: string;
   } {
-    const qualityScore = RecommendationEvaluation.computeScore({
+    const qualityScore = computeRecommendationEvaluationScore({
       played: event.action === 'play' || event.action === 'complete',
       skipped: event.action === 'skip',
       liked: event.action === 'like' || event.action === 'thumbs_up',

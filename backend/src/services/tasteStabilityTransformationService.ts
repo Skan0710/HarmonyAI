@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import { IMusicDNASnapshot } from '../models/MusicDNASnapshot.js';
 import { MusicDNASnapshotService } from './musicDnaSnapshotService.js';
 import { UnifiedMusicDNAService } from './unifiedMusicDnaService.js';
@@ -287,7 +287,7 @@ export class TasteStabilityTransformationService {
     userId: string,
     config: StabilityMetricsConfig = {}
   ): Promise<TasteStabilityTransformationMetrics> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error(`Invalid userId: ${userId}`);
     }
 

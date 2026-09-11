@@ -1,4 +1,5 @@
-import { Types } from 'mongoose';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
 import { searchCatalog, GroupedSearchResults } from './searchService.js';
 import { SemanticSearchService, SemanticSearchResult } from './semanticSearchService.js';
 import { HybridRecommendationService } from './hybridRecommendationService.js';
@@ -7,7 +8,6 @@ import { TrendingService } from './trendingService.js';
 import { UserTasteProfileService } from './userTasteProfileService.js';
 import { CandidateGenerationService } from './candidateGenerationService.js';
 import { RecommendationPostRankingPipeline } from './recommendationPostRankingPipeline.js';
-import { Artist } from '../models/Artist.js';
 
 export type DiscoverySourceType = 'keyword_search' | 'semantic_search' | 'recommendation' | 'trending' | 'hybrid';
 
@@ -908,7 +908,7 @@ export class UnifiedMusicDiscoveryService {
     // 3. Personalized Recommendation Engine Execution
     if (executeRecommendations && (searchRecommended || searchSongs)) {
       // 3A. Personalized Discovery via Existing Recommendation Post-Ranking Pipeline
-      if (userId && Types.ObjectId.isValid(userId)) {
+      if (userId && isValidObjectId(userId)) {
         try {
           const [tasteProfile, rawCandidates] = await Promise.all([
             UserTasteProfileService.generateTasteProfile(userId).catch(() => null),
@@ -953,7 +953,7 @@ export class UnifiedMusicDiscoveryService {
       }
 
       // 3B. Seed Song Recommendations Fallback
-      if (seedSongId && Types.ObjectId.isValid(seedSongId) && recommendedSongsMap.size === 0) {
+      if (seedSongId && isValidObjectId(seedSongId) && recommendedSongsMap.size === 0) {
         try {
           const recSongs = await ContentRecommendationService.getRecommendationsForSong(seedSongId, internalFetchLimit);
           if (Array.isArray(recSongs) && recSongs.length > 0) {
@@ -987,7 +987,7 @@ export class UnifiedMusicDiscoveryService {
       }
 
       // 3C. Hybrid Recommendation Service Fallback
-      if (userId && Types.ObjectId.isValid(userId) && recommendedSongsMap.size === 0) {
+      if (userId && isValidObjectId(userId) && recommendedSongsMap.size === 0) {
         try {
           const hybridRes = await HybridRecommendationService.getHybridRecommendations({
             userId,
@@ -1062,12 +1062,34 @@ export class UnifiedMusicDiscoveryService {
         const matchedArtistIds = topMatchedArtists.map((a) => a.id);
 
         if (genresToFind.length > 0) {
-          const similarArtistDocs = await Artist.find({
-            genres: { $in: genresToFind },
-            _id: { $nin: matchedArtistIds.map((id) => new Types.ObjectId(id)) },
-          })
-            .limit(4)
-            .lean();
+          // Artists don't carry a genres column directly in Postgres; derive matches
+          // via songs in those genres, excluding artists already matched.
+          const genreOrFilter = genresToFind.map((g: string) => `name.ilike.%${g}%`).join(',');
+          const { data: matchedGenreDocs } = await supabase.from('genres').select('id').or(genreOrFilter);
+          const genreIds = (matchedGenreDocs || []).map((g) => g.id);
+
+          let similarArtistDocs: any[] = [];
+          if (genreIds.length > 0) {
+            let songArtistQuery = supabase
+              .from('songs')
+              .select('artist_id')
+              .in('genre_id', genreIds);
+            if (matchedArtistIds.length > 0) {
+              songArtistQuery = songArtistQuery.not('artist_id', 'in', `(${matchedArtistIds.join(',')})`);
+            }
+            const { data: songArtistRows } = await songArtistQuery;
+            const candidateArtistIds = Array.from(
+              new Set((songArtistRows || []).map((r: any) => r.artist_id).filter(Boolean))
+            ).slice(0, 4);
+
+            if (candidateArtistIds.length > 0) {
+              const { data: artistRows } = await supabase
+                .from('artists')
+                .select('*')
+                .in('id', candidateArtistIds);
+              similarArtistDocs = artistRows || [];
+            }
+          }
 
           if (Array.isArray(similarArtistDocs)) {
             for (const doc of similarArtistDocs) {

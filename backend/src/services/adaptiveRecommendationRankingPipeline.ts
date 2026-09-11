@@ -1,4 +1,4 @@
-import mongoose, { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import { CandidateGenerationService, HybridCandidate } from './candidateGenerationService.js';
 import {
   HybridRankingPipeline,
@@ -245,7 +245,7 @@ export class AdaptiveRecommendationRankingPipeline {
       };
     }
 
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       return {
         candidates: [],
         isColdStart: true,
@@ -713,14 +713,12 @@ export class AdaptiveRecommendationRankingPipeline {
     };
 
     // Resolve context & profiles early so candidate generation can benefit from Music DNA
-    const isDbConnected = mongoose.connection?.readyState === 1;
     let effectiveMusicDnaProfile = musicDnaProfile || null;
     if (
       !effectiveMusicDnaProfile &&
       (useMusicDna || enableAllStages) &&
       userId &&
-      Types.ObjectId.isValid(userId) &&
-      isDbConnected
+      isValidObjectId(userId)
     ) {
       try {
         effectiveMusicDnaProfile = await UnifiedMusicDNAService.getOrGenerateProfile(userId);
@@ -734,8 +732,7 @@ export class AdaptiveRecommendationRankingPipeline {
       !effectivePersonalMusicTwin &&
       (usePersonalMusicTwin || enableAllStages) &&
       userId &&
-      Types.ObjectId.isValid(userId) &&
-      isDbConnected
+      isValidObjectId(userId)
     ) {
       try {
         effectivePersonalMusicTwin = await PersonalMusicTwinService.getOrGenerateTwin(userId);
@@ -870,7 +867,7 @@ export class AdaptiveRecommendationRankingPipeline {
       } catch {
         // Safe fallback
       }
-    } else if (!effectiveSessionProfile && useActiveSession && userId && Types.ObjectId.isValid(userId) && isDbConnected) {
+    } else if (!effectiveSessionProfile && useActiveSession && userId && isValidObjectId(userId)) {
       try {
         activeSessionDoc = await ListeningSessionService.getActiveSession(userId);
         if (activeSessionDoc) {
@@ -882,7 +879,7 @@ export class AdaptiveRecommendationRankingPipeline {
     }
 
     let effectiveTemporalProfile = temporalProfile || null;
-    if (!effectiveTemporalProfile && (useTemporalProfile || enableAllStages || options.recommendationMode === 'TASTE_EVOLUTION_DISCOVERY') && userId && Types.ObjectId.isValid(userId) && isDbConnected) {
+    if (!effectiveTemporalProfile && (useTemporalProfile || enableAllStages || options.recommendationMode === 'TASTE_EVOLUTION_DISCOVERY') && userId && isValidObjectId(userId)) {
       try {
         effectiveTemporalProfile = await LayeredTemporalTasteProfileService.generateLayeredTasteProfile(userId);
       } catch {
@@ -1024,8 +1021,8 @@ export class AdaptiveRecommendationRankingPipeline {
     // =========================================================================
     let feedbackProfile = providedFeedbackProfile || null;
     const shouldApplyFeedback = enableAllStages || useScoreCalibration !== false;
-    if (shouldApplyFeedback && userId && Types.ObjectId.isValid(userId)) {
-      if (!feedbackProfile && isDbConnected) {
+    if (shouldApplyFeedback && userId && isValidObjectId(userId)) {
+      if (!feedbackProfile) {
         try {
           feedbackProfile = await RecommendationScoreCalibrationService.buildUserFeedbackProfile(userId);
         } catch {
@@ -1092,7 +1089,7 @@ export class AdaptiveRecommendationRankingPipeline {
     const shouldApplyNovelty = enableAllStages || useNoveltyScoring;
     if (shouldApplyNovelty && userId) {
       let familiarityProfile = providedFamiliarityProfile || null;
-      if (!familiarityProfile && Types.ObjectId.isValid(userId) && isDbConnected) {
+      if (!familiarityProfile && isValidObjectId(userId)) {
         try {
           familiarityProfile = await NoveltyScoringService.buildUserFamiliarityProfile(userId);
         } catch {

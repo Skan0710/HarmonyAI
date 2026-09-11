@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import {
   TasteBoundaryConfig,
   getTasteBoundaryConfig,
@@ -51,7 +51,7 @@ export interface TasteBoundaryProfile {
 }
 
 export interface TasteBoundaryInputs {
-  userId: string | Types.ObjectId;
+  userId: string;
   musicDna?: UnifiedMusicDNA | any | null;
   personalMusicTwin?: PersonalMusicTwinAttributes | any | null;
   temporalProfile?: any | null;
@@ -806,7 +806,7 @@ export class TasteBoundaryDetectionService {
    * Asynchronously retrieves upstream user intelligence and computes the complete Taste Boundary profile.
    */
   static async getUserTasteBoundaries(
-    userId: string | Types.ObjectId,
+    userId: string,
     options: {
       configOverride?: Partial<TasteBoundaryConfig>;
       forceRefresh?: boolean;

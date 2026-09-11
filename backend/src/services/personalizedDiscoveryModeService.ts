@@ -1,4 +1,4 @@
-import mongoose, { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import {
   PersonalizedDiscoveryMode,
   PersonalizedDiscoveryModeConfig,
@@ -65,7 +65,7 @@ export interface PersonalizedDiscoveryModeResult {
 }
 
 export interface PersonalizedDiscoveryModeParams {
-  userId: string | Types.ObjectId;
+  userId: string;
   mode?: PersonalizedDiscoveryMode | string | null;
   limit?: number;
   seedSongId?: string;
@@ -275,8 +275,7 @@ export class PersonalizedDiscoveryModeService {
     let effectiveCdScore = comfortDiscoveryScore;
     let effectiveBoundaries = tasteBoundaries;
 
-    const isDbConnected = mongoose.connection?.readyState === 1;
-    if (userIdStr && Types.ObjectId.isValid(userIdStr) && !candidates && isDbConnected) {
+    if (userIdStr && isValidObjectId(userIdStr) && !candidates) {
       try {
         const [fetchedTwin, fetchedCdScore, fetchedBoundaries, fetchedDna] = await Promise.all([
           !effectiveTwin ? PersonalMusicTwinService.getOrGenerateTwin(userIdStr).catch(() => null) : Promise.resolve(effectiveTwin),

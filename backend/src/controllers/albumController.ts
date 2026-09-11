@@ -1,12 +1,11 @@
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
 import { supabase } from '../config/supabase.js';
 import { AlbumService } from '../services/albumService.js';
 import { AlbumType } from '../models/Album.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
-import { extractQueryParams, sanitizeString } from '../utils/validators.js';
+import { extractQueryParams, sanitizeString, isValidObjectId } from '../utils/validators.js';
 
-// Postgres `artists.id` is a uuid, not a Mongo ObjectId - Types.ObjectId.isValid()
+// Postgres `artists.id` is a uuid, not a Mongo ObjectId - isValidObjectId()
 // (still used by updateAlbum below, out of scope for this port) would reject every
 // valid uuid, so createAlbum validates the uuid shape directly instead.
 const isValidUuid = (value: string): boolean =>
@@ -127,7 +126,7 @@ export const updateAlbum = controllerWrapper(async (req: Request, res: Response)
     throw new ControllerError(400, 'Album title must be a non-empty string');
   }
 
-  if (artist !== undefined && !Types.ObjectId.isValid(artist)) {
+  if (artist !== undefined && !isValidObjectId(artist)) {
     throw new ControllerError(400, 'Valid primary artist ID is required');
   }
 

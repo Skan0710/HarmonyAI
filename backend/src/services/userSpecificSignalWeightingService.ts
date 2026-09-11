@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import {
   BaselineSignalWeights,
   ContextSignalWeights,
@@ -330,7 +330,7 @@ export class UserSpecificSignalWeightingService {
       baseConfig?: RecommendationSignalConfig;
     } = {}
   ): Promise<UserSpecificSignalWeightingResult> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       // Fallback for invalid ID
       return this.calculateUserSpecificWeights({
         userId,

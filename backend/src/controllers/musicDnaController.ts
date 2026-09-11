@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
 import { UnifiedMusicDNAService } from '../services/unifiedMusicDnaService.js';
 import { controllerWrapper, ensureAuth, ControllerError, sendSuccess } from '../utils/controllerHelpers.js';
-import { extractQueryParams } from '../utils/validators.js';
+import { extractQueryParams, isValidObjectId } from '../utils/validators.js';
 
 /**
  * Controller for retrieving the authenticated user's Music DNA profile.
@@ -24,7 +23,7 @@ export const getMusicDNAProfile = controllerWrapper(async (req: Request, res: Re
   if (!user) return;
 
   const userId = user._id ? user._id.toString() : '';
-  if (!userId || !Types.ObjectId.isValid(userId)) {
+  if (!userId || !isValidObjectId(userId)) {
     throw new ControllerError(400, 'Invalid user ID in authentication token');
   }
 
@@ -136,7 +135,7 @@ export const refreshMusicDNAProfile = controllerWrapper(async (req: Request, res
   if (!user) return;
 
   const userId = user._id ? user._id.toString() : '';
-  if (!userId || !Types.ObjectId.isValid(userId)) {
+  if (!userId || !isValidObjectId(userId)) {
     throw new ControllerError(400, 'Invalid user ID in authentication token');
   }
 

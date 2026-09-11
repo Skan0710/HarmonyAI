@@ -1,5 +1,7 @@
-import { Types } from 'mongoose';
-import { Song, ISong } from '../models/Song.js';
+import { ISong } from '../models/Song.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 import { AIPlaylistPreference } from '../schemas/aiPlaylistPreferenceSchema.js';
 import { SemanticSearchService } from './semanticSearchService.js';
 import { CandidateGenerationService } from './candidateGenerationService.js';
@@ -68,7 +70,7 @@ export class PlaylistCandidateGenerationService {
 
     // 2. Candidate Sourcing: User Taste Profile & Hybrid Recommendation Candidates (if authenticated)
     let userTasteProfile: UserTasteProfile | null = null;
-    if (userId && Types.ObjectId.isValid(userId)) {
+    if (userId && isValidObjectId(userId)) {
       try {
         userTasteProfile = await UserTasteProfileService.generateTasteProfile(userId);
         const hybridCandidates = await CandidateGenerationService.generateHybridCandidates({
@@ -97,24 +99,18 @@ export class PlaylistCandidateGenerationService {
 
     // 3. Candidate Sourcing: Direct Metadata DB Query Fallback
     try {
-      const dbQuery: any = { isPublished: true };
-      const orClauses: any[] = [];
+      let catalogQuery = supabase
+        .from('songs')
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .eq('is_published', true)
+        .limit(candidateLimit);
 
       if (preference.requestedMood) {
-        orClauses.push({ mood: new RegExp(preference.requestedMood, 'i') });
+        catalogQuery = catalogQuery.ilike('mood', `%${preference.requestedMood}%`);
       }
 
-      if (orClauses.length > 0) {
-        dbQuery.$or = orClauses;
-      }
-
-      const catalogSongs = await Song.find(dbQuery)
-        .populate('artist', 'name')
-        .populate('featuredArtists', 'name')
-        .populate('album', 'title')
-        .populate('genre', 'name slug')
-        .limit(candidateLimit)
-        .lean();
+      const { data: catalogSongRows } = await catalogQuery;
+      const catalogSongs = (catalogSongRows || []).map(mapSongRow).filter(Boolean) as any[];
 
       for (const song of catalogSongs) {
         const songId = song._id ? String(song._id) : '';

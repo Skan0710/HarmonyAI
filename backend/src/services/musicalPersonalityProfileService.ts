@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import { UnifiedMusicDNAService } from './unifiedMusicDnaService.js';
 import { TasteStabilityTransformationService } from './tasteStabilityTransformationService.js';
 import { EmergingTasteDetectionService } from './emergingTasteDetectionService.js';
@@ -526,7 +526,7 @@ export class MusicalPersonalityProfileService {
    * into an integrated Musical Personality Profile.
    */
   static async getUserPersonalityProfile(userId: string): Promise<MusicalPersonalityProfile> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error(`Invalid userId: ${userId}`);
     }
 

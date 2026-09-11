@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import { HybridCandidate } from './candidateGenerationService.js';
 import { HybridRankedResult } from './hybridRankingPipeline.js';
 import { ColdStartRecommendationService } from './coldStartRecommendationService.js';
@@ -107,7 +107,7 @@ export class HybridRecommendationService {
       tasteEvolutionDiscoveryConfig,
     } = params;
 
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
 

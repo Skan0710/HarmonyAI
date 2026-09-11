@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import {
   TasteEvolutionDiscoveryConfig,
   getTasteEvolutionDiscoveryConfig,
@@ -60,7 +60,7 @@ export interface EvolutionTrendState {
 }
 
 export interface TasteEvolutionDiscoveryInputs {
-  userId: string | Types.ObjectId;
+  userId: string;
   candidates: HybridCandidate[];
   limit?: number;
   musicDna?: UnifiedMusicDNA | any | null;
@@ -796,7 +796,7 @@ export class TasteEvolutionDiscoveryService {
     let snapshots: any[] = [];
     let tasteStabilityMetrics: any = null;
 
-    if (userId && Types.ObjectId.isValid(userId)) {
+    if (userId && isValidObjectId(userId)) {
       try {
         musicDna = await UnifiedMusicDNAService.getOrGenerateProfile(userId);
       } catch {

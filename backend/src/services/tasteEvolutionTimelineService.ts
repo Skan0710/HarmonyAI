@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import { IMusicDNASnapshot } from '../models/MusicDNASnapshot.js';
 import { MusicDNASnapshotService } from './musicDnaSnapshotService.js';
 import {
@@ -412,7 +412,7 @@ export class TasteEvolutionTimelineService {
     userId: string,
     options: TimelineGenerationOptions = {}
   ): Promise<TasteEvolutionTimeline> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error(`Invalid userId: ${userId}`);
     }
 

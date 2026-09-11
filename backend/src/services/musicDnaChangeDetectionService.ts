@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import { IMusicDNASnapshot } from '../models/MusicDNASnapshot.js';
 import { MusicDNASnapshotService } from './musicDnaSnapshotService.js';
 import { UnifiedMusicDNAService } from './unifiedMusicDnaService.js';
@@ -492,7 +492,7 @@ export class MusicDNAChangeDetectionService {
     userId: string,
     thresholds: ChangeDetectionThresholds = DEFAULT_CHANGE_THRESHOLDS
   ): Promise<MusicDNAChangeAnalysis> {
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!isValidObjectId(userId)) {
       throw new Error(`Invalid userId: ${userId}`);
     }
 

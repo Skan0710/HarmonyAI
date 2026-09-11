@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import {
   ComfortDiscoveryConfig,
   getComfortDiscoveryConfig,
@@ -15,7 +15,7 @@ import { UserFeedbackProfile } from './recommendationScoreCalibrationService.js'
 export type ComfortDiscoveryMode = 'COMFORT' | 'DISCOVERY' | 'BALANCED';
 
 export interface ComfortDiscoveryScoringInputs {
-  userId: string | Types.ObjectId;
+  userId: string;
   musicDna?: UnifiedMusicDNA | any | null;
   personalMusicTwin?: PersonalMusicTwinAttributes | any | null;
   temporalProfile?: UnifiedLayeredTasteProfile | any | null;
@@ -408,7 +408,7 @@ export class ComfortDiscoveryScoringService {
    * and computes the user's Comfort vs Discovery score profile.
    */
   static async getUserComfortDiscoveryScores(
-    userId: string | Types.ObjectId,
+    userId: string,
     options: {
       configOverride?: Partial<ComfortDiscoveryConfig>;
       forceRefresh?: boolean;
