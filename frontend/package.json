@@ -19,6 +19,7 @@
     "@phosphor-icons/react": "^2.1.10",
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
+    "@supabase/supabase-js": "^2.116.0",
     "@tailwindcss/vite": "^4.3.3",
     "cn": "^0.2.6",
     "dialkit": "^2.0.2",

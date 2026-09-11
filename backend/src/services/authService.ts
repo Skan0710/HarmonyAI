@@ -1,4 +1,5 @@
-import { User } from '../models/User.js';
+import bcrypt from 'bcryptjs';
+import { supabase } from '../config/supabase.js';
 import { generateToken } from '../utils/jwt.js';
 
 export interface RegisterInput {
@@ -27,32 +28,48 @@ export interface AuthResult {
 export class AuthService {
   static async register(input: RegisterInput): Promise<AuthResult> {
     const { name, email, password, profilePicture } = input;
+    const normalizedEmail = email.toLowerCase().trim();
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+
     if (existingUser) {
       const error = new Error('User with this email already exists');
       (error as Error & { statusCode?: number }).statusCode = 400;
       throw error;
     }
 
-    // Create user
-    const user = await User.create({
-      name,
-      email,
-      password,
-      profilePicture,
-    });
+    const passwordHash = password ? await bcrypt.hash(password, 10) : null;
 
-    const token = generateToken(user._id.toString());
+    // Create user in Supabase
+    const { data: user, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        name,
+        email: normalizedEmail,
+        password_hash: passwordHash,
+        profile_picture: profilePicture || '',
+      })
+      .select()
+      .single();
+
+    if (insertError || !user) {
+      throw new Error(`Registration failed: ${insertError?.message}`);
+    }
+
+    const token = generateToken(user.id);
 
     return {
       user: {
-        id: user._id.toString(),
+        id: user.id,
         name: user.name,
         email: user.email,
-        profilePicture: user.profilePicture,
-        createdAt: user.createdAt,
+        profilePicture: user.profile_picture || undefined,
+        createdAt: user.created_at ? new Date(user.created_at) : new Date(),
       },
       token,
     };
@@ -60,32 +77,37 @@ export class AuthService {
 
   static async login(input: LoginInput): Promise<AuthResult> {
     const { email, password } = input;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // Find user and explicitly select password field
-    const user = await User.findOne({ email }).select('+password');
-    if (!user || !password) {
-      const error = new Error('Invalid email or password');
-      (error as Error & { statusCode?: number }).statusCode = 401;
-      throw error;
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+
+    if (error || !user || !password) {
+      const authErr = new Error('Invalid email or password');
+      (authErr as Error & { statusCode?: number }).statusCode = 401;
+      throw authErr;
     }
 
     // Compare password
-    const isMatch = await user.comparePassword(password);
+    const isMatch = user.password_hash ? await bcrypt.compare(password, user.password_hash) : false;
     if (!isMatch) {
-      const error = new Error('Invalid email or password');
-      (error as Error & { statusCode?: number }).statusCode = 401;
-      throw error;
+      const authErr = new Error('Invalid email or password');
+      (authErr as Error & { statusCode?: number }).statusCode = 401;
+      throw authErr;
     }
 
-    const token = generateToken(user._id.toString());
+    const token = generateToken(user.id);
 
     return {
       user: {
-        id: user._id.toString(),
+        id: user.id,
         name: user.name,
         email: user.email,
-        profilePicture: user.profilePicture,
-        createdAt: user.createdAt,
+        profilePicture: user.profile_picture || undefined,
+        createdAt: user.created_at ? new Date(user.created_at) : new Date(),
       },
       token,
     };

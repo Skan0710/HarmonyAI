@@ -1,7 +1,17 @@
-import { Types } from 'mongoose';
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HEX_OID_REGEX = /^[0-9a-f]{24}$/i;
 
 /**
- * Validate and sanitize an array of string IDs as Mongoose ObjectIds.
+ * Validate that a single string is a valid ID (UUID or legacy ObjectId).
+ */
+export function isValidObjectId(id: unknown): id is string {
+  if (typeof id !== 'string') return false;
+  const trimmed = id.trim();
+  return UUID_REGEX.test(trimmed) || HEX_OID_REGEX.test(trimmed);
+}
+
+/**
+ * Validate and sanitize an array of string IDs.
  * Returns only the IDs that pass validation.
  */
 export function validateObjectIds(ids: unknown[]): string[] {
@@ -9,18 +19,11 @@ export function validateObjectIds(ids: unknown[]): string[] {
 
   const valid: string[] = [];
   for (const id of ids) {
-    if (typeof id === 'string' && Types.ObjectId.isValid(id.trim())) {
+    if (isValidObjectId(id)) {
       valid.push(id.trim());
     }
   }
   return valid;
-}
-
-/**
- * Validate that a single string is a valid Mongoose ObjectId.
- */
-export function isValidObjectId(id: unknown): id is string {
-  return typeof id === 'string' && Types.ObjectId.isValid(id.trim());
 }
 
 /**

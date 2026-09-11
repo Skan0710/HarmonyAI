@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { connectDB } from './config/db.js';
+import { checkSupabaseConnection } from './config/supabase.js';
 import healthRoutes from './routes/healthRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -120,7 +120,7 @@ app.use((err: any, _req: Request, res: Response, _next: any) => {
 });
 
 const startServer = async (): Promise<void> => {
-  await connectDB();
+  await checkSupabaseConnection();
   app.listen(PORT, () => {
     console.log(`[HarmonyAI Backend] Server is running on port ${PORT}`);
   });

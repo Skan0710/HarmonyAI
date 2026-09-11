@@ -20,7 +20,7 @@ export const getCurrentUser = controllerWrapper(async (req: Request, res: Respon
       name: profile.name,
       email: profile.email,
       profilePicture: profile.profilePicture,
-      likedSongs: profile.likedSongs?.map((id) => id.toString()) || [],
+      likedSongs: profile.likedSongs?.map((id: any) => id.toString()) || [],
       favoriteArtists: profile.favoriteArtists || [],
       favoriteGenres: profile.favoriteGenres || [],
       createdAt: profile.createdAt,
@@ -51,7 +51,7 @@ export const updateCurrentUser = controllerWrapper(async (req: Request, res: Res
       name: updatedUser.name,
       email: updatedUser.email,
       profilePicture: updatedUser.profilePicture,
-      likedSongs: updatedUser.likedSongs?.map((id) => id.toString()) || [],
+      likedSongs: updatedUser.likedSongs?.map((id: any) => id.toString()) || [],
       createdAt: updatedUser.createdAt,
     },
   });

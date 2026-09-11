@@ -1,157 +1,114 @@
-import { ListeningHistory } from '../models/ListeningHistory.js';
-import { Song } from '../models/Song.js';
-import { ListeningSessionService } from './listeningSessionService.js';
-import { Types } from 'mongoose';
+import { supabase } from '../config/supabase.js';
 
 export class HistoryService {
-  /**
-   * Records a playback event for a user.
-   * If the same song was recorded within the last 60 seconds, updates the timestamp
-   * to avoid duplicate clutter while keeping accurate playback history.
-   * Lightweight non-blocking integration with active ListeningSession tracking.
-   */
   static async recordPlayback(userId: string, songId: string): Promise<any> {
-    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(songId)) {
-      throw new Error('Invalid user or song ID');
-    }
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
 
-    const songExists = await Song.exists({ _id: songId });
-    if (!songExists) {
-      throw new Error('Song not found');
-    }
+    const { data: recentRecord } = await supabase
+      .from('listening_history')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('song_id', songId)
+      .gte('played_at', oneMinuteAgo)
+      .order('played_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    // Lightweight non-blocking listening session playback association
-    ListeningSessionService.recordSongPlayInSession({ userId, songId }).catch((err) => {
-      console.warn(
-        `[HistoryService Warning]: Non-blocking listening session tracking failed: ${err.message}`
-      );
-    });
-
-    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
-
-    const recentRecord = await ListeningHistory.findOne({
-      user: userId,
-      song: songId,
-      playedAt: { $gte: oneMinuteAgo },
-    });
+    const now = new Date().toISOString();
 
     if (recentRecord) {
-      recentRecord.playedAt = new Date();
-      return recentRecord.save();
+      const { data: updated } = await supabase
+        .from('listening_history')
+        .update({ played_at: now })
+        .eq('id', recentRecord.id)
+        .select()
+        .single();
+      return updated;
     }
 
-    return ListeningHistory.create({
-      user: userId,
-      song: songId,
-      playedAt: new Date(),
+    const { data: created, error } = await supabase
+      .from('listening_history')
+      .insert({
+        user_id: userId,
+        song_id: songId,
+        played_at: now,
+        completed: true,
+        skipped: false,
+        progress_percent: 100,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(`Failed to record playback: ${error.message}`);
+    return created;
+  }
+
+  static async getListeningHistory(userId: string, limit: number = 50): Promise<any[]> {
+    const { data: history, error } = await supabase
+      .from('listening_history')
+      .select('*, songs(*, artists(*), albums(*), genres(*))')
+      .eq('user_id', userId)
+      .order('played_at', { ascending: false })
+      .limit(limit);
+
+    if (error || !history) return [];
+
+    return history.map((h: any) => {
+      const s = h.songs;
+      return {
+        _id: h.id,
+        id: h.id,
+        playedAt: h.played_at,
+        completed: h.completed,
+        skipped: h.skipped,
+        progressPercent: h.progress_percent,
+        song: s ? {
+          _id: s.id,
+          id: s.id,
+          title: s.title,
+          coverImage: s.cover_image,
+          audioUrl: s.audio_url,
+          duration: s.duration,
+          artist: s.artists ? {
+            _id: s.artists.id,
+            id: s.artists.id,
+            name: s.artists.name,
+            avatar: s.artists.avatar,
+            verified: s.artists.verified,
+          } : null,
+          album: s.albums ? {
+            _id: s.albums.id,
+            id: s.albums.id,
+            title: s.albums.title,
+            coverImage: s.albums.cover_image,
+            releaseYear: s.albums.release_year,
+          } : null,
+          genre: s.genres ? {
+            _id: s.genres.id,
+            id: s.genres.id,
+            name: s.genres.name,
+            slug: s.genres.slug,
+          } : null,
+        } : null,
+      };
     });
   }
 
-  /**
-   * Fetches full chronological listening history sorted newest first.
-   */
-  static async getListeningHistory(userId: string, limit: number = 50): Promise<any[]> {
-    return ListeningHistory.find({ user: userId })
-      .sort({ playedAt: -1 })
-      .limit(limit)
-      .populate({
-        path: 'song',
-        populate: [
-          { path: 'artist', select: 'name profileImage avatar verified' },
-          { path: 'album', select: 'title coverImage releaseYear' },
-          { path: 'genre', select: 'name slug' },
-        ],
-      })
-      .lean();
-  }
-
-  /**
-   * Fetches distinct recently played songs for a user.
-   */
   static async getRecentlyPlayed(userId: string, limit: number = 20): Promise<any[]> {
-    const userObjectId = new Types.ObjectId(userId);
+    const history = await this.getListeningHistory(userId, limit * 2);
+    const seenSongs = new Set<string>();
+    const uniqueRecent: any[] = [];
 
-    const aggregated = await ListeningHistory.aggregate([
-      { $match: { user: userObjectId } },
-      { $sort: { playedAt: -1 } },
-      {
-        $group: {
-          _id: '$song',
-          lastPlayedAt: { $first: '$playedAt' },
-          historyId: { $first: '$_id' },
-        },
-      },
-      { $sort: { lastPlayedAt: -1 } },
-      { $limit: limit },
-      {
-        $lookup: {
-          from: 'songs',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'song',
-        },
-      },
-      { $unwind: '$song' },
-      {
-        $lookup: {
-          from: 'artists',
-          localField: 'song.artist',
-          foreignField: '_id',
-          as: 'song.artist',
-        },
-      },
-      {
-        $unwind: {
-          path: '$song.artist',
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $lookup: {
-          from: 'albums',
-          localField: 'song.album',
-          foreignField: '_id',
-          as: 'song.album',
-        },
-      },
-      {
-        $unwind: {
-          path: '$song.album',
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $lookup: {
-          from: 'genres',
-          localField: 'song.genre',
-          foreignField: '_id',
-          as: 'song.genre',
-        },
-      },
-      {
-        $unwind: {
-          path: '$song.genre',
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $project: {
-          _id: '$song._id',
-          title: '$song.title',
-          audioUrl: '$song.audioUrl',
-          coverImage: '$song.coverImage',
-          duration: '$song.duration',
-          releaseYear: '$song.releaseYear',
-          playCount: '$song.playCount',
-          tags: '$song.tags',
-          artist: '$song.artist',
-          album: '$song.album',
-          genre: '$song.genre',
-          lastPlayedAt: 1,
-        },
-      },
-    ]);
+    for (const entry of history) {
+      if (!entry.song || seenSongs.has(entry.song.id)) continue;
+      seenSongs.add(entry.song.id);
+      uniqueRecent.push({
+        ...entry.song,
+        lastPlayedAt: entry.playedAt,
+      });
+      if (uniqueRecent.length >= limit) break;
+    }
 
-    return aggregated;
+    return uniqueRecent;
   }
 }
