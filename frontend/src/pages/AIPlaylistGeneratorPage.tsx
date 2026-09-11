@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Wand2,
   Play,
   Pause,
   Plus,
@@ -26,6 +25,7 @@ import type {
 import { usePlayer } from '../hooks/usePlayer';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { Button } from '../components/ui/Button';
+import { GenerateButton } from '../components/ui/generate-button';
 
 const PRESET_PROMPTS = [
   { text: 'High-energy 80s synthwave workout mix for running', mood: 'Energetic', genre: 'Synthwave', duration: 45 },
@@ -336,19 +336,7 @@ export const AIPlaylistGeneratorPage: React.FC = () => {
         </AnimatePresence>
 
         <div className="flex items-center justify-end pt-2">
-          <Button type="submit" disabled={loading}>
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-text-on-accent/30 border-t-text-on-accent rounded-full animate-spin" />
-                <span>Generating…</span>
-              </>
-            ) : (
-              <>
-                <Wand2 size={15} />
-                <span>Generate playlist</span>
-              </>
-            )}
-          </Button>
+          <GenerateButton type="submit" disabled={loading} isGenerating={loading} />
         </div>
       </form>
 

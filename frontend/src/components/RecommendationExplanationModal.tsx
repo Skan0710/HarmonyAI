@@ -22,6 +22,7 @@ import type { Song } from '../types/music';
 import { fetchRecommendationExplanationApi } from '../services/recommendationService';
 import type { RecommendationExplanationResponse } from '../services/recommendationService';
 import { submitRecommendationFeedbackApi } from '../services/recommendationTrackingService';
+import { ScrollArea } from './ui/scroll-area';
 
 export interface ExplanationFactor {
   label: string;
@@ -208,8 +209,10 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-lg bg-surface-1 rounded-[var(--radius-lg)] p-6 space-y-5 text-text-primary max-h-[90vh] overflow-y-auto"
+            className="relative w-full max-w-lg bg-surface-1 rounded-[var(--radius-lg)] text-text-primary max-h-[90vh]"
           >
+          <ScrollArea className="max-h-[90vh]">
+          <div className="p-6 space-y-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1.5 pr-2">
                 <p className="text-2xs font-semibold uppercase tracking-[0.1em] text-accent flex items-center gap-1.5">
@@ -359,6 +362,8 @@ export const RecommendationExplanationModal: React.FC<RecommendationExplanationM
                 <p className="text-2xs text-success text-center pt-1">Thanks — this helps tune your recommendations.</p>
               )}
             </div>
+          </div>
+          </ScrollArea>
           </motion.div>
         </motion.div>
       )}

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Fingerprint, TrendingUp, Compass, Sparkles } from 'lucide-react';
+import { AnimatedLink } from '../components/ui/AnimatedLink';
+import StatsCounter from '../components/ui/stats-counter';
 import { useAuth } from '../hooks/useAuth';
 import type { Song } from '../types/music';
 import { fetchTrendingSongsApi } from '../services/songService';
@@ -147,13 +148,10 @@ export const HomePage: React.FC = () => {
             {heroLine}
           </motion.h1>
           {archetype && (
-            <Link
-              to="/music-dna"
-              className="inline-flex items-center gap-1.5 mt-5 text-sm font-medium text-accent hover:text-accent-strong transition-colors"
-            >
+            <AnimatedLink to="/music-dna" className="mt-5 text-sm font-medium text-accent hover:text-accent-strong">
               <Fingerprint size={15} strokeWidth={1.75} />
               See your full Music DNA
-            </Link>
+            </AnimatedLink>
           )}
         </div>
         <div className="relative h-10 mt-8 -mx-5 sm:-mx-8 lg:-mx-12 text-accent pointer-events-none">
@@ -238,12 +236,9 @@ export const HomePage: React.FC = () => {
                 </span>
               ))}
             </div>
-            <Link
-              to="/taste-evolution"
-              className="inline-flex items-center gap-1.5 mt-5 text-sm font-medium text-gold hover:text-gold-strong transition-colors"
-            >
-              Explore your full evolution timeline →
-            </Link>
+            <AnimatedLink to="/taste-evolution" className="mt-5 text-sm font-medium text-gold hover:text-gold-strong">
+              Explore your full evolution timeline
+            </AnimatedLink>
           </section>
         )}
 
@@ -276,12 +271,9 @@ export const HomePage: React.FC = () => {
                   <p className="text-sm text-text-secondary mt-1.5 max-w-xl">{twin.currentMusicalIdentity.tagline}</p>
                 )}
               </div>
-              <Link
-                to="/music-twin"
-                className="text-sm font-medium text-accent hover:text-accent-strong transition-colors shrink-0"
-              >
-                Meet your twin →
-              </Link>
+              <AnimatedLink to="/music-twin" className="text-sm font-medium text-accent hover:text-accent-strong shrink-0">
+                Meet your twin
+              </AnimatedLink>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 mt-5">
@@ -294,15 +286,21 @@ export const HomePage: React.FC = () => {
 
             <div className="grid grid-cols-3 gap-4 mt-6 max-w-md">
               <div>
-                <p className="text-2xl font-display text-text-primary tabular-nums">{Math.round(twin.confidence * 100)}%</p>
+                <p className="text-2xl font-display text-text-primary">
+                  <StatsCounter value={Math.round(twin.confidence * 100)} suffix="%" />
+                </p>
                 <p className="text-2xs text-text-tertiary mt-0.5">Confidence</p>
               </div>
               <div>
-                <p className="text-2xl font-display text-text-primary tabular-nums">{Math.round(twin.explorationTendency * 100)}%</p>
+                <p className="text-2xl font-display text-text-primary">
+                  <StatsCounter value={Math.round(twin.explorationTendency * 100)} suffix="%" />
+                </p>
                 <p className="text-2xs text-text-tertiary mt-0.5">Exploration</p>
               </div>
               <div>
-                <p className="text-2xl font-display text-text-primary tabular-nums">{Math.round(twin.tasteStability.stabilityScore * 100)}%</p>
+                <p className="text-2xl font-display text-text-primary">
+                  <StatsCounter value={Math.round(twin.tasteStability.stabilityScore * 100)} suffix="%" />
+                </p>
                 <p className="text-2xs text-text-tertiary mt-0.5">Stability</p>
               </div>
             </div>

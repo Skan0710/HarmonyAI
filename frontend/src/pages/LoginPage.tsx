@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AudioLines, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
+import { AnimatedLink } from '../components/ui/AnimatedLink';
 
 export const LoginPage: React.FC = () => {
   const { isAuthenticated, isInitializing, login, isLoading, error } = useAuth();
@@ -120,9 +121,9 @@ export const LoginPage: React.FC = () => {
 
         <div className="text-center text-xs text-text-tertiary">
           Don't have an account?{' '}
-          <Link to="/register" className="text-accent hover:text-accent-strong font-medium">
+          <AnimatedLink to="/register" showArrow={false} className="text-accent hover:text-accent-strong font-medium">
             Sign up
-          </Link>
+          </AnimatedLink>
         </div>
       </div>
     </div>

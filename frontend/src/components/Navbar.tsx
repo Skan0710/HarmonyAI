@@ -7,6 +7,7 @@ import type { GroupedSearchResults } from '../services/searchService';
 import { SearchSuggestionsDropdown } from './SearchSuggestionsDropdown';
 import { useRecentSearchesStore } from '../store/useRecentSearchesStore';
 import { Button } from './ui/Button';
+import { Wordmark } from './Wordmark';
 
 interface NavbarProps {
   onMenuClick?: () => void;
@@ -93,9 +94,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         <Menu size={20} />
       </button>
 
-      <span className="md:hidden font-display italic text-base text-text-primary shrink-0">
-        harmony<span className="text-accent not-italic">ai</span>
-      </span>
+      <Wordmark className="md:hidden text-base shrink-0" />
 
       <div ref={searchContainerRef} className="relative flex-1 max-w-lg mx-auto md:ml-6 md:mr-0">
         <form onSubmit={handleSearchSubmit} className="relative">

@@ -1,11 +1,11 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Sparkles as SparklesIcon, TrendingUp } from 'lucide-react';
 import { fetchPersonalMusicTwinApi, type PersonalMusicTwin } from '../services/musicIntelligenceService';
 import { ThreeErrorBoundary } from '../components/ThreeErrorBoundary';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { hasWebGL } from '../utils/webgl';
 import { Meter } from '../components/ui/Meter';
+import { AnimatedLink } from '../components/ui/AnimatedLink';
 
 const MusicTwinOrganism = lazy(() =>
   import('../components/MusicTwinOrganism').then((m) => ({ default: m.MusicTwinOrganism }))
@@ -155,12 +155,9 @@ export const MusicTwinPage: React.FC = () => {
               Where your twin is headed
             </h3>
             <p className="text-sm text-text-secondary mt-2 leading-relaxed">{twin.emergingPreferences.narrative}</p>
-            <Link
-              to="/taste-evolution"
-              className="inline-flex items-center gap-1.5 mt-4 text-sm font-medium text-gold hover:text-gold-strong transition-colors"
-            >
-              See your full taste evolution →
-            </Link>
+            <AnimatedLink to="/taste-evolution" className="mt-4 text-sm font-medium text-gold hover:text-gold-strong">
+              See your full taste evolution
+            </AnimatedLink>
           </div>
         </div>
       )}

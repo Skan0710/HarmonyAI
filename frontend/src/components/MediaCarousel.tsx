@@ -1,10 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Song, Artist, Album } from '../types/music';
 import { SongCard } from './SongCard';
 import { ArtistCard } from './ArtistCard';
 import { AlbumCard } from './AlbumCard';
+import { AnimatedLink } from './ui/AnimatedLink';
 import { trackRecommendationBulkImpressions } from '../services/recommendationTrackingService';
 
 export type CarouselItemType = 'song' | 'album' | 'artist';
@@ -140,13 +140,9 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = ({
           </div>
 
           {seeAllLink && (
-            <Link
-              to={seeAllLink}
-              className="text-xs font-medium text-text-secondary hover:text-accent transition-colors flex items-center gap-1"
-            >
+            <AnimatedLink to={seeAllLink} className="text-xs font-medium text-text-secondary hover:text-accent">
               See all
-              <ArrowRight size={13} strokeWidth={1.75} />
-            </Link>
+            </AnimatedLink>
           )}
         </div>
       </div>

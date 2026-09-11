@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
+import { Wordmark } from './Wordmark';
 import {
   Home,
   Compass,
@@ -139,9 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose })
     <>
       <aside className="hidden md:flex w-60 shrink-0 flex-col bg-surface-1 border-r border-border-subtle">
         <div className="px-6 pt-7 pb-6">
-          <span className="font-display italic text-lg text-text-primary tracking-tight">
-            harmony<span className="text-accent not-italic">ai</span>
-          </span>
+          <Wordmark />
         </div>
         <SidebarContent />
       </aside>
@@ -165,9 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose })
               className="md:hidden fixed top-0 left-0 bottom-0 z-50 w-72 flex flex-col bg-surface-1 border-r border-border-subtle"
             >
               <div className="px-6 pt-6 pb-6 flex items-center justify-between">
-                <span className="font-display italic text-lg text-text-primary tracking-tight">
-                  harmony<span className="text-accent not-italic">ai</span>
-                </span>
+                <Wordmark onClick={onClose} />
                 <button
                   onClick={onClose}
                   aria-label="Close navigation"

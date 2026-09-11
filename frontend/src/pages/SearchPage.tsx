@@ -17,6 +17,7 @@ import { MusicGrid } from '../components/MusicGrid';
 import { ArtistCard } from '../components/ArtistCard';
 import { AlbumCard } from '../components/AlbumCard';
 import { TrendingSearches } from '../components/TrendingSearches';
+import { SmoothInput } from '../components/ui/SmoothInput';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useRecentSearchesStore } from '../store/useRecentSearchesStore';
 
@@ -246,14 +247,15 @@ export const SearchPage: React.FC = () => {
 
         <div ref={containerRef} className="relative max-w-2xl mt-6">
           <div className="relative flex items-center">
-            <SearchIcon size={17} className="absolute left-4 text-text-tertiary pointer-events-none" strokeWidth={1.75} />
-            <input
+            <SearchIcon size={17} className="absolute left-4 text-text-tertiary pointer-events-none z-10" strokeWidth={1.75} />
+            <SmoothInput
               type="text"
               value={queryInput}
               onChange={(e) => setQueryInput(e.target.value)}
               onFocus={() => setIsFocused(true)}
               placeholder="Try 'something like Arctic Monkeys but dreamier'…"
-              className="w-full pl-11 pr-11 py-3.5 bg-surface-1 rounded-[var(--radius-md)] text-text-primary placeholder-text-tertiary text-sm focus:outline-none focus:ring-1 focus:ring-border-strong transition-shadow"
+              wrapperClassName="w-full bg-surface-1 rounded-[var(--radius-md)] focus-within:ring-1 focus-within:ring-border-strong transition-shadow"
+              className="w-full pl-11 pr-11 py-3.5 text-text-primary placeholder-text-tertiary text-sm"
               autoFocus
             />
             {queryInput && (

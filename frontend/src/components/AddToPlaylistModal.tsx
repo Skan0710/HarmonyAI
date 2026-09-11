@@ -8,6 +8,7 @@ import {
   removeSongFromPlaylistApi,
 } from '../services/playlistService';
 import { CreatePlaylistModal } from './CreatePlaylistModal';
+import { ScrollArea } from './ui/scroll-area';
 
 interface AddToPlaylistModalProps {
   song: Song | null;
@@ -143,7 +144,8 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                 Create new playlist
               </button>
 
-              <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+              <ScrollArea className="max-h-64">
+              <div className="space-y-1 pr-1">
                 {loading ? (
                   <div className="space-y-2 py-4">
                     {Array.from({ length: 4 }).map((_, i) => (
@@ -197,6 +199,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                   })
                 )}
               </div>
+              </ScrollArea>
 
               <div className="pt-2 border-t border-border-subtle text-right">
                 <button
