@@ -1,7 +1,5 @@
 import { AssistantTool, AssistantToolContext, ToolExecutionResult, ToolParameterSchema } from './toolTypes.js';
-import { Playlist } from '../models/Playlist.js';
 import { PlaylistService } from '../services/playlistService.js';
-import { Types } from 'mongoose';
 import { validateObjectIds, isValidObjectId, sanitizeString } from '../utils/validators.js';
 
 export interface PlaylistModificationInput {
@@ -21,7 +19,7 @@ export class PlaylistModificationTool implements AssistantTool<PlaylistModificat
     properties: {
       playlistId: {
         type: 'string',
-        description: 'The unique ObjectId of the target playlist.',
+        description: 'The unique ID of the target playlist.',
       },
       action: {
         type: 'string',
@@ -31,7 +29,7 @@ export class PlaylistModificationTool implements AssistantTool<PlaylistModificat
       songIds: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Array of song Object IDs to add or remove.',
+        description: 'Array of song IDs to add or remove.',
       },
       name: {
         type: 'string',
@@ -58,13 +56,34 @@ export class PlaylistModificationTool implements AssistantTool<PlaylistModificat
 
     const validActions = ['add_songs', 'remove_songs', 'update_metadata'];
     if (!raw.action || !validActions.includes(raw.action)) {
-      return { valid: false, error: `Invalid action. Must be one of: ${validActions.join(', ')}` };
+      return {
+        valid: false,
+        error: `Invalid action "${raw.action}". Must be one of: ${validActions.join(', ')}`,
+      };
     }
 
-    const songIds = validateObjectIds(raw.songIds || []);
+    let songIds: string[] | undefined;
+    if (raw.action === 'add_songs' || raw.action === 'remove_songs') {
+      if (!Array.isArray(raw.songIds) || raw.songIds.length === 0) {
+        return {
+          valid: false,
+          error: `Action "${raw.action}" requires a non-empty array of songIds`,
+        };
+      }
+      songIds = validateObjectIds(raw.songIds);
+      if (songIds.length === 0) {
+        return { valid: false, error: 'At least one valid song ID is required' };
+      }
+    }
 
-    if ((raw.action === 'add_songs' || raw.action === 'remove_songs') && songIds.length === 0) {
-      return { valid: false, error: `At least one valid songId is required for ${raw.action}` };
+    const name = sanitizeString(raw.name);
+    const description = sanitizeString(raw.description);
+
+    if (raw.action === 'update_metadata' && !name && description === undefined) {
+      return {
+        valid: false,
+        error: 'Action "update_metadata" requires at least name or description to be provided',
+      };
     }
 
     return {
@@ -73,23 +92,26 @@ export class PlaylistModificationTool implements AssistantTool<PlaylistModificat
         playlistId: raw.playlistId.trim(),
         action: raw.action,
         songIds,
-        name: sanitizeString(raw.name),
-        description: sanitizeString(raw.description),
+        name,
+        description,
       },
     };
   }
 
-  async execute(input: PlaylistModificationInput, context: AssistantToolContext): Promise<ToolExecutionResult> {
+  async execute(
+    input: PlaylistModificationInput,
+    context: AssistantToolContext
+  ): Promise<ToolExecutionResult> {
     const validation = this.validate(input);
     if (!validation.valid || !validation.data) {
       return {
         success: false,
         toolName: this.name,
-        error: validation.error || 'Validation failed',
+        error: validation.error || 'Invalid modification parameters',
       };
     }
 
-    if (!context.userId || !Types.ObjectId.isValid(context.userId)) {
+    if (!context.userId || !isValidObjectId(context.userId)) {
       return {
         success: false,
         toolName: this.name,
@@ -100,7 +122,7 @@ export class PlaylistModificationTool implements AssistantTool<PlaylistModificat
     const { playlistId, action, songIds = [], name, description } = validation.data;
 
     try {
-      const playlist = await Playlist.findById(playlistId);
+      const playlist = await PlaylistService.getPlaylistById(playlistId);
       if (!playlist) {
         return {
           success: false,
@@ -110,7 +132,8 @@ export class PlaylistModificationTool implements AssistantTool<PlaylistModificat
       }
 
       // Authorization check: User must be playlist owner or admin
-      if (playlist.owner.toString() !== context.userId && context.userRole !== 'admin') {
+      const ownerId = playlist.owner?._id || playlist.owner?.id || playlist.owner;
+      if (ownerId !== context.userId && context.userRole !== 'admin') {
         return {
           success: false,
           toolName: this.name,
@@ -128,7 +151,7 @@ export class PlaylistModificationTool implements AssistantTool<PlaylistModificat
             // Skip invalid or duplicate songs
           }
         }
-        const updated = await Playlist.findById(playlistId).populate('songs');
+        const updated = await PlaylistService.getPlaylistById(playlistId);
         return {
           success: true,
           toolName: this.name,
@@ -145,7 +168,7 @@ export class PlaylistModificationTool implements AssistantTool<PlaylistModificat
             // Skip songs not in playlist
           }
         }
-        const updated = await Playlist.findById(playlistId).populate('songs');
+        const updated = await PlaylistService.getPlaylistById(playlistId);
         return {
           success: true,
           toolName: this.name,
@@ -153,17 +176,17 @@ export class PlaylistModificationTool implements AssistantTool<PlaylistModificat
           message: `Successfully removed ${removedCount} song(s) from playlist "${playlist.name}"`,
         };
       } else if (action === 'update_metadata') {
-        if (name) playlist.name = name;
-        if (description !== undefined) playlist.description = description;
+        const updatePayload: any = {};
+        if (name) updatePayload.name = name;
+        if (description !== undefined) updatePayload.description = description;
 
-        await playlist.save();
-        const updated = await Playlist.findById(playlist._id).populate('songs');
+        const updated = await PlaylistService.updatePlaylist(playlistId, context.userId, updatePayload);
 
         return {
           success: true,
           toolName: this.name,
           data: updated,
-          message: `Playlist "${playlist.name}" successfully updated (${action})`,
+          message: `Playlist "${name || playlist.name}" successfully updated (${action})`,
         };
       }
 

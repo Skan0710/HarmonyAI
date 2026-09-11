@@ -93,12 +93,12 @@ export class QueueManagementTool implements AssistantTool<QueueManagementInput> 
       }
 
       if ((action === 'add' || action === 'add_next') && songIds.length > 0) {
-        const objectIds = songIds.map((id) => new Types.ObjectId(id));
-        const foundSongs = await Song.find({ _id: { $in: objectIds } })
-          .populate('artist', 'name profileImage avatar')
-          .populate('album', 'title coverImage releaseYear')
-          .populate('genre', 'name slug')
-          .lean();
+        const { data: foundRaw } = await supabase
+          .from('songs')
+          .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+          .in('id', songIds);
+
+        const foundSongs = (foundRaw || []).map(mapSongRow);
 
         return {
           success: true,

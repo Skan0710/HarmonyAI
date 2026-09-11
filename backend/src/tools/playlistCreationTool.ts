@@ -1,6 +1,6 @@
 import { AssistantTool, AssistantToolContext, ToolExecutionResult, ToolParameterSchema } from './toolTypes.js';
 import { PlaylistService } from '../services/playlistService.js';
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 
 export interface PlaylistCreationInput {
   name: string;
@@ -51,7 +51,7 @@ export class PlaylistCreationTool implements AssistantTool<PlaylistCreationInput
     const validSongIds: string[] = [];
     if (Array.isArray(raw.songIds)) {
       for (const id of raw.songIds) {
-        if (typeof id === 'string' && Types.ObjectId.isValid(id.trim())) {
+        if (typeof id === 'string' && isValidObjectId(id.trim())) {
           validSongIds.push(id.trim());
         }
       }
@@ -80,7 +80,7 @@ export class PlaylistCreationTool implements AssistantTool<PlaylistCreationInput
       };
     }
 
-    if (!context.userId || !Types.ObjectId.isValid(context.userId)) {
+    if (!context.userId || !isValidObjectId(context.userId)) {
       return {
         success: false,
         toolName: this.name,

@@ -2,6 +2,8 @@ import { supabase } from '../config/supabase.js';
 import { isValidObjectId } from '../utils/validators.js';
 import { mapSongRow } from './songService.js';
 
+import { UserService } from './userService.js';
+
 export interface ColdStartRecommendationParams {
   userId?: string;
   limit?: number;
@@ -34,21 +36,13 @@ export class ColdStartRecommendationService {
     // 1. If valid authenticated user ID is provided, query user taste signals from Supabase
     if (userId && isValidObjectId(userId)) {
       try {
-        const { data: userDoc } = await supabase
-          .from('users')
-          .select('favorite_genres, favorite_artists, liked_songs')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (userDoc) {
-          if (Array.isArray(userDoc.favorite_genres)) {
-            userDoc.favorite_genres.forEach((g: string) => favoriteGenreIds.add(String(g)));
+        const user = await UserService.getUserById(userId);
+        if (user) {
+          if (Array.isArray(user.favoriteGenres)) {
+            user.favoriteGenres.forEach((g: any) => favoriteGenreIds.add(String(g.id || g._id || g)));
           }
-          if (Array.isArray(userDoc.favorite_artists)) {
-            userDoc.favorite_artists.forEach((a: string) => favoriteArtistIds.add(String(a)));
-          }
-          if (Array.isArray(userDoc.liked_songs)) {
-            userDoc.liked_songs.forEach((s: string) => userLikedSongIds.add(String(s)));
+          if (Array.isArray(user.favoriteArtists)) {
+            user.favoriteArtists.forEach((a: any) => favoriteArtistIds.add(String(a.id || a._id || a)));
           }
         }
 

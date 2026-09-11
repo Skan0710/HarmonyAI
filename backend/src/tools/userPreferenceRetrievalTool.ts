@@ -1,6 +1,6 @@
 import { AssistantTool, AssistantToolContext, ToolExecutionResult, ToolParameterSchema } from './toolTypes.js';
 import { UserTasteProfileService } from '../services/userTasteProfileService.js';
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 
 export interface UserPreferenceInput {
   timeframe?: 'short_term' | 'long_term' | 'combined';
@@ -43,7 +43,7 @@ export class UserPreferenceRetrievalTool implements AssistantTool<UserPreference
       };
     }
 
-    if (!context.userId || !Types.ObjectId.isValid(context.userId)) {
+    if (!context.userId || !isValidObjectId(context.userId)) {
       return {
         success: false,
         toolName: this.name,

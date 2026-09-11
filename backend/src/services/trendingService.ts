@@ -33,7 +33,8 @@ export class TrendingService {
       for (const record of recentHistory) {
         if (!record.song_id) continue;
         const songId = record.song_id;
-        const ageInHours = (now.getTime() - new Date(record.played_at).getTime()) / (1000 * 60 * 60);
+        const playedAtTime = record.played_at ? new Date(record.played_at).getTime() : now.getTime();
+        const ageInHours = (now.getTime() - playedAtTime) / (1000 * 60 * 60);
 
         const recencyWeight = Math.exp(-lambda * Math.max(0, ageInHours));
 
