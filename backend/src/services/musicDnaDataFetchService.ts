@@ -127,20 +127,14 @@ export async function fetchMusicDnaRawInputs(
     progressPercent: row.progress_percent ?? undefined,
   }));
 
-  // `listening_sessions` currently only exposes an aggregate `tracks_played`
-  // jsonb column; per-event skip/completion detail columns land in a
-  // separate migration. Pass what exists through as-is rather than
-  // fabricating tracksSkipped/tracksCompleted data.
   const sessions = ((sessionsRes.data || []) as any[]).map((row) => ({
     _id: row.id as string,
     startTime: row.session_start ? new Date(row.session_start) : new Date(row.created_at || Date.now()),
     endTime: row.session_end ? new Date(row.session_end) : undefined,
     songsPlayed: Array.isArray(row.tracks_played) ? row.tracks_played : [],
     tracksPlayed: Array.isArray(row.tracks_played) ? row.tracks_played : [],
-    // TODO: populated once listening_sessions session-detail columns land
-    tracksSkipped: [] as any[],
-    // TODO: populated once listening_sessions session-detail columns land
-    tracksCompleted: [] as any[],
+    tracksSkipped: Array.isArray(row.tracks_skipped) ? row.tracks_skipped : [],
+    tracksCompleted: Array.isArray(row.tracks_completed) ? row.tracks_completed : [],
   }));
 
   const feedback = ((interactionsRes.data || []) as any[]).map((row) => ({

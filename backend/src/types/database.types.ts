@@ -289,7 +289,10 @@ export type Database = {
           device_context: Json | null
           id: string
           initial_intent: string | null
+          current_song: string | null
           last_activity_time: string
+          metadata: Json
+          session_context: Json
           session_dynamics: Json | null
           session_end: string | null
           session_events: Json
@@ -298,7 +301,6 @@ export type Database = {
           tracks_completed: Json
           tracks_played: Json | null
           tracks_skipped: Json
-          songs_played: Json
           updated_at: string | null
           user_id: string
         }
@@ -307,7 +309,10 @@ export type Database = {
           device_context?: Json | null
           id?: string
           initial_intent?: string | null
+          current_song?: string | null
           last_activity_time?: string
+          metadata?: Json
+          session_context?: Json
           session_dynamics?: Json | null
           session_end?: string | null
           session_events?: Json
@@ -316,7 +321,6 @@ export type Database = {
           tracks_completed?: Json
           tracks_played?: Json | null
           tracks_skipped?: Json
-          songs_played?: Json
           updated_at?: string | null
           user_id: string
         }
@@ -325,7 +329,10 @@ export type Database = {
           device_context?: Json | null
           id?: string
           initial_intent?: string | null
+          current_song?: string | null
           last_activity_time?: string
+          metadata?: Json
+          session_context?: Json
           session_dynamics?: Json | null
           session_end?: string | null
           session_events?: Json
@@ -334,7 +341,6 @@ export type Database = {
           tracks_completed?: Json
           tracks_played?: Json | null
           tracks_skipped?: Json
-          songs_played?: Json
           updated_at?: string | null
           user_id?: string
         }
@@ -356,6 +362,7 @@ export type Database = {
           id: string
           last_calculated_at: string | null
           listening_patterns: Json | null
+          metadata: Json
           moods: Json | null
           temporal_taste: Json | null
           tendencies: Json | null
@@ -370,6 +377,7 @@ export type Database = {
           id?: string
           last_calculated_at?: string | null
           listening_patterns?: Json | null
+          metadata?: Json
           moods?: Json | null
           temporal_taste?: Json | null
           tendencies?: Json | null
@@ -384,6 +392,7 @@ export type Database = {
           id?: string
           last_calculated_at?: string | null
           listening_patterns?: Json | null
+          metadata?: Json
           moods?: Json | null
           temporal_taste?: Json | null
           tendencies?: Json | null

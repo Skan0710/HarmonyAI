@@ -1,6 +1,6 @@
 import { ISong } from '../models/Song.js';
 import { ContextPreference } from '../schemas/contextPreferenceSchema.js';
-import { IListeningSession } from '../models/ListeningSession.js';
+import { IListeningSession } from '../services/listeningSessionService.js';
 
 export interface PipelineItem {
   songId: string;

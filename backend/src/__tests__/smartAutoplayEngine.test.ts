@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Types } from 'mongoose';
 import { SmartAutoplayService, AutoplayCandidateResult } from '../services/smartAutoplayService.js';
 import { AdaptiveSessionScoringService } from '../services/adaptiveSessionScoringService.js';
-import { ISessionEvent } from '../models/ListeningSession.js';
+import { ISessionEvent } from '../services/listeningSessionService.js';
 
 export function runSmartAutoplayEngineTests() {
   console.log('[Smart Autoplay Engine Test Suite] Starting tests...');
@@ -46,7 +46,7 @@ export function runSmartAutoplayEngineTests() {
   // Test 1: Liked songs increasing similar recommendations
   {
     const sessionEvents: ISessionEvent[] = [
-      { song: likedSongId, action: 'like', timestamp: new Date() },
+      { song: likedSongId.toString(), action: 'like', timestamp: new Date().toISOString() },
     ];
 
     const candidateSynthwave = {
@@ -87,7 +87,7 @@ export function runSmartAutoplayEngineTests() {
   // Test 2: Skipped songs reducing similar recommendations
   {
     const sessionEvents: ISessionEvent[] = [
-      { song: skippedSongId, action: 'skip', timestamp: new Date() },
+      { song: skippedSongId.toString(), action: 'skip', timestamp: new Date().toISOString() },
     ];
 
     const candidateAcoustic = {
@@ -114,7 +114,7 @@ export function runSmartAutoplayEngineTests() {
   // Test 3: Replayed songs increasing preference strength
   {
     const sessionEvents: ISessionEvent[] = [
-      { song: replayedSongId, action: 'replay', timestamp: new Date() },
+      { song: replayedSongId.toString(), action: 'replay', timestamp: new Date().toISOString() },
     ];
 
     const candidatePop = {

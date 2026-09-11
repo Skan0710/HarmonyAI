@@ -18,8 +18,7 @@ import {
   RecommendationScoreCalibrationService,
   UserFeedbackProfile,
 } from './recommendationScoreCalibrationService.js';
-import { ListeningSessionService } from './listeningSessionService.js';
-import { IListeningSession } from '../models/ListeningSession.js';
+import { ListeningSessionService, IListeningSession } from './listeningSessionService.js';
 import { SessionTasteProfile } from './sessionTasteProfileService.js';
 
 export interface SignalRationale {

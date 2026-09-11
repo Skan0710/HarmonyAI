@@ -1,9 +1,4 @@
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
-import { Song } from '../models/Song.js';
-import { User } from '../models/User.js';
-import { ListeningSession } from '../models/ListeningSession.js';
-import { RecommendationInteraction } from '../models/RecommendationInteraction.js';
 import { ContentRecommendationService } from '../services/recommendationService.js';
 import { CollaborativeFilteringService } from '../services/collaborativeFilteringService.js';
 import { HybridRecommendationService } from '../services/hybridRecommendationService.js';
@@ -509,7 +504,7 @@ export const getRecommendationExplanation = controllerWrapper(async (req: Reques
   // 3. Fetch Active Listening Session if available
   let activeSessionPreferences: any = null;
   try {
-    const activeSession = await ListeningSession.findOne({ user: user._id, status: 'active' }).lean();
+    const activeSession = await ListeningSessionService.getActiveSession(userId);
     if (activeSession && activeSession.contextSnapshot) {
       activeSessionPreferences = {
         activeMood: activeSession.contextSnapshot.mood,
@@ -524,13 +519,14 @@ export const getRecommendationExplanation = controllerWrapper(async (req: Reques
   // 4. Fetch Recent Recommendation Interactions for this song
   let recentInteractions: any[] = [];
   try {
-    recentInteractions = await RecommendationInteraction.find({
-      user: user._id,
-      song: song._id,
-    })
-      .sort({ timestamp: -1 })
-      .limit(5)
-      .lean();
+    const { data: interactionRows } = await supabase
+      .from('recommendation_interactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('song_id', song._id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    recentInteractions = interactionRows || [];
   } catch {
     // Continue safely
   }
@@ -538,15 +534,16 @@ export const getRecommendationExplanation = controllerWrapper(async (req: Reques
   // 5. Fetch Liked Songs Sample for acoustic content comparison
   let likedSongsSample: any[] = [];
   try {
-    const userDoc = await User.findById(userId)
-      .select('likedSongs')
-      .populate({
-        path: 'likedSongs',
-        select: 'title artist genre audioFeatures mood language',
-        options: { limit: 5, sort: { createdAt: -1 } },
-      })
-      .lean();
-    likedSongsSample = (userDoc?.likedSongs as any[]) || [];
+    const { data: likedRows } = await supabase
+      .from('user_liked_songs')
+      .select('songs(id, title, mood, audio_features, language, artists(id, name), genres(id, name))')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    likedSongsSample = (likedRows || [])
+      .map((r: any) => r.songs)
+      .filter(Boolean)
+      .map(mapSongRow);
   } catch {
     // Continue safely
   }

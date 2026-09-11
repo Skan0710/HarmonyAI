@@ -1,4 +1,4 @@
-import { ISessionEvent } from '../models/ListeningSession.js';
+import { ISessionEvent } from './listeningSessionService.js';
 import { TemporarySessionProfile } from './sessionProfileService.js';
 import {
   AdaptiveSessionScoringWeights,

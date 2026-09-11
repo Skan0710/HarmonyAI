@@ -7,7 +7,7 @@ import {
   resetAdaptiveSessionWeights,
 } from '../config/recommendationConfig.js';
 import { TemporarySessionProfile } from '../services/sessionProfileService.js';
-import { ISessionEvent } from '../models/ListeningSession.js';
+import { ISessionEvent } from '../services/listeningSessionService.js';
 
 export function runAdaptiveSessionScoringTests() {
   console.log('[Adaptive Session Scoring Test Suite] Starting tests...');
@@ -52,8 +52,8 @@ export function runAdaptiveSessionScoringTests() {
   // Test 1: Increased score for song similar to liked track vs skipped track
   {
     const sessionEvents: ISessionEvent[] = [
-      { song: skippedSongId, action: 'skip', timestamp: new Date(Date.now() - 10000) },
-      { song: likedSongId, action: 'like', timestamp: new Date() },
+      { song: skippedSongId.toString(), action: 'skip', timestamp: new Date(Date.now() - 10000).toISOString() },
+      { song: likedSongId.toString(), action: 'like', timestamp: new Date().toISOString() },
     ];
 
     const candidateSimilarToLiked = {
@@ -132,8 +132,8 @@ export function runAdaptiveSessionScoringTests() {
   {
     // If skip was older and like was recent, net feedback should be strongly positive
     const sessionEventsLikeRecent: ISessionEvent[] = [
-      { song: skippedSongId, action: 'skip', timestamp: new Date(Date.now() - 60000) },
-      { song: likedSongId, action: 'like', timestamp: new Date() },
+      { song: skippedSongId.toString(), action: 'skip', timestamp: new Date(Date.now() - 60000).toISOString() },
+      { song: likedSongId.toString(), action: 'like', timestamp: new Date().toISOString() },
     ];
 
     const candidateSynth = {

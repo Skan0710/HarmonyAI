@@ -1,6 +1,7 @@
-import { ISong, Song } from '../models/Song.js';
-import { IListeningSession } from '../models/ListeningSession.js';
-import { ListeningSessionService } from './listeningSessionService.js';
+import { ISong } from '../models/Song.js';
+import { supabase } from '../config/supabase.js';
+import { mapSongRow } from './songService.js';
+import { IListeningSession, ListeningSessionService } from './listeningSessionService.js';
 import { SessionProfileService } from './sessionProfileService.js';
 import { ContentRecommendationService } from './recommendationService.js';
 import { AdaptiveSessionScoringService } from './adaptiveSessionScoringService.js';
@@ -98,15 +99,18 @@ export class SessionCandidateGenerationService {
 
     // 2. Supplementary Session Profile Matching Catalog Songs if candidates are sparse
     if (candidateMap.size < limit * 2 && sessionProfile.dominantGenres.length > 0) {
-      const genreMatches = await Song.find({
-        _id: { $nin: Array.from(playedSongIdsSet) },
-      })
-        .limit(20)
-        .populate('artist', 'name')
-        .populate('genre', 'name')
-        .lean();
+      const playedIdList = Array.from(playedSongIdsSet);
+      let genreMatchQuery = supabase
+        .from('songs')
+        .select('id, mood, audio_features, artists!songs_artist_id_fkey(id, name), genres!songs_genre_id_fkey(id, name)')
+        .limit(20);
+      if (playedIdList.length > 0) {
+        genreMatchQuery = genreMatchQuery.not('id', 'in', `(${playedIdList.join(',')})`);
+      }
+      const { data: genreMatchRows } = await genreMatchQuery;
+      const genreMatches = (genreMatchRows || []).map(mapSongRow);
 
-      genreMatches.forEach((song) => {
+      genreMatches.forEach((song: any) => {
         const sId = song._id.toString();
         if (!candidateMap.has(sId)) {
           candidateMap.set(sId, {
@@ -120,13 +124,16 @@ export class SessionCandidateGenerationService {
     // Build map of event songs for interaction feedback scoring
     const sessionEvents = session.sessionEvents || [];
     const eventSongIds = sessionEvents.map((ev) => ev.song);
-    const eventSongs = await Song.find({ _id: { $in: eventSongIds } })
-      .populate('artist', 'name')
-      .populate('genre', 'name')
-      .lean();
+    const { data: eventSongRows } = eventSongIds.length > 0
+      ? await supabase
+          .from('songs')
+          .select('id, mood, audio_features, artists!songs_artist_id_fkey(id, name), genres!songs_genre_id_fkey(id, name)')
+          .in('id', eventSongIds)
+      : { data: [] as any[] };
+    const eventSongs = (eventSongRows || []).map(mapSongRow);
 
     const eventSongMap = new Map<string, any>();
-    eventSongs.forEach((s) => eventSongMap.set(s._id.toString(), s));
+    eventSongs.forEach((s: any) => eventSongMap.set(s._id.toString(), s));
 
     // 3. Adaptive Score Fusion
     const candidates: SessionCandidateResult[] = [];

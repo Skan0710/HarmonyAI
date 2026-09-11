@@ -79,7 +79,7 @@ export function runSessionTasteProfileServiceTests() {
         { song: songLofi._id, playedAt: new Date(Date.now() - 100000), completed: false },
       ],
       status: 'active',
-    });
+    }) as any;
 
     SessionTasteProfileService.generateSessionTasteProfile(session).then((profile) => {
       assert.ok(profile !== null);
@@ -112,7 +112,7 @@ export function runSessionTasteProfileServiceTests() {
         { song: songEdm._id, action: 'replay', timestamp: new Date(Date.now() - 100000) }, // Replays EDM (2.0x)
       ],
       status: 'active',
-    });
+    }) as any;
 
     SessionTasteProfileService.generateSessionTasteProfile(session).then((profile) => {
       assert.ok(profile !== null);
@@ -143,7 +143,7 @@ export function runSessionTasteProfileServiceTests() {
         { song: songLofi._id, action: 'play', timestamp: new Date(Date.now() - 10000) },  // Recent
       ],
       status: 'active',
-    });
+    }) as any;
 
     SessionTasteProfileService.generateSessionTasteProfile(session).then((profile) => {
       assert.ok(profile !== null);
@@ -174,7 +174,7 @@ export function runSessionTasteProfileServiceTests() {
         { song: songLofi._id, action: 'play', timestamp: new Date() },
       ],
       status: 'active',
-    });
+    }) as any;
 
     SessionTasteProfileService.generateSessionTasteProfile(session).then((profile) => {
       assert.ok(profile !== null);

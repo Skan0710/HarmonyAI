@@ -250,7 +250,7 @@ export async function runSmartAutoplayAdaptiveQueueTests() {
         { song: new Types.ObjectId(skippedTrackId), skippedAt: new Date() },
       ],
       status: 'active',
-    });
+    }) as any;
 
     const result = await SmartAutoplayService.generateAdaptiveQueue({
       userId,

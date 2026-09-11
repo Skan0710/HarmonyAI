@@ -1,7 +1,8 @@
-import { Types } from 'mongoose';
-import { IListeningSession, SessionActionType } from '../models/ListeningSession.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { IListeningSession, SessionActionType } from './listeningSessionService.js';
 import { SessionProfileService, TemporarySessionProfile } from './sessionProfileService.js';
-import { Song } from '../models/Song.js';
+import { mapSongRow } from './songService.js';
 
 export const ACTION_WEIGHT_MULTIPLIERS: Record<SessionActionType, number> = {
   like: 2.0,       // Strong positive boost
@@ -41,13 +42,15 @@ export class SessionPreferenceUpdateService {
     }
 
     const songIds = events.map((ev) => ev.song);
-    const songDocs = await Song.find({ _id: { $in: songIds } })
-      .populate('artist', 'name')
-      .populate('genre', 'name')
-      .lean();
+    const { data: songRows } = await supabase
+      .from('songs')
+      .select('id, mood, audio_features, artists!songs_artist_id_fkey(id, name), genres!songs_genre_id_fkey(id, name)')
+      .in('id', songIds);
+
+    const songDocs = (songRows || []).map(mapSongRow);
 
     const songMap = new Map<string, any>();
-    songDocs.forEach((s) => songMap.set(s._id.toString(), s));
+    songDocs.forEach((s: any) => songMap.set(s._id.toString(), s));
 
     const totalEvents = events.length;
     const genreWeightsMap = new Map<string, number>();
@@ -167,7 +170,7 @@ export class SessionPreferenceUpdateService {
    * Updates session preferences for a user's active listening session.
    */
   static async updateActiveSessionPreferences(userId: string): Promise<TemporarySessionProfile | null> {
-    if (!userId || !Types.ObjectId.isValid(userId)) return null;
+    if (!userId || !isValidObjectId(userId)) return null;
 
     const { ListeningSessionService } = await import('./listeningSessionService.js');
     const activeSession = await ListeningSessionService.getActiveSession(userId);

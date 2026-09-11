@@ -5,7 +5,7 @@ import {
 import { UserClassificationType } from './coldStartDetectionService.js';
 import { UnifiedLayeredTasteProfile } from './layeredTemporalTasteProfileService.js';
 import { UserFeedbackProfile } from './recommendationScoreCalibrationService.js';
-import { IListeningSession } from '../models/ListeningSession.js';
+import { IListeningSession } from './listeningSessionService.js';
 import { NoveltyScoringService } from './noveltyScoringService.js';
 import { HybridRankedResult } from './hybridRankingPipeline.js';
 

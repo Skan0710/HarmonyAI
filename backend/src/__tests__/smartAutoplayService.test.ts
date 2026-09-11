@@ -168,7 +168,7 @@ export async function runSmartAutoplayServiceTests() {
       tracksPlayed: [{ song: new Types.ObjectId(currentSongId), playedAt: new Date(), completed: false }],
       tracksSkipped: [{ song: new Types.ObjectId(skippedSongId), skippedAt: new Date() }],
       status: 'active',
-    });
+    }) as any;
 
     const res = await SmartAutoplayService.generateAutoplayCandidates({
       userId,

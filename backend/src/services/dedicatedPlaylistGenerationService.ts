@@ -1,5 +1,7 @@
-import { Types } from 'mongoose';
-import { Song, ISong } from '../models/Song.js';
+import { ISong } from '../models/Song.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
+import { mapSongRow } from './songService.js';
 import { CandidateGenerationService } from './candidateGenerationService.js';
 import { SemanticSearchService } from './semanticSearchService.js';
 import { RecommendationPostRankingPipeline } from './recommendationPostRankingPipeline.js';
@@ -9,7 +11,6 @@ import {
   getNoveltyConfigWeights,
   getGenreDiversityWeights,
 } from '../config/recommendationConfig.js';
-import { ListeningSession } from '../models/ListeningSession.js';
 import {
   PlaylistSequencingService,
   SequencingStrategy,
@@ -170,7 +171,7 @@ export class DedicatedPlaylistGenerationService {
     const candidateMap = new Map<string, { song: ISong; baseScore: number; sources: Set<string> }>();
 
     // 2. Candidate Sourcing: Hybrid Recommendation Engine (if authenticated)
-    if (userId && Types.ObjectId.isValid(userId)) {
+    if (userId && isValidObjectId(userId)) {
       try {
         const hybridCandidates = await CandidateGenerationService.generateHybridCandidates({
           userId,
@@ -234,26 +235,31 @@ export class DedicatedPlaylistGenerationService {
 
     // 4. Candidate Sourcing: Catalog DB Query Fallback
     try {
-      const dbQuery: any = { isPublished: true };
-      const orConditions: any[] = [];
+      const orParts: string[] = [];
 
       if (preferredGenres.length > 0) {
-        orConditions.push({ 'genre.name': { $in: preferredGenres.map((g) => new RegExp(g, 'i')) } });
+        const genreOrFilter = preferredGenres.map((g) => `name.ilike.%${g}%`).join(',');
+        const { data: matchedGenreDocs } = await supabase.from('genres').select('id').or(genreOrFilter);
+        const genreIds = (matchedGenreDocs || []).map((g) => g.id);
+        if (genreIds.length > 0) {
+          orParts.push(`genre_id.in.(${genreIds.join(',')})`);
+        }
       }
       if (mood) {
-        orConditions.push({ mood: new RegExp(mood, 'i') });
+        orParts.push(`mood.ilike.%${mood}%`);
       }
 
-      if (orConditions.length > 0) {
-        dbQuery.$or = orConditions;
+      let catalogQuery = supabase
+        .from('songs')
+        .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+        .eq('is_published', true)
+        .limit(candidatePoolLimit);
+      if (orParts.length > 0) {
+        catalogQuery = catalogQuery.or(orParts.join(','));
       }
 
-      const catalogSongs = await Song.find(dbQuery)
-        .populate('artist', 'name profileImage avatar')
-        .populate('album', 'title coverImage releaseYear')
-        .populate('genre', 'name slug')
-        .limit(candidatePoolLimit)
-        .lean();
+      const { data: catalogSongRows } = await catalogQuery;
+      const catalogSongs = (catalogSongRows || []).map(mapSongRow).filter(Boolean) as any[];
 
       for (const s of catalogSongs) {
         const sId = s._id ? String(s._id) : '';
@@ -264,7 +270,7 @@ export class DedicatedPlaylistGenerationService {
           existing.sources.add('catalog_match');
         } else {
           candidateMap.set(sId, {
-            song: s as ISong,
+            song: s as unknown as ISong,
             baseScore: 0.5,
             sources: new Set(['catalog_match']),
           });
@@ -277,16 +283,17 @@ export class DedicatedPlaylistGenerationService {
     // 5. Session Data: Look up session skipped tracks if sessionId is provided
     // Security: verify the session belongs to the authenticated user
     const sessionSkippedIds = new Set<string>();
-    if (sessionId && Types.ObjectId.isValid(sessionId)) {
+    if (sessionId && isValidObjectId(sessionId) && userId && isValidObjectId(userId)) {
       try {
-        const sessionDoc = await ListeningSession.findOne({
-          _id: sessionId,
-          user: new Types.ObjectId(userId),
-        }).lean();
-        if (sessionDoc && Array.isArray((sessionDoc as any).skippedSongs)) {
-          for (const skipId of (sessionDoc as any).skippedSongs) {
-            sessionSkippedIds.add(String(skipId));
-          }
+        const { data: sessionRow } = await supabase
+          .from('listening_sessions')
+          .select('tracks_skipped')
+          .eq('id', sessionId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        const tracksSkipped = (sessionRow?.tracks_skipped as any[]) || [];
+        for (const skip of tracksSkipped) {
+          if (skip?.song) sessionSkippedIds.add(String(skip.song));
         }
       } catch (err: any) {
         console.warn(`[DedicatedPlaylistGeneration] Session skipped track fetch failed: ${err.message}`);

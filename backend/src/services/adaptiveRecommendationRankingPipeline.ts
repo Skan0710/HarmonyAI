@@ -17,8 +17,7 @@ import {
   SessionTasteProfile,
   SessionTasteProfileService,
 } from './sessionTasteProfileService.js';
-import { ListeningSessionService } from './listeningSessionService.js';
-import { IListeningSession } from '../models/ListeningSession.js';
+import { ListeningSessionService, IListeningSession } from './listeningSessionService.js';
 import {
   LayeredTemporalTasteProfileService,
   UnifiedLayeredTasteProfile,

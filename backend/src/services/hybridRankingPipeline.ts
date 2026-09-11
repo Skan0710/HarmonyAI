@@ -23,7 +23,7 @@ import {
   ContextDerivedPreferences,
 } from './contextPreferenceMappingService.js';
 import { SessionTasteProfile } from './sessionTasteProfileService.js';
-import { IListeningSession } from '../models/ListeningSession.js';
+import { IListeningSession } from './listeningSessionService.js';
 import {
   UnifiedLayeredTasteProfile,
   TemporalTasteLayer,

@@ -1,5 +1,4 @@
-import { IListeningSession } from '../models/ListeningSession.js';
-import { ListeningSessionService } from './listeningSessionService.js';
+import { ListeningSessionService, IListeningSession } from './listeningSessionService.js';
 import { supabase } from '../config/supabase.js';
 import { isValidObjectId } from '../utils/validators.js';
 import { mapSongRow } from './songService.js';

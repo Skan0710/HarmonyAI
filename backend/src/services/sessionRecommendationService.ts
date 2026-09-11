@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { isValidObjectId } from '../utils/validators.js';
 import { ListeningSessionService } from './listeningSessionService.js';
 import { SessionCandidateGenerationService, SessionCandidateResult } from './sessionCandidateGenerationService.js';
 import { ColdStartRecommendationService } from './coldStartRecommendationService.js';
@@ -53,7 +53,7 @@ export class SessionRecommendationService {
   }): Promise<SessionRecommendationResponse> {
     const { userId, limit = 10, isDebugMode = false } = params;
 
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       throw new Error('Invalid user ID provided for session recommendations');
     }
 

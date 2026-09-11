@@ -1,17 +1,73 @@
-import { Types } from 'mongoose';
-import {
-  ListeningSession,
-  IListeningSession,
-  SessionStatus,
-  SessionActionType,
-  ISessionContext,
-} from '../models/ListeningSession.js';
+import { supabase } from '../config/supabase.js';
+import { isValidObjectId } from '../utils/validators.js';
 import { ContextPreference } from '../schemas/contextPreferenceSchema.js';
 import { RecommendationContextAttributes } from '../schemas/recommendationContextSchema.js';
 import { RecommendationInteractionTrackingService } from './recommendationInteractionTrackingService.js';
 import { SessionPreferenceUpdateService } from './sessionPreferenceUpdateService.js';
 
 export const SESSION_INACTIVITY_TIMEOUT_MINUTES = 30;
+
+export type SessionStatus = 'active' | 'paused' | 'ended';
+
+export type SessionActionType = 'play' | 'skip' | 'like' | 'replay' | 'queue_add' | 'complete';
+
+export interface ISessionPlayedSong {
+  song: string;
+  playedAt: string;
+  playDurationSeconds?: number;
+  completed?: boolean;
+  metadata?: Record<string, any>;
+}
+
+export interface ISessionTrackSkip {
+  song: string;
+  skippedAt: string;
+  playDurationBeforeSkipSeconds?: number;
+  reason?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface ISessionTrackComplete {
+  song: string;
+  completedAt: string;
+  durationSeconds?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface ISessionEvent {
+  song: string;
+  action: SessionActionType;
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
+export interface ISessionContext extends RecommendationContextAttributes {
+  snapshotTakenAt?: string;
+  source?: string;
+  [key: string]: any;
+}
+
+export interface IListeningSession {
+  _id: string;
+  id: string;
+  user: string;
+  startTime: string;
+  endTime?: string;
+  lastActivityTime: string;
+  currentSong?: string;
+  currentTrack?: string;
+  songsPlayed: ISessionPlayedSong[];
+  tracksPlayed: ISessionPlayedSong[];
+  tracksSkipped: ISessionTrackSkip[];
+  tracksCompleted: ISessionTrackComplete[];
+  sessionEvents: ISessionEvent[];
+  status: SessionStatus;
+  sessionContext?: ISessionContext;
+  contextSnapshot?: ContextPreference | ISessionContext;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface StartSessionParams {
   userId: string;
@@ -60,6 +116,35 @@ export interface RecordSessionEventParams {
   metadata?: Record<string, any>;
 }
 
+function mapSessionRow(row: any): IListeningSession {
+  const tracksPlayed: ISessionPlayedSong[] = row.tracks_played || [];
+  const sessionContext = row.session_context && Object.keys(row.session_context).length > 0
+    ? row.session_context
+    : undefined;
+
+  return {
+    _id: row.id,
+    id: row.id,
+    user: row.user_id,
+    startTime: row.session_start,
+    endTime: row.session_end || undefined,
+    lastActivityTime: row.last_activity_time,
+    currentSong: row.current_song || undefined,
+    currentTrack: row.current_song || undefined,
+    songsPlayed: tracksPlayed,
+    tracksPlayed,
+    tracksSkipped: row.tracks_skipped || [],
+    tracksCompleted: row.tracks_completed || [],
+    sessionEvents: row.session_events || [],
+    status: row.status,
+    sessionContext,
+    contextSnapshot: sessionContext,
+    metadata: row.metadata || {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export class ListeningSessionService {
   /**
    * Retrieves the currently active session for a user.
@@ -69,26 +154,33 @@ export class ListeningSessionService {
     userId: string,
     timeoutMinutes: number = SESSION_INACTIVITY_TIMEOUT_MINUTES
   ): Promise<IListeningSession | null> {
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       return null;
     }
 
-    const session = await ListeningSession.findOne({
-      user: new Types.ObjectId(userId),
-      status: 'active',
-    }).sort({ lastActivityTime: -1 });
+    const { data, error } = await supabase
+      .from('listening_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('last_activity_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (!session) {
+    if (error || !data) {
       return null;
     }
 
+    const session = mapSessionRow(data);
     const now = new Date();
-    const elapsedMinutes = (now.getTime() - session.lastActivityTime.getTime()) / (1000 * 60);
+    const elapsedMinutes = (now.getTime() - new Date(session.lastActivityTime).getTime()) / (1000 * 60);
 
     if (elapsedMinutes > timeoutMinutes) {
-      session.status = 'ended';
-      session.endTime = now;
-      await session.save();
+      const nowIso = now.toISOString();
+      await supabase
+        .from('listening_sessions')
+        .update({ status: 'ended', session_end: nowIso, updated_at: nowIso })
+        .eq('id', session._id);
       return null;
     }
 
@@ -103,49 +195,52 @@ export class ListeningSessionService {
     const { userId, initialSongId, initialTrackId, contextSnapshot, sessionContext, metadata } = params;
     const targetSongId = initialSongId || initialTrackId;
 
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       throw new Error('Invalid user ID provided for session creation');
     }
 
-    const userObjectId = new Types.ObjectId(userId);
     const now = new Date();
+    const nowIso = now.toISOString();
 
     // Prevent multiple active sessions: terminate any existing active or paused sessions
-    await ListeningSession.updateMany(
-      { user: userObjectId, status: { $in: ['active', 'paused'] } },
-      { $set: { status: 'ended', endTime: now, updatedAt: now } }
-    );
+    await supabase
+      .from('listening_sessions')
+      .update({ status: 'ended', session_end: nowIso, updated_at: nowIso })
+      .eq('user_id', userId)
+      .in('status', ['active', 'paused']);
 
-    const initialSongObjectId = targetSongId && Types.ObjectId.isValid(targetSongId)
-      ? new Types.ObjectId(targetSongId)
-      : undefined;
-
-    const initialPlay = initialSongObjectId
-      ? [{ song: initialSongObjectId, playedAt: now, completed: false }]
+    const validSongId = targetSongId && isValidObjectId(targetSongId) ? targetSongId : undefined;
+    const initialPlay: ISessionPlayedSong[] = validSongId
+      ? [{ song: validSongId, playedAt: nowIso, completed: false }]
       : [];
 
     const effectiveContext = (sessionContext || contextSnapshot) as any;
 
-    const newSession = new ListeningSession({
-      user: userObjectId,
-      startTime: now,
-      lastActivityTime: now,
-      status: 'active',
-      currentSong: initialSongObjectId,
-      currentTrack: initialSongObjectId,
-      songsPlayed: initialPlay,
-      tracksPlayed: initialPlay,
-      tracksSkipped: [],
-      tracksCompleted: [],
-      sessionEvents: initialSongObjectId
-        ? [{ song: initialSongObjectId, action: 'play', timestamp: now }]
-        : [],
-      contextSnapshot: effectiveContext,
-      sessionContext: effectiveContext,
-      metadata: metadata || {},
-    });
+    const { data, error } = await supabase
+      .from('listening_sessions')
+      .insert({
+        user_id: userId,
+        session_start: nowIso,
+        last_activity_time: nowIso,
+        status: 'active',
+        current_song: validSongId || null,
+        tracks_played: initialPlay,
+        tracks_skipped: [],
+        tracks_completed: [],
+        session_events: validSongId
+          ? [{ song: validSongId, action: 'play', timestamp: nowIso }]
+          : [],
+        session_context: effectiveContext || {},
+        metadata: metadata || {},
+      } as any)
+      .select()
+      .single();
 
-    return await newSession.save();
+    if (error || !data) {
+      throw new Error(`Failed to start listening session: ${error?.message}`);
+    }
+
+    return mapSessionRow(data);
   }
 
   /**
@@ -173,68 +268,74 @@ export class ListeningSessionService {
     } = params;
 
     const effectiveSongId = songId || trackId;
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
-    if (!effectiveSongId || !Types.ObjectId.isValid(effectiveSongId)) {
+    if (!effectiveSongId || !isValidObjectId(effectiveSongId)) {
       throw new Error('Invalid song ID');
     }
 
     const effectiveDuration = durationSeconds ?? playDurationSeconds;
     const effectiveContext = (sessionContext || contextSnapshot) as any;
 
-    let session = await this.getActiveSession(userId);
+    const session = await this.getActiveSession(userId);
 
     if (!session) {
-      session = await this.startSession({
+      return await this.startSession({
         userId,
         initialSongId: effectiveSongId,
         sessionContext: effectiveContext,
         metadata,
       });
-      return session;
     }
 
-    const songObjectId = new Types.ObjectId(effectiveSongId);
     const now = new Date();
+    const nowIso = now.toISOString();
 
-    session.lastActivityTime = now;
-    session.currentSong = songObjectId;
-    session.currentTrack = songObjectId;
-
-    const playRecord = {
-      song: songObjectId,
-      playedAt: now,
+    const playRecord: ISessionPlayedSong = {
+      song: effectiveSongId,
+      playedAt: nowIso,
       playDurationSeconds: effectiveDuration,
       completed,
       metadata,
     };
 
-    session.songsPlayed.push(playRecord);
-    if (!session.tracksPlayed) session.tracksPlayed = [];
-    session.tracksPlayed.push(playRecord);
+    const tracksPlayed = [...session.songsPlayed, playRecord];
+    const sessionEvents = [
+      ...session.sessionEvents,
+      { song: effectiveSongId, action: 'play' as SessionActionType, timestamp: nowIso, metadata },
+    ];
+    const tracksCompleted = completed
+      ? [
+          ...session.tracksCompleted,
+          { song: effectiveSongId, completedAt: nowIso, durationSeconds: effectiveDuration, metadata },
+        ]
+      : session.tracksCompleted;
 
-    session.sessionEvents.push({
-      song: songObjectId,
-      action: 'play',
-      timestamp: now,
-      metadata,
-    });
-
-    if (completed) {
-      if (!session.tracksCompleted) session.tracksCompleted = [];
-      session.tracksCompleted.push({
-        song: songObjectId,
-        completedAt: now,
-        durationSeconds: effectiveDuration,
-        metadata,
-      });
-    }
-
+    const updatePayload: Record<string, any> = {
+      last_activity_time: nowIso,
+      current_song: effectiveSongId,
+      tracks_played: tracksPlayed,
+      session_events: sessionEvents,
+      tracks_completed: tracksCompleted,
+      updated_at: nowIso,
+    };
     if (effectiveContext) {
-      session.contextSnapshot = effectiveContext;
-      session.sessionContext = effectiveContext;
+      updatePayload.session_context = effectiveContext;
     }
+
+    const { data, error } = await supabase
+      .from('listening_sessions')
+      .update(updatePayload as any)
+      .eq('id', session._id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(`Failed to record track play: ${error?.message}`);
+    }
+
+    const saved = mapSessionRow(data);
 
     // Reuse existing recommendation interaction tracking (non-blocking call)
     RecommendationInteractionTrackingService.recordInteraction({
@@ -243,8 +344,6 @@ export class ListeningSessionService {
       action: 'play',
       recommendationSource: (metadata?.recommendationSource as any) || 'session',
     }).catch(() => {});
-
-    const saved = await session.save();
 
     // Trigger non-blocking real-time session profile update
     SessionPreferenceUpdateService.updateSessionProfileFromInteractions(saved).catch((err) => {
@@ -276,50 +375,59 @@ export class ListeningSessionService {
     } = params;
 
     const effectiveSongId = songId || trackId;
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
-    if (!effectiveSongId || !Types.ObjectId.isValid(effectiveSongId)) {
+    if (!effectiveSongId || !isValidObjectId(effectiveSongId)) {
       throw new Error('Invalid song ID');
     }
 
     const effectiveSkipDuration = durationBeforeSkipSeconds ?? playDurationBeforeSkipSeconds;
 
-    let session = await this.getActiveSession(userId);
-    if (!session) {
-      session = await this.startSession({ userId, initialSongId: effectiveSongId });
+    const session = (await this.getActiveSession(userId)) || (await this.startSession({ userId, initialSongId: effectiveSongId }));
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    const sessionEvents = [
+      ...session.sessionEvents,
+      { song: effectiveSongId, action: 'skip' as SessionActionType, timestamp: nowIso, metadata },
+    ];
+    const tracksSkipped = [
+      ...session.tracksSkipped,
+      {
+        song: effectiveSongId,
+        skippedAt: nowIso,
+        playDurationBeforeSkipSeconds: effectiveSkipDuration,
+        reason: reason || metadata?.reason,
+        metadata,
+      },
+    ];
+
+    const { data, error } = await supabase
+      .from('listening_sessions')
+      .update({
+        last_activity_time: nowIso,
+        session_events: sessionEvents,
+        tracks_skipped: tracksSkipped,
+        updated_at: nowIso,
+      } as any)
+      .eq('id', session._id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(`Failed to record track skip: ${error?.message}`);
     }
 
-    const songObjectId = new Types.ObjectId(effectiveSongId);
-    const now = new Date();
+    const saved = mapSessionRow(data);
 
-    session.lastActivityTime = now;
-
-    session.sessionEvents.push({
-      song: songObjectId,
-      action: 'skip',
-      timestamp: now,
-      metadata,
-    });
-
-    if (!session.tracksSkipped) session.tracksSkipped = [];
-    session.tracksSkipped.push({
-      song: songObjectId,
-      skippedAt: now,
-      playDurationBeforeSkipSeconds: effectiveSkipDuration,
-      reason: reason || metadata?.reason,
-      metadata,
-    });
-
-    // Reuse existing recommendation interaction tracking (non-blocking call)
     RecommendationInteractionTrackingService.recordInteraction({
       userId,
       songId: effectiveSongId,
       action: 'skip',
       recommendationSource: (metadata?.recommendationSource as any) || 'session',
     }).catch(() => {});
-
-    const saved = await session.save();
 
     SessionPreferenceUpdateService.updateSessionProfileFromInteractions(saved).catch((err) => {
       console.warn(`[ListeningSessionService Warning]: Session preference update failed: ${err.message}`);
@@ -335,47 +443,54 @@ export class ListeningSessionService {
     const { userId, songId, trackId, durationSeconds, metadata } = params;
     const effectiveSongId = songId || trackId;
 
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
-    if (!effectiveSongId || !Types.ObjectId.isValid(effectiveSongId)) {
+    if (!effectiveSongId || !isValidObjectId(effectiveSongId)) {
       throw new Error('Invalid song ID');
     }
 
-    let session = await this.getActiveSession(userId);
-    if (!session) {
-      session = await this.startSession({ userId, initialSongId: effectiveSongId });
-    }
+    const session = (await this.getActiveSession(userId)) || (await this.startSession({ userId, initialSongId: effectiveSongId }));
 
-    const songObjectId = new Types.ObjectId(effectiveSongId);
     const now = new Date();
+    const nowIso = now.toISOString();
 
-    session.lastActivityTime = now;
+    const sessionEvents = [
+      ...session.sessionEvents,
+      { song: effectiveSongId, action: 'complete' as SessionActionType, timestamp: nowIso, metadata },
+    ];
+    const tracksCompleted = [
+      ...session.tracksCompleted,
+      { song: effectiveSongId, completedAt: nowIso, durationSeconds, metadata },
+    ];
 
-    session.sessionEvents.push({
-      song: songObjectId,
-      action: 'complete',
-      timestamp: now,
-      metadata,
-    });
-
-    if (!session.tracksCompleted) session.tracksCompleted = [];
-    session.tracksCompleted.push({
-      song: songObjectId,
-      completedAt: now,
-      durationSeconds,
-      metadata,
-    });
-
-    // Mark completed in songsPlayed/tracksPlayed
-    const lastPlay = [...session.songsPlayed].reverse().find(
-      (p) => p.song.toString() === songObjectId.toString()
-    );
-    if (lastPlay) {
-      lastPlay.completed = true;
+    // Mark completed in the most recent matching play record
+    const tracksPlayed = [...session.songsPlayed];
+    for (let i = tracksPlayed.length - 1; i >= 0; i -= 1) {
+      if (String(tracksPlayed[i].song) === String(effectiveSongId)) {
+        tracksPlayed[i] = { ...tracksPlayed[i], completed: true };
+        break;
+      }
     }
 
-    const saved = await session.save();
+    const { data, error } = await supabase
+      .from('listening_sessions')
+      .update({
+        last_activity_time: nowIso,
+        session_events: sessionEvents,
+        tracks_completed: tracksCompleted,
+        tracks_played: tracksPlayed,
+        updated_at: nowIso,
+      } as any)
+      .eq('id', session._id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(`Failed to record track completion: ${error?.message}`);
+    }
+
+    const saved = mapSessionRow(data);
 
     SessionPreferenceUpdateService.updateSessionProfileFromInteractions(saved).catch((err) => {
       console.warn(`[ListeningSessionService Warning]: Session preference update failed: ${err.message}`);
@@ -391,10 +506,10 @@ export class ListeningSessionService {
     const { userId, songId, trackId, action, metadata } = params;
     const effectiveSongId = songId || trackId;
 
-    if (!userId || !Types.ObjectId.isValid(userId)) {
+    if (!userId || !isValidObjectId(userId)) {
       throw new Error('Invalid user ID');
     }
-    if (!effectiveSongId || !Types.ObjectId.isValid(effectiveSongId)) {
+    if (!effectiveSongId || !isValidObjectId(effectiveSongId)) {
       throw new Error('Invalid song ID');
     }
 
@@ -429,26 +544,37 @@ export class ListeningSessionService {
       });
     }
 
-    let session = await this.getActiveSession(userId);
-    if (!session) {
-      session = await this.startSession({ userId, initialSongId: effectiveSongId });
-    }
+    const session = (await this.getActiveSession(userId)) || (await this.startSession({ userId, initialSongId: effectiveSongId }));
 
-    const songObjectId = new Types.ObjectId(effectiveSongId);
     const now = new Date();
+    const nowIso = now.toISOString();
 
-    session.lastActivityTime = now;
+    const sessionEvents = [
+      ...session.sessionEvents,
+      { song: effectiveSongId, action, timestamp: nowIso, metadata },
+    ];
+
+    const updatePayload: Record<string, any> = {
+      last_activity_time: nowIso,
+      session_events: sessionEvents,
+      updated_at: nowIso,
+    };
     if (action === 'play' || action === 'replay') {
-      session.currentSong = songObjectId;
-      session.currentTrack = songObjectId;
+      updatePayload.current_song = effectiveSongId;
     }
 
-    session.sessionEvents.push({
-      song: songObjectId,
-      action,
-      timestamp: now,
-      metadata,
-    });
+    const { data, error } = await supabase
+      .from('listening_sessions')
+      .update(updatePayload as any)
+      .eq('id', session._id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(`Failed to record session event: ${error?.message}`);
+    }
+
+    const savedSession = mapSessionRow(data);
 
     // Reuse existing recommendation interaction tracking where appropriate (non-blocking call)
     if (action === 'play' || action === 'like') {
@@ -459,8 +585,6 @@ export class ListeningSessionService {
         recommendationSource: (metadata?.recommendationSource as any) || 'session',
       }).catch(() => {});
     }
-
-    const savedSession = await session.save();
 
     // Trigger non-blocking real-time session profile update
     SessionPreferenceUpdateService.updateSessionProfileFromInteractions(savedSession).catch((err) => {
@@ -478,38 +602,44 @@ export class ListeningSessionService {
     userId: string,
     status: SessionStatus
   ): Promise<IListeningSession | null> {
-    if (!sessionId || !Types.ObjectId.isValid(sessionId)) return null;
-    if (!userId || !Types.ObjectId.isValid(userId)) return null;
+    if (!sessionId || !isValidObjectId(sessionId)) return null;
+    if (!userId || !isValidObjectId(userId)) return null;
 
-    const session = await ListeningSession.findOne({
-      _id: new Types.ObjectId(sessionId),
-      user: new Types.ObjectId(userId),
-    });
-
-    if (!session) return null;
-
-    session.status = status;
-    session.lastActivityTime = new Date();
+    const nowIso = new Date().toISOString();
+    const updatePayload: Record<string, any> = { status, last_activity_time: nowIso, updated_at: nowIso };
     if (status === 'ended') {
-      session.endTime = new Date();
+      updatePayload.session_end = nowIso;
     }
 
-    return await session.save();
+    const { data, error } = await supabase
+      .from('listening_sessions')
+      .update(updatePayload as any)
+      .eq('id', sessionId)
+      .eq('user_id', userId)
+      .select()
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return mapSessionRow(data);
   }
 
   /**
    * Ends the active listening session for a user.
    */
   static async endActiveSession(userId: string): Promise<boolean> {
-    if (!userId || !Types.ObjectId.isValid(userId)) return false;
+    if (!userId || !isValidObjectId(userId)) return false;
 
-    const now = new Date();
-    const result = await ListeningSession.updateMany(
-      { user: new Types.ObjectId(userId), status: { $in: ['active', 'paused'] } },
-      { $set: { status: 'ended', endTime: now, updatedAt: now } }
-    );
+    const nowIso = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('listening_sessions')
+      .update({ status: 'ended', session_end: nowIso, updated_at: nowIso })
+      .eq('user_id', userId)
+      .in('status', ['active', 'paused'])
+      .select('id');
 
-    return result.modifiedCount > 0;
+    if (error) return false;
+    return (data?.length || 0) > 0;
   }
 
   /**
@@ -525,15 +655,18 @@ export class ListeningSessionService {
   static async cleanExpiredSessions(
     timeoutMinutes: number = SESSION_INACTIVITY_TIMEOUT_MINUTES
   ): Promise<number> {
-    const cutoffTime = new Date(Date.now() - timeoutMinutes * 60 * 1000);
-    const now = new Date();
+    const cutoffIso = new Date(Date.now() - timeoutMinutes * 60 * 1000).toISOString();
+    const nowIso = new Date().toISOString();
 
-    const result = await ListeningSession.updateMany(
-      { status: 'active', lastActivityTime: { $lt: cutoffTime } },
-      { $set: { status: 'ended', endTime: now, updatedAt: now } }
-    );
+    const { data, error } = await supabase
+      .from('listening_sessions')
+      .update({ status: 'ended', session_end: nowIso, updated_at: nowIso })
+      .eq('status', 'active')
+      .lt('last_activity_time', cutoffIso)
+      .select('id');
 
-    return result.modifiedCount;
+    if (error) return 0;
+    return data?.length || 0;
   }
 }
 

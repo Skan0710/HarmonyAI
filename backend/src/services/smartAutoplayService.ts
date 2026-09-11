@@ -1,6 +1,5 @@
 import mongoose, { Types } from 'mongoose';
-import { IListeningSession } from '../models/ListeningSession.js';
-import { ListeningSessionService } from './listeningSessionService.js';
+import { ListeningSessionService, IListeningSession } from './listeningSessionService.js';
 import {
   SessionTasteProfile,
   SessionTasteProfileService,
