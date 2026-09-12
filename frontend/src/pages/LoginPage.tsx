@@ -5,6 +5,9 @@ import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
 import { AnimatedLink } from '../components/ui/AnimatedLink';
 import AnimatedButton from '../components/ui/animated-button';
+import { Seo } from '../components/Seo';
+import { PublicFooter } from '../components/PublicFooter';
+import { StickyMobileCta } from '../components/StickyMobileCta';
 
 export const LoginPage: React.FC = () => {
   const { isAuthenticated, isInitializing, login, isLoading, error } = useAuth();
@@ -49,7 +52,12 @@ export const LoginPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-surface-0 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-surface-0 flex flex-col items-center justify-center p-4 pb-20 sm:pb-4">
+      <Seo
+        title="Sign In"
+        description="Sign in to HarmonyAI to pick up your personalized recommendations, playlists, and Music DNA profile."
+        path="/login"
+      />
       <div className="text-center mb-7">
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-wash text-accent mb-4">
           <AudioLines size={22} strokeWidth={1.75} />
@@ -127,6 +135,8 @@ export const LoginPage: React.FC = () => {
           </AnimatedLink>
         </div>
       </div>
+      <PublicFooter />
+      <StickyMobileCta />
     </div>
   );
 };

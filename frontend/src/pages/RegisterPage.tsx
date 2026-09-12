@@ -4,6 +4,9 @@ import { AudioLines } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
 import { AnimatedLink } from '../components/ui/AnimatedLink';
+import { Seo } from '../components/Seo';
+import { PublicFooter } from '../components/PublicFooter';
+import { Testimonials } from '../components/Testimonials';
 
 export const RegisterPage: React.FC = () => {
   const { isAuthenticated, isInitializing, register, isLoading, error } = useAuth();
@@ -12,19 +15,21 @@ export const RegisterPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [justRegistered, setJustRegistered] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !justRegistered) {
       navigate('/', { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, justRegistered, navigate]);
 
   const handleStandardRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !password) return;
     const success = await register({ name: name.trim(), email: email.trim(), password });
     if (success) {
-      navigate('/', { replace: true });
+      setJustRegistered(true);
+      navigate('/thank-you', { replace: true });
     }
   };
 
@@ -38,6 +43,11 @@ export const RegisterPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface-0 flex flex-col items-center justify-center p-4">
+      <Seo
+        title="Create Your Free Account"
+        description="Create a free HarmonyAI account to get AI-generated playlists and recommendations built from your own Music DNA."
+        path="/register"
+      />
       <div className="text-center mb-7">
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-wash text-accent mb-4">
           <AudioLines size={22} strokeWidth={1.75} />
@@ -118,6 +128,10 @@ export const RegisterPage: React.FC = () => {
           </AnimatedLink>
         </div>
       </div>
+
+      <Testimonials />
+
+      <PublicFooter />
     </div>
   );
 };

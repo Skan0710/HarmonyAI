@@ -25,9 +25,13 @@ import { RecommendationEvaluationDashboardPage } from './pages/RecommendationEva
 import { NotFoundPage } from './pages/NotFoundPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
+import { ThankYouPage } from './pages/ThankYouPage';
+import { FaqPage } from './pages/FaqPage';
 import { useAuthStore } from './store/useAuthStore';
 import { useLikedSongsStore } from './store/useLikedSongsStore';
 import { usePreferenceStore } from './store/usePreferenceStore';
+import { GoogleAnalytics } from './components/GoogleAnalytics';
 
 function App() {
   const { fetchCurrentUser, isAuthenticated } = useAuthStore();
@@ -47,10 +51,14 @@ function App() {
 
   return (
     <BrowserRouter>
+      <GoogleAnalytics />
       <Routes>
-        {/* Public Auth Routes */}
+        {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/thank-you" element={<ThankYouPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/faq" element={<FaqPage />} />
 
         {/* Protected Routes with Nested Layout */}
         <Route element={<ProtectedRoute />}>
@@ -76,10 +84,12 @@ function App() {
             <Route path="/albums/:id" element={<AlbumDetailPage />} />
             {/* Developer Diagnostic Dashboard */}
             <Route path="/admin/recommendations" element={<RecommendationEvaluationDashboardPage />} />
-            {/* Catch-all 404 Route */}
-            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Route>
+
+        {/* Public catch-all: unauthenticated visitors and crawlers hitting an
+            unknown URL should see a real 404, not get redirected to /login. */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

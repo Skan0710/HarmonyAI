@@ -1,11 +1,18 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Seo } from '../components/Seo';
 
 export const NotFoundPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center p-4">
+      <Seo
+        title="Page Not Found"
+        description="The page you're looking for doesn't exist, has been moved, or is temporarily unavailable."
+        path="/404"
+        noIndex
+      />
       <div className="max-w-md w-full text-center space-y-6 bg-surface-1 border border-border-subtle p-8 sm:p-10 rounded-[var(--radius-lg)]">
         {/* 404 Badge & Graphic */}
         <div className="relative inline-flex items-center justify-center">

@@ -19,6 +19,7 @@ import {
 import { MediaCarousel } from '../components/MediaCarousel';
 import { SongRow } from '../components/SongRow';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { Seo } from '../components/Seo';
 
 const getTimeGreeting = (): string => {
   const hour = new Date().getHours();
@@ -132,6 +133,12 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="pb-16">
+      <Seo
+        title="Home"
+        description="Your personalized HarmonyAI feed — recommendations, recently played, and trending tracks built from your Music DNA."
+        path="/"
+        noIndex
+      />
       {/* Hero — personalized statement, not a marketing banner */}
       <section className="relative overflow-hidden border-b border-border-subtle px-5 sm:px-8 lg:px-12 pt-10 pb-6">
         <div className="relative max-w-2xl mx-auto">

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, ListMusic, History, SlidersHorizontal, LogOut, Mail, CalendarDays } from 'lucide-react';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { Seo } from '../components/Seo';
 import { AnimatedLink } from '../components/ui/AnimatedLink';
 import { useAuth } from '../hooks/useAuth';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
@@ -56,6 +57,7 @@ export const ProfilePage: React.FC = () => {
 
   return (
     <div className="space-y-8 pb-16">
+      <Seo title="Your Profile" description="View and manage your HarmonyAI profile, liked songs, playlists, and listening history." path="/profile" noIndex />
       <Breadcrumbs items={[{ label: 'Profile' }]} />
 
       {/* Header Hero Banner */}
