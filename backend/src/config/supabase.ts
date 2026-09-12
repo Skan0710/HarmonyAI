@@ -4,8 +4,12 @@ import { Database } from '../types/database.types';
 
 dotenv.config();
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://xyjfwwztbtsqzegargpa.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY environment variables are required. Set them in your .env file.');
+}
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
@@ -16,7 +20,7 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
       console.error('[Database] Supabase connection check failed:', error.message);
       return false;
     }
-    console.log('[Database] Supabase Connected successfully to project xyjfwwztbtsqzegargpa');
+    console.log('[Database] Supabase connected successfully');
     return true;
   } catch (err) {
     console.error('[Database] Supabase connection error:', err instanceof Error ? err.message : err);
