@@ -1,7 +1,8 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { checkSupabaseConnection } from './config/supabase.js';
 import healthRoutes from './routes/healthRoutes.js';
@@ -28,6 +29,17 @@ const isProduction = process.env.NODE_ENV === 'production';
 // --- Security Headers ---
 app.use(helmet());
 
+// --- Force HTTPS in production ---
+// Most hosts (Render, Railway, Heroku, etc.) terminate TLS at a proxy in
+// front of this process, so we check the standard forwarded-proto header
+// rather than req.secure, which would always be false behind that proxy.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (isProduction && req.headers['x-forwarded-proto'] === 'http') {
+    return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+  }
+  next();
+});
+
 // --- CORS Configuration ---
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
@@ -50,6 +62,7 @@ app.use(
 // --- Body Parsing with Size Limits ---
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+app.use(cookieParser());
 
 // --- Global Rate Limiting ---
 const globalLimiter = rateLimit({

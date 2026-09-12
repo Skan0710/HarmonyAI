@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { UserService } from '../services/userService.js';
 import { ListeningProfileService } from '../services/listeningProfileService.js';
 import { controllerWrapper, ensureAuth, ControllerError } from '../utils/controllerHelpers.js';
+import { isValidHttpUrl } from '../utils/validators.js';
 
 export const getCurrentUser = controllerWrapper(async (req: Request, res: Response) => {
   const user = ensureAuth(req, res);
@@ -33,6 +34,10 @@ export const updateCurrentUser = controllerWrapper(async (req: Request, res: Res
   if (!user) return;
 
   const { name, profilePicture } = req.body;
+
+  if (!isValidHttpUrl(profilePicture)) {
+    throw new ControllerError(400, 'profilePicture must be a valid http(s) URL');
+  }
 
   const updatedUser = await UserService.updateProfile(user._id.toString(), {
     name,

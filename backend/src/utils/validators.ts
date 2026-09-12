@@ -27,6 +27,23 @@ export function validateObjectIds(ids: unknown[]): string[] {
 }
 
 /**
+ * Validate that a value is either absent or an http(s) URL. Used for
+ * user-supplied image URLs (profile pictures, cover art) so a client can't
+ * store a javascript:/data: URI or other non-http scheme that a future
+ * change to how these are rendered (e.g. as a link's href) could turn into
+ * script execution.
+ */
+export function isValidHttpUrl(value: unknown): boolean {
+  if (typeof value !== 'string' || !value.trim()) return true; // absent/empty is allowed
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Validate and trim a string input, returning undefined if empty.
  */
 export function sanitizeString(value: unknown): string | undefined {

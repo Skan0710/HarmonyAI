@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/authService.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
+import { setAuthCookie, clearAuthCookie } from '../utils/authCookie.js';
+import { isValidHttpUrl } from '../utils/validators.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -19,6 +21,10 @@ export const register = controllerWrapper(async (req: Request, res: Response) =>
     throw new ControllerError(400, 'Password must be at least 8 characters long');
   }
 
+  if (!isValidHttpUrl(profilePicture)) {
+    throw new ControllerError(400, 'profilePicture must be a valid http(s) URL');
+  }
+
   const result = await AuthService.register({
     name: name.trim(),
     email: email.trim().toLowerCase(),
@@ -26,10 +32,12 @@ export const register = controllerWrapper(async (req: Request, res: Response) =>
     profilePicture,
   });
 
+  setAuthCookie(res, result.token);
+
   res.status(201).json({
     success: true,
     message: 'User registered successfully',
-    data: result,
+    data: { user: result.user },
   });
 });
 
@@ -49,10 +57,12 @@ export const login = controllerWrapper(async (req: Request, res: Response) => {
     password,
   });
 
+  setAuthCookie(res, result.token);
+
   res.status(200).json({
     success: true,
     message: 'Login successful',
-    data: result,
+    data: { user: result.user },
   });
 });
 
@@ -62,5 +72,13 @@ export const getMe = controllerWrapper(async (req: Request, res: Response) => {
     data: {
       user: req.user,
     },
+  });
+});
+
+export const logout = controllerWrapper(async (_req: Request, res: Response) => {
+  clearAuthCookie(res);
+  res.status(200).json({
+    success: true,
+    message: 'Logged out successfully',
   });
 });

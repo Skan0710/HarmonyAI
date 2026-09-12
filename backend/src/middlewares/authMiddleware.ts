@@ -1,23 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt.js';
 import { supabase } from '../config/supabase.js';
-
-export const extractBearerToken = (req: Request): string | null => {
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    return req.headers.authorization.split(' ')[1];
-  }
-  return null;
-};
+import { extractAuthToken } from '../utils/authCookie.js';
 
 export const protect = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const token = extractBearerToken(req);
+  const token = extractAuthToken(req);
 
   if (!token) {
     res.status(401).json({
@@ -67,7 +58,7 @@ export const optionalAuth = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const token = extractBearerToken(req);
+  const token = extractAuthToken(req);
 
   if (!token) {
     return next();

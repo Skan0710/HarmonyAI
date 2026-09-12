@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { evaluateRecommendationStrategy } from '../controllers/recommendationEvaluationController.js';
 import { protect, requireAdmin } from '../middlewares/authMiddleware.js';
 
@@ -10,7 +10,7 @@ const adminLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?._id?.toString() ?? req.ip ?? 'unknown',
+  keyGenerator: (req) => req.user?._id?.toString() ?? ipKeyGenerator(req.ip ?? 'unknown'),
   message: { success: false, message: 'Too many requests, please try again later.' },
 });
 
