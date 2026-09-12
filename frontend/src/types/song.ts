@@ -13,6 +13,7 @@ export interface Song {
   duration: number; // in seconds
   coverImage?: string;
   audioUrl: string;
+  youtubeVideoId?: string | null;
   releaseYear?: number;
   playCount: number;
   audioFeatures?: AudioFeatures;

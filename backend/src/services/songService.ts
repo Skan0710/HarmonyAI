@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase.js';
+import { searchYoutubeVideoId } from './youtubeService.js';
 
 export interface IAudioFeatures {
   bpm?: number;
@@ -123,6 +124,7 @@ export function mapSongRow(row: any) {
     explicit: Boolean(row.explicit),
     lyrics: row.lyrics || '',
     isPublished: row.is_published !== false,
+    youtubeVideoId: row.youtube_video_id || null,
     vectorEmbedding: row.vector_embedding,
     recommendationMetadata: row.recommendation_metadata || {},
     createdAt: row.created_at,
@@ -280,6 +282,34 @@ export class SongService {
       .maybeSingle();
 
     return mapSongRow(updated);
+  }
+
+  /**
+   * Resolves and caches the YouTube video ID used for full-length playback.
+   * Reads the cached column first — only calls the (quota-limited) YouTube
+   * search API on a cache miss, then persists the result so it's free on
+   * every subsequent play.
+   */
+  static async resolveYoutubeVideoId(songId: string): Promise<string | null> {
+    const { data: song, error } = await supabase
+      .from('songs')
+      .select('youtube_video_id, title, artists!songs_artist_id_fkey(name)')
+      .eq('id', songId)
+      .maybeSingle();
+
+    if (error || !song) return null;
+    if (song.youtube_video_id) return song.youtube_video_id;
+
+    const artistName = (song as any).artists?.name || '';
+    const videoId = await searchYoutubeVideoId(song.title, artistName);
+    if (!videoId) return null;
+
+    await supabase
+      .from('songs')
+      .update({ youtube_video_id: videoId, updated_at: new Date().toISOString() } as any)
+      .eq('id', songId);
+
+    return videoId;
   }
 
   static async getRecommendations(params: RecommendationParams): Promise<any[]> {

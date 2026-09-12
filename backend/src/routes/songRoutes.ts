@@ -7,6 +7,7 @@ import {
   deleteSong,
   recordPlay,
   getRecommendations,
+  getYoutubeVideoId,
 } from '../controllers/songController.js';
 import { getTrendingSongs } from '../controllers/trendingController.js';
 import { protect, optionalAuth, requireAdmin } from '../middlewares/authMiddleware.js';
@@ -19,6 +20,7 @@ router.get('/trending', getTrendingSongs);
 router.get('/recommendations', getRecommendations);
 router.get('/:id', getSongById);
 router.post('/:id/play', optionalAuth, recordPlay);
+router.get('/:id/youtube', optionalAuth, getYoutubeVideoId);
 
 // Admin-only routes
 router.post('/', protect, requireAdmin, createSong);

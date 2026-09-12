@@ -177,6 +177,16 @@ export const recordPlay = controllerWrapper(async (req: Request, res: Response) 
   });
 });
 
+export const getYoutubeVideoId = controllerWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const videoId = await SongService.resolveYoutubeVideoId(id);
+
+  res.status(200).json({
+    success: true,
+    data: { videoId },
+  });
+});
+
 export const getRecommendations = controllerWrapper(async (req: Request, res: Response) => {
   const q = extractQueryParams(req, {
     songId: 'string',

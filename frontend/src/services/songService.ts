@@ -57,6 +57,15 @@ export const recordSongPlay = async (songId: string): Promise<void> => {
   await apiClient(`/songs/${songId}/play`, { method: 'POST' });
 };
 
+export const fetchYoutubeVideoIdApi = async (songId: string): Promise<string | null> => {
+  const response = await apiClient<{ success: boolean; data: { videoId: string | null } }>(
+    `/songs/${songId}/youtube`,
+    { method: 'GET' }
+  );
+  const result = extractEnvelopeData(response, 'Failed to resolve YouTube video');
+  return result.data?.videoId || null;
+};
+
 export const fetchSimilarSongsApi = async (
   songId: string,
   limit = 10

@@ -17,6 +17,8 @@ import { usePlayer } from '../hooks/usePlayer';
 import { usePlayerKeyboardShortcuts } from '../hooks/usePlayerKeyboardShortcuts';
 import { formatTime } from '../utils/formatters';
 import { IconButton } from './ui/IconButton';
+import { YoutubePlayerEngine, type PlaybackEngineHandle } from './YoutubePlayerEngine';
+import { fetchYoutubeVideoIdApi } from '../services/songService';
 
 interface MiniPlayerProps {
   onExpand?: () => void;
@@ -24,9 +26,13 @@ interface MiniPlayerProps {
 
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const youtubeEngineRef = useRef<PlaybackEngineHandle | null>(null);
 
   const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+  // undefined = not resolved yet, null = confirmed no YouTube match (fall back
+  // to the placeholder audioUrl), string = resolved YouTube video ID.
+  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null | undefined>(undefined);
 
   usePlayerKeyboardShortcuts();
 
@@ -63,9 +69,35 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   useEffect(() => {
     setIsLoadingAudio(true);
     setAudioError(null);
-  }, [currentSong?._id]);
 
+    if (currentSong?.youtubeVideoId) {
+      setYoutubeVideoId(currentSong.youtubeVideoId);
+      return;
+    }
+
+    setYoutubeVideoId(undefined);
+    if (!currentSong?._id) return;
+
+    let cancelled = false;
+    fetchYoutubeVideoIdApi(currentSong._id)
+      .then((videoId) => {
+        if (!cancelled) setYoutubeVideoId(videoId);
+      })
+      .catch(() => {
+        if (!cancelled) setYoutubeVideoId(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSong?._id, currentSong?.youtubeVideoId]);
+
+  const usingYoutubeEngine = Boolean(youtubeVideoId);
+
+  // Native <audio> engine — only active for the placeholder-audio fallback
+  // path (no YouTube match resolved for this track).
   useEffect(() => {
+    if (usingYoutubeEngine) return;
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -82,13 +114,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     } else {
       audio.pause();
     }
-  }, [isPlaying, currentSong, pause]);
+  }, [isPlaying, currentSong, pause, usingYoutubeEngine]);
 
   useEffect(() => {
+    if (usingYoutubeEngine) return;
     const audio = audioRef.current;
     if (!audio) return;
     audio.volume = isMuted ? 0 : volume;
-  }, [volume, isMuted]);
+  }, [volume, isMuted, usingYoutubeEngine]);
 
   if (!currentSong) return null;
 
@@ -132,7 +165,9 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
-    if (audioRef.current) {
+    if (usingYoutubeEngine) {
+      youtubeEngineRef.current?.seekTo(newTime);
+    } else if (audioRef.current) {
       audioRef.current.currentTime = newTime;
     }
     setCurrentTime(newTime);
@@ -149,18 +184,20 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[var(--z-player)] bg-surface-1/95 border-t border-border-subtle backdrop-blur-xl px-3 py-2.5 sm:px-5 sm:py-3">
-      <audio
-        ref={audioRef}
-        src={currentSong.audioUrl}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onCanPlay={handleCanPlay}
-        onWaiting={handleWaiting}
-        onPlaying={handlePlaying}
-        onError={handleError}
-        onEnded={handleSongEnd}
-        preload="metadata"
-      />
+      {!usingYoutubeEngine && (
+        <audio
+          ref={audioRef}
+          src={currentSong.audioUrl}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
+          onCanPlay={handleCanPlay}
+          onWaiting={handleWaiting}
+          onPlaying={handlePlaying}
+          onError={handleError}
+          onEnded={handleSongEnd}
+          preload="metadata"
+        />
+      )}
 
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-6">
         {/* Metadata */}
@@ -171,7 +208,22 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             aria-label="Expand player"
           >
             <div className="w-11 h-11 rounded-[var(--radius-artwork)] overflow-hidden bg-surface-2 shrink-0 relative">
-              <img src={currentSong.coverImage || fallbackCover} alt={currentSong.title} className="w-full h-full object-cover" />
+              {usingYoutubeEngine ? (
+                <YoutubePlayerEngine
+                  ref={youtubeEngineRef}
+                  videoId={youtubeVideoId as string}
+                  isPlaying={isPlaying}
+                  volume={volume}
+                  isMuted={isMuted}
+                  onTimeUpdate={handleTimeUpdate}
+                  onDuration={(seconds) => setDuration(seconds || currentSong.duration || 0)}
+                  onEnded={handleSongEnd}
+                  onReady={handleCanPlay}
+                  onError={handleError}
+                />
+              ) : (
+                <img src={currentSong.coverImage || fallbackCover} alt={currentSong.title} className="w-full h-full object-cover" />
+              )}
               {isLoadingAudio && (
                 <div className="absolute inset-0 bg-surface-0/70 flex items-center justify-center">
                   <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />

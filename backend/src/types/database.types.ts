@@ -791,6 +791,7 @@ export type Database = {
           title: string
           updated_at: string | null
           vector_embedding: string | null
+          youtube_video_id: string | null
         }
         Insert: {
           album_id?: string | null
@@ -817,6 +818,7 @@ export type Database = {
           title: string
           updated_at?: string | null
           vector_embedding?: string | null
+          youtube_video_id?: string | null
         }
         Update: {
           album_id?: string | null
@@ -843,6 +845,7 @@ export type Database = {
           title?: string
           updated_at?: string | null
           vector_embedding?: string | null
+          youtube_video_id?: string | null
         }
         Relationships: [
           {
