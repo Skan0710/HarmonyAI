@@ -7,7 +7,7 @@ import {
   deleteArtist,
   getSimilarArtists,
 } from '../controllers/artistController.js';
-import { protect } from '../middlewares/authMiddleware.js';
+import { protect, requireAdmin } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
@@ -16,9 +16,9 @@ router.get('/', getArtists);
 router.get('/:id', getArtistById);
 router.get('/:id/similar', getSimilarArtists);
 
-// Protected routes
-router.post('/', protect, createArtist);
-router.put('/:id', protect, updateArtist);
-router.delete('/:id', protect, deleteArtist);
+// Admin-only routes
+router.post('/', protect, requireAdmin, createArtist);
+router.put('/:id', protect, requireAdmin, updateArtist);
+router.delete('/:id', protect, requireAdmin, deleteArtist);
 
 export default router;

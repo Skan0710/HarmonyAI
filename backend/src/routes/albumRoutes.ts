@@ -6,7 +6,7 @@ import {
   updateAlbum,
   deleteAlbum,
 } from '../controllers/albumController.js';
-import { protect } from '../middlewares/authMiddleware.js';
+import { protect, requireAdmin } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
@@ -14,9 +14,9 @@ const router = Router();
 router.get('/', getAlbums);
 router.get('/:id', getAlbumById);
 
-// Protected routes
-router.post('/', protect, createAlbum);
-router.put('/:id', protect, updateAlbum);
-router.delete('/:id', protect, deleteAlbum);
+// Admin-only routes
+router.post('/', protect, requireAdmin, createAlbum);
+router.put('/:id', protect, requireAdmin, updateAlbum);
+router.delete('/:id', protect, requireAdmin, deleteAlbum);
 
 export default router;

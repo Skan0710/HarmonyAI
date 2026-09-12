@@ -15,8 +15,8 @@ export const register = controllerWrapper(async (req: Request, res: Response) =>
     throw new ControllerError(400, 'A valid email address is required');
   }
 
-  if (!password || typeof password !== 'string' || password.length < 6) {
-    throw new ControllerError(400, 'Password must be at least 6 characters long');
+  if (!password || typeof password !== 'string' || password.length < 8) {
+    throw new ControllerError(400, 'Password must be at least 8 characters long');
   }
 
   const result = await AuthService.register({
