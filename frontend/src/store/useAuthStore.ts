@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { apiClient } from '../services/api';
-import { getToken, setToken, removeToken } from '../utils/token';
 
 export interface User {
   id: string;
@@ -14,7 +13,6 @@ interface AuthResponseData {
   success: boolean;
   data: {
     user: User;
-    token: string;
   };
 }
 
@@ -31,22 +29,23 @@ interface UserProfileResponseData {
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   isInitializing: boolean;
   error: string | null;
   login: (credentials: { email: string; password?: string }) => Promise<boolean>;
   register: (userData: { name: string; email: string; password?: string }) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   fetchCurrentUser: () => Promise<void>;
   clearError: () => void;
 }
 
+// The session token lives only in an httpOnly cookie the browser manages —
+// there is nothing for this store to read synchronously on init, so auth
+// state starts unknown and is resolved by fetchCurrentUser() on app mount.
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: getToken(),
-  isAuthenticated: !!getToken(),
+  isAuthenticated: false,
   isLoading: false,
   isInitializing: true,
   error: null,
@@ -67,12 +66,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       return false;
     }
 
-    const { user, token } = response.data.data;
-    setToken(token);
+    const { user } = response.data.data;
 
     set({
       user,
-      token,
       isAuthenticated: true,
       isLoading: false,
       isInitializing: false,
@@ -97,12 +94,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       return false;
     }
 
-    const { user, token } = response.data.data;
-    setToken(token);
+    const { user } = response.data.data;
 
     set({
       user,
-      token,
       isAuthenticated: true,
       isLoading: false,
       isInitializing: false,
@@ -111,11 +106,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     return true;
   },
 
-  logout: () => {
-    removeToken();
+  logout: async () => {
+    // Clears the httpOnly cookie server-side — client JS has no way to read
+    // or remove it itself, so this request is the only thing that can
+    // actually end the session before its 7-day expiry.
+    await apiClient('/auth/logout', { method: 'POST' });
     set({
       user: null,
-      token: null,
       isAuthenticated: false,
       isLoading: false,
       isInitializing: false,
@@ -124,27 +121,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   fetchCurrentUser: async () => {
-    const token = getToken();
-    if (!token) {
-      set({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        isInitializing: false,
-      });
-      return;
-    }
-
     set({ isLoading: true });
     const response = await apiClient<UserProfileResponseData>('/users/me');
 
     if (response.error || !response.data?.data) {
-      // Invalid/expired token -> clear auth state
-      removeToken();
       set({
         user: null,
-        token: null,
         isAuthenticated: false,
         isLoading: false,
         isInitializing: false,

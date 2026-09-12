@@ -1,5 +1,4 @@
 import { API_CONFIG } from '../config/api';
-import { getToken } from '../utils/token';
 
 export interface ApiResponse<T = unknown> {
   data?: T;
@@ -13,17 +12,15 @@ export const apiClient = async <T = unknown>(
 ): Promise<ApiResponse<T>> => {
   const url = `${API_CONFIG.baseURL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  const token = getToken();
-  const authHeaders: Record<string, string> = token
-    ? { Authorization: `Bearer ${token}` }
-    : {};
-
   try {
     const response = await fetch(url, {
       ...options,
+      // The session lives in an httpOnly cookie the browser attaches
+      // automatically; there is no token in JS to put in an Authorization
+      // header any more.
+      credentials: 'include',
       headers: {
         ...API_CONFIG.headers,
-        ...authHeaders,
         ...options.headers,
       },
     });
