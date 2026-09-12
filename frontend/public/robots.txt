@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /login
+Allow: /register
+Allow: /privacy-policy
+Allow: /faq
+Allow: /thank-you
+Disallow: /
+
+Sitemap: https://harmonyai.app/sitemap.xml

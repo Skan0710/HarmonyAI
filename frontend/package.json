@@ -30,6 +30,7 @@
     "motion": "^13.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-helmet-async": "^3.0.0",
     "react-router-dom": "^7.18.2",
     "tailwindcss": "^4.3.3",
     "three": "^0.186.0",
