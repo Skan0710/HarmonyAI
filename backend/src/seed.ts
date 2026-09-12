@@ -7,7 +7,9 @@ import { SongService } from './services/songService.js';
 
 dotenv.config();
 
-// Royalty-free audio URLs for realistic music playback demo
+// Fallback audio, used only if YouTube resolution ever fails for a song.
+// Real playback comes from the YouTube IFrame Player API, resolved lazily
+// per song (title + artist search) on first play and cached on the row.
 const AUDIO_SAMPLE_URLS = [
   'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
   'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
@@ -20,6 +22,108 @@ const AUDIO_SAMPLE_URLS = [
   'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
   'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
 ];
+
+// Real, well-known commercial songs. Title/artist metadata (real album,
+// real cover art, real duration, real release year) is resolved at seed
+// time from the iTunes Search API — a free, keyless, public catalog lookup.
+// No audio is fetched from iTunes; only metadata.
+const REAL_SONGS: { query: string; genre: string }[] = [
+  // Pop
+  { query: 'Blinding Lights The Weeknd', genre: 'pop' },
+  { query: 'Shape of You Ed Sheeran', genre: 'pop' },
+  { query: 'Levitating Dua Lipa', genre: 'pop' },
+  { query: 'Watermelon Sugar Harry Styles', genre: 'pop' },
+  { query: 'As It Was Harry Styles', genre: 'pop' },
+  { query: 'Anti-Hero Taylor Swift', genre: 'pop' },
+  // Rock
+  { query: "Sweet Child O Mine Guns N Roses", genre: 'rock' },
+  { query: 'Smells Like Teen Spirit Nirvana', genre: 'rock' },
+  { query: 'Bohemian Rhapsody Queen', genre: 'rock' },
+  { query: 'Africa Toto', genre: 'rock' },
+  { query: 'Mr Brightside The Killers', genre: 'rock' },
+  { query: 'Somebody Told Me The Killers', genre: 'rock' },
+  // Hip-Hop
+  { query: 'HUMBLE Kendrick Lamar', genre: 'hip-hop' },
+  { query: 'SICKO MODE Travis Scott', genre: 'hip-hop' },
+  { query: "Gods Plan Drake", genre: 'hip-hop' },
+  { query: 'Sunflower Post Malone', genre: 'hip-hop' },
+  { query: 'Lose Yourself Eminem', genre: 'hip-hop' },
+  { query: 'In Da Club 50 Cent', genre: 'hip-hop' },
+  // Electronic
+  { query: 'Titanium David Guetta Sia', genre: 'electronic' },
+  { query: 'Wake Me Up Avicii', genre: 'electronic' },
+  { query: 'One More Time Daft Punk', genre: 'electronic' },
+  { query: 'Levels Avicii', genre: 'electronic' },
+  { query: 'Clarity Zedd', genre: 'electronic' },
+  { query: 'Animals Martin Garrix', genre: 'electronic' },
+  // R&B / Soul
+  { query: 'Location Khalid', genre: 'r-and-b' },
+  { query: 'Best Part Daniel Caesar', genre: 'r-and-b' },
+  { query: 'Redbone Childish Gambino', genre: 'r-and-b' },
+  { query: 'Adorn Miguel', genre: 'r-and-b' },
+  { query: 'Pyramids Frank Ocean', genre: 'r-and-b' },
+  // Jazz & Blues
+  { query: 'Fly Me to the Moon Frank Sinatra', genre: 'jazz' },
+  { query: 'What a Wonderful World Louis Armstrong', genre: 'jazz' },
+  { query: 'Feeling Good Nina Simone', genre: 'jazz' },
+  { query: 'Take Five Dave Brubeck', genre: 'jazz' },
+  { query: 'My Way Frank Sinatra', genre: 'jazz' },
+  // Classical
+  { query: 'Clair de Lune Debussy', genre: 'classical' },
+  { query: 'Canon in D Pachelbel', genre: 'classical' },
+  { query: 'River Flows in You Yiruma', genre: 'classical' },
+  { query: 'Nuvole Bianche Ludovico Einaudi', genre: 'classical' },
+  { query: 'Gymnopedie No 1 Erik Satie', genre: 'classical' },
+  // Indie & Folk
+  { query: 'Ho Hey The Lumineers', genre: 'indie' },
+  { query: 'Skinny Love Bon Iver', genre: 'indie' },
+  { query: 'Riptide Vance Joy', genre: 'indie' },
+  { query: 'Budapest George Ezra', genre: 'indie' },
+  { query: 'Little Talks Of Monsters and Men', genre: 'indie' },
+];
+
+const GENRE_AUDIO_DEFAULTS: Record<
+  string,
+  { bpm: number; energy: number; valence: number; acousticness: number; instrumentalness: number }
+> = {
+  pop: { bpm: 118, energy: 0.78, valence: 0.8, acousticness: 0.2, instrumentalness: 0.05 },
+  rock: { bpm: 135, energy: 0.9, valence: 0.6, acousticness: 0.15, instrumentalness: 0.1 },
+  'hip-hop': { bpm: 95, energy: 0.8, valence: 0.68, acousticness: 0.1, instrumentalness: 0.05 },
+  electronic: { bpm: 128, energy: 0.92, valence: 0.75, acousticness: 0.05, instrumentalness: 0.3 },
+  'r-and-b': { bpm: 85, energy: 0.55, valence: 0.65, acousticness: 0.25, instrumentalness: 0.1 },
+  jazz: { bpm: 82, energy: 0.42, valence: 0.5, acousticness: 0.85, instrumentalness: 0.5 },
+  classical: { bpm: 70, energy: 0.35, valence: 0.4, acousticness: 0.95, instrumentalness: 0.95 },
+  indie: { bpm: 96, energy: 0.5, valence: 0.6, acousticness: 0.6, instrumentalness: 0.1 },
+};
+
+interface ITunesTrack {
+  trackName: string;
+  artistName: string;
+  collectionName?: string;
+  artworkUrl100?: string;
+  releaseDate?: string;
+  trackTimeMillis?: number;
+  primaryGenreName?: string;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchItunesTrack(query: string): Promise<ITunesTrack | null> {
+  const url = `https://itunes.apple.com/search?media=music&entity=song&limit=1&term=${encodeURIComponent(query)}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const body = (await response.json()) as { results?: ITunesTrack[] };
+    return body.results?.[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+const upscaleArtwork = (url?: string): string => {
+  if (!url) return '';
+  return url.replace(/\d+x\d+bb\.(jpg|png)$/, '600x600bb.$1');
+};
 
 const seedDatabase = async () => {
   try {
@@ -38,64 +142,64 @@ const seedDatabase = async () => {
     console.log('🎵 Seeding Genres...');
     const genreData = [
       {
+        key: 'pop',
         name: 'Pop',
-        slug: 'pop',
         description: 'Catchy melodies, upbeat rhythms, and modern electronic hit tracks.',
         coverImage: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop',
         tags: ['pop', 'hits', 'upbeat', 'dance'],
         isFeatured: true,
       },
       {
+        key: 'rock',
         name: 'Rock',
-        slug: 'rock',
         description: 'Electric guitars, driving drumbeats, and raw vocal energy.',
         coverImage: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600&auto=format&fit=crop',
         tags: ['rock', 'alternative', 'guitars', 'energetic'],
         isFeatured: true,
       },
       {
+        key: 'hip-hop',
         name: 'Hip-Hop',
-        slug: 'hip-hop',
         description: 'Rhythmic beats, expressive poetry, and urban soundscapes.',
         coverImage: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop',
         tags: ['hiphop', 'rap', 'trap', 'urban'],
         isFeatured: true,
       },
       {
+        key: 'electronic',
         name: 'Electronic',
-        slug: 'electronic',
         description: 'Synthesizers, deep basslines, and immersive electronic grooves.',
         coverImage: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&auto=format&fit=crop',
         tags: ['edm', 'synthwave', 'club', 'house'],
         isFeatured: true,
       },
       {
+        key: 'r-and-b',
         name: 'R&B / Soul',
-        slug: 'r-and-b',
         description: 'Smooth vocals, soulful melodies, and atmospheric grooves.',
         coverImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop',
         tags: ['rnb', 'soul', 'chill', 'smooth'],
         isFeatured: true,
       },
       {
+        key: 'jazz',
         name: 'Jazz & Blues',
-        slug: 'jazz',
         description: 'Improvisational solos, brass tones, and timeless acoustic swing.',
         coverImage: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=600&auto=format&fit=crop',
         tags: ['jazz', 'blues', 'acoustic', 'relaxing'],
         isFeatured: false,
       },
       {
+        key: 'classical',
         name: 'Classical',
-        slug: 'classical',
         description: 'Orchestral arrangements, piano solos, and cinematic themes.',
         coverImage: 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=600&auto=format&fit=crop',
         tags: ['classical', 'piano', 'cinematic', 'instrumental'],
         isFeatured: false,
       },
       {
+        key: 'indie',
         name: 'Indie & Folk',
-        slug: 'indie',
         description: 'Acoustic guitars, dreamy synths, and independent songwriting.',
         coverImage: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop',
         tags: ['indie', 'folk', 'acoustic', 'chill'],
@@ -103,262 +207,120 @@ const seedDatabase = async () => {
       },
     ];
 
-    const genres = await Promise.all(genreData.map((g) => GenreService.createGenre(g)));
-    const genreMap = new Map(genres.map((g) => [g.slug as string, g._id as string]));
-
-    // 2. Seed Artists
-    console.log('🎤 Seeding Artists...');
-    const artistData = [
-      {
-        name: 'The Midnight Wave',
-        bio: 'Synthwave duo blending 80s nostalgia with futuristic electronic beats.',
-        profileImage: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('electronic'), genreMap.get('pop')].filter(Boolean) as string[],
-        monthlyListeners: 1250000,
-        verified: true,
-        tags: ['synthwave', 'electronic', 'retrowave'],
-      },
-      {
-        name: 'Luna Resonance',
-        bio: 'Atmospheric indie pop singer-songwriter with hauntingly beautiful vocals.',
-        profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('indie'), genreMap.get('pop')].filter(Boolean) as string[],
-        monthlyListeners: 890000,
-        verified: true,
-        tags: ['indie', 'dreamy', 'pop'],
-      },
-      {
-        name: 'Apex Pulse',
-        bio: 'High-octane EDM producer crafting mainstage festival anthems.',
-        profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('electronic')].filter(Boolean) as string[],
-        monthlyListeners: 2400000,
-        verified: true,
-        tags: ['edm', 'dance', 'festival'],
-      },
-      {
-        name: 'Velvet Groove',
-        bio: 'Contemporary R&B collective with soul-infused basslines and lush harmonies.',
-        profileImage: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('r-and-b')].filter(Boolean) as string[],
-        monthlyListeners: 760000,
-        verified: true,
-        tags: ['rnb', 'soul', 'chill'],
-      },
-      {
-        name: 'Echoes of Orion',
-        bio: 'Alternative rock band pushing boundaries with explosive riffs and introspective lyrics.',
-        profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('rock')].filter(Boolean) as string[],
-        monthlyListeners: 1540000,
-        verified: true,
-        tags: ['rock', 'alternative', 'guitar'],
-      },
-      {
-        name: 'Rhythm & Rhyme',
-        bio: 'Chart-topping hip-hop artist known for intricate storytelling and heavy 808s.',
-        profileImage: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=400&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('hip-hop')].filter(Boolean) as string[],
-        monthlyListeners: 3100000,
-        verified: true,
-        tags: ['hiphop', 'rap', 'urban'],
-      },
-      {
-        name: 'Starlight Quartet',
-        bio: 'Modern classical ensemble merging chamber orchestra traditions with film scores.',
-        profileImage: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=400&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('classical')].filter(Boolean) as string[],
-        monthlyListeners: 420000,
-        verified: false,
-        tags: ['classical', 'piano', 'strings'],
-      },
-      {
-        name: 'Blue Horizon',
-        bio: 'Jazz quintet captivating audiences with smooth saxophone riffs and swing feel.',
-        profileImage: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=400&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('jazz')].filter(Boolean) as string[],
-        monthlyListeners: 380000,
-        verified: false,
-        tags: ['jazz', 'sax', 'relaxing'],
-      },
-      {
-        name: 'Solaris Nova',
-        bio: 'Futuristic synthpop project with neon aesthetics and catchy hooks.',
-        profileImage: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('pop'), genreMap.get('electronic')].filter(Boolean) as string[],
-        monthlyListeners: 980000,
-        verified: true,
-        tags: ['synthpop', 'dance', 'electronic'],
-      },
-      {
-        name: 'Acoustic Drift',
-        bio: 'Folk & indie duo exploring acoustic strings and organic soundscapes.',
-        profileImage: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&auto=format&fit=crop',
-        genres: [genreMap.get('indie')].filter(Boolean) as string[],
-        monthlyListeners: 540000,
-        verified: false,
-        tags: ['folk', 'acoustic', 'chill'],
-      },
-    ];
-
-    const artists = await Promise.all(artistData.map((a) => ArtistService.createArtist(a)));
-    const artistMap = new Map(artists.map((a) => [a.name as string, a._id as string]));
-
-    // 3. Seed Albums
-    console.log('💿 Seeding Albums...');
-    const albumData = [
-      { title: 'Neon Skyline', artist: 'The Midnight Wave', genre: 'electronic', coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop', releaseYear: 2023, albumType: 'album', totalTracks: 4, tags: ['synthwave', 'electronic'] },
-      { title: 'Celestial Whispers', artist: 'Luna Resonance', genre: 'indie', coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop', releaseYear: 2024, albumType: 'album', totalTracks: 5, tags: ['indie', 'dreamy'] },
-      { title: 'Overdrive', artist: 'Apex Pulse', genre: 'electronic', coverImage: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop', releaseYear: 2024, albumType: 'album', totalTracks: 5, tags: ['edm', 'dance'] },
-      { title: 'Midnight Lounge', artist: 'Velvet Groove', genre: 'r-and-b', coverImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop', releaseYear: 2023, albumType: 'album', totalTracks: 5, tags: ['rnb', 'soul'] },
-      { title: 'Thunder & Dust', artist: 'Echoes of Orion', genre: 'rock', coverImage: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&auto=format&fit=crop', releaseYear: 2022, albumType: 'album', totalTracks: 5, tags: ['rock', 'alternative'] },
-      { title: 'Urban Chronicles', artist: 'Rhythm & Rhyme', genre: 'hip-hop', coverImage: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&auto=format&fit=crop', releaseYear: 2025, albumType: 'album', totalTracks: 5, tags: ['hiphop', 'rap'] },
-      { title: 'Symphony of Lights', artist: 'Starlight Quartet', genre: 'classical', coverImage: 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=500&auto=format&fit=crop', releaseYear: 2021, albumType: 'album', totalTracks: 5, tags: ['classical', 'piano'] },
-      { title: 'Midnight in Harlem', artist: 'Blue Horizon', genre: 'jazz', coverImage: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=500&auto=format&fit=crop', releaseYear: 2023, albumType: 'album', totalTracks: 5, tags: ['jazz', 'relaxing'] },
-      { title: 'Electric Dreams', artist: 'Solaris Nova', genre: 'pop', coverImage: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&auto=format&fit=crop', releaseYear: 2024, albumType: 'album', totalTracks: 5, tags: ['synthpop', 'pop'] },
-      { title: 'Woodland Echoes', artist: 'Acoustic Drift', genre: 'indie', coverImage: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format&fit=crop', releaseYear: 2023, albumType: 'album', totalTracks: 5, tags: ['folk', 'acoustic'] },
-    ];
-
-    const albums = await Promise.all(
-      albumData.map((al) => {
-        const artistId = artistMap.get(al.artist);
-        const genreId = genreMap.get(al.genre);
-        if (!artistId) throw new Error(`Seed error: unknown artist "${al.artist}"`);
-        return AlbumService.createAlbum({
-          title: al.title,
-          artist: artistId,
-          genre: genreId,
-          coverImage: al.coverImage,
-          releaseYear: al.releaseYear,
-          albumType: al.albumType,
-          totalTracks: al.totalTracks,
-          tags: al.tags,
-        });
-      })
+    // Keyed by our own stable `key`, not the DB-generated slug — GenreService
+    // slugifies only whitespace, so multi-word names like "R&B / Soul" end up
+    // with a punctuation-mangled slug that would silently break this lookup.
+    const genres = await Promise.all(
+      genreData.map((g) => GenreService.createGenre({ ...g, key: undefined } as any))
     );
-    const albumMap = new Map(albums.map((al) => [al.title as string, al._id as string]));
+    const genreMap = new Map(genreData.map((g, i) => [g.key, genres[i]._id as string]));
 
-    // 4. Seed ~50 Songs
-    console.log('🎶 Seeding 50 Songs with Audio Features & Recommendation Metadata...');
+    // 2. Resolve real song metadata from the iTunes catalog
+    console.log('🔎 Resolving real song metadata from the iTunes catalog...');
+    const resolved: { track: ITunesTrack; genreSlug: string }[] = [];
+    for (const entry of REAL_SONGS) {
+      const track = await fetchItunesTrack(entry.query);
+      if (!track) {
+        console.warn(`  ⚠️  No iTunes match for "${entry.query}", skipping`);
+        continue;
+      }
+      resolved.push({ track, genreSlug: entry.genre });
+      await sleep(150); // stay well under iTunes' unpublished per-minute rate limit
+    }
+    console.log(`✅ Resolved ${resolved.length}/${REAL_SONGS.length} real songs`);
 
-    const songTemplates = [
-      // Pop Songs (1-7)
-      { title: 'Starlight Avenue', artist: 'Solaris Nova', album: 'Electric Dreams', genre: 'pop', duration: 215, bpm: 120, energy: 0.8, valence: 0.85 },
-      { title: 'Neon Hearts', artist: 'Solaris Nova', album: 'Electric Dreams', genre: 'pop', duration: 198, bpm: 118, energy: 0.75, valence: 0.90 },
-      { title: 'Midnight Crush', artist: 'Solaris Nova', album: 'Electric Dreams', genre: 'pop', duration: 210, bpm: 124, energy: 0.82, valence: 0.78 },
-      { title: 'Golden Hour Vibe', artist: 'Solaris Nova', album: 'Electric Dreams', genre: 'pop', duration: 185, bpm: 115, energy: 0.70, valence: 0.88 },
-      { title: 'Dancing in Berlin', artist: 'Solaris Nova', album: 'Electric Dreams', genre: 'pop', duration: 230, bpm: 126, energy: 0.88, valence: 0.82 },
-      { title: 'Summer High', artist: 'The Midnight Wave', album: 'Neon Skyline', genre: 'pop', duration: 204, bpm: 116, energy: 0.78, valence: 0.92 },
-      { title: 'Electric Glow', artist: 'The Midnight Wave', album: 'Neon Skyline', genre: 'pop', duration: 222, bpm: 122, energy: 0.85, valence: 0.80 },
+    // 3. Seed real Artists (deduped by the artist name iTunes returns)
+    console.log('🎤 Seeding real Artists...');
+    const artistNames = Array.from(new Set(resolved.map((r) => r.track.artistName)));
+    const artistMap = new Map<string, string>();
+    for (const name of artistNames) {
+      const first = resolved.find((r) => r.track.artistName === name)!;
+      const image = upscaleArtwork(first.track.artworkUrl100);
+      const artist = await ArtistService.createArtist({
+        name,
+        bio: `${name} — real recording artist, catalogued from public music metadata.`,
+        profileImage: image,
+        bannerImage: image,
+        genres: [genreMap.get(first.genreSlug)].filter(Boolean) as string[],
+        monthlyListeners: Math.floor(Math.random() * 3000000) + 200000,
+        verified: true,
+        tags: [first.genreSlug],
+      });
+      artistMap.set(name, artist._id as string);
+    }
 
-      // Rock Songs (8-13)
-      { title: 'Rebel Horizon', artist: 'Echoes of Orion', album: 'Thunder & Dust', genre: 'rock', duration: 245, bpm: 138, energy: 0.92, valence: 0.65 },
-      { title: 'Shattered Glass', artist: 'Echoes of Orion', album: 'Thunder & Dust', genre: 'rock', duration: 210, bpm: 142, energy: 0.95, valence: 0.50 },
-      { title: 'Midnight Lightning', artist: 'Echoes of Orion', album: 'Thunder & Dust', genre: 'rock', duration: 255, bpm: 130, energy: 0.88, valence: 0.60 },
-      { title: 'Chasing Ghosts', artist: 'Echoes of Orion', album: 'Thunder & Dust', genre: 'rock', duration: 238, bpm: 135, energy: 0.90, valence: 0.55 },
-      { title: 'Rumble & Burn', artist: 'Echoes of Orion', album: 'Thunder & Dust', genre: 'rock', duration: 195, bpm: 145, energy: 0.96, valence: 0.70 },
-      { title: 'Wild Heart Flame', artist: 'Echoes of Orion', album: 'Thunder & Dust', genre: 'rock', duration: 228, bpm: 132, energy: 0.89, valence: 0.62 },
+    // 4. Seed real Albums (deduped by artist + album title)
+    console.log('💿 Seeding real Albums...');
+    const albumMap = new Map<string, string>();
+    for (const { track, genreSlug } of resolved) {
+      const albumTitle = track.collectionName || track.trackName;
+      const key = `${track.artistName}::${albumTitle}`;
+      if (albumMap.has(key)) continue;
 
-      // Hip-Hop Songs (14-19)
-      { title: 'City Lights & 808s', artist: 'Rhythm & Rhyme', album: 'Urban Chronicles', genre: 'hip-hop', duration: 205, bpm: 95, energy: 0.80, valence: 0.68 },
-      { title: 'Hustle State of Mind', artist: 'Rhythm & Rhyme', album: 'Urban Chronicles', genre: 'hip-hop', duration: 190, bpm: 92, energy: 0.85, valence: 0.72 },
-      { title: 'Top Floor Views', artist: 'Rhythm & Rhyme', album: 'Urban Chronicles', genre: 'hip-hop', duration: 218, bpm: 98, energy: 0.78, valence: 0.60 },
-      { title: 'Concrete Kingdom', artist: 'Rhythm & Rhyme', album: 'Urban Chronicles', genre: 'hip-hop', duration: 212, bpm: 90, energy: 0.82, valence: 0.65 },
-      { title: 'Midnight Cypher', artist: 'Rhythm & Rhyme', album: 'Urban Chronicles', genre: 'hip-hop', duration: 240, bpm: 102, energy: 0.88, valence: 0.75 },
-      { title: 'Platinum Dreams', artist: 'Rhythm & Rhyme', album: 'Urban Chronicles', genre: 'hip-hop', duration: 200, bpm: 96, energy: 0.81, valence: 0.70 },
+      const artistId = artistMap.get(track.artistName);
+      if (!artistId) continue;
 
-      // Electronic / EDM Songs (20-27)
-      { title: 'Cybernetic Drive', artist: 'Apex Pulse', album: 'Overdrive', genre: 'electronic', duration: 260, bpm: 128, energy: 0.94, valence: 0.75 },
-      { title: 'Neon Pulse', artist: 'Apex Pulse', album: 'Overdrive', genre: 'electronic', duration: 245, bpm: 130, energy: 0.96, valence: 0.80 },
-      { title: 'Hyperion Frequency', artist: 'Apex Pulse', album: 'Overdrive', genre: 'electronic', duration: 275, bpm: 132, energy: 0.98, valence: 0.68 },
-      { title: 'Laser Grid', artist: 'Apex Pulse', album: 'Overdrive', genre: 'electronic', duration: 230, bpm: 126, energy: 0.92, valence: 0.72 },
-      { title: 'Synthwave City', artist: 'The Midnight Wave', album: 'Neon Skyline', genre: 'electronic', duration: 250, bpm: 120, energy: 0.84, valence: 0.82 },
-      { title: 'Retro Sunset', artist: 'The Midnight Wave', album: 'Neon Skyline', genre: 'electronic', duration: 235, bpm: 118, energy: 0.80, valence: 0.88 },
-      { title: 'Digital Odyssey', artist: 'The Midnight Wave', album: 'Neon Skyline', genre: 'electronic', duration: 280, bpm: 124, energy: 0.86, valence: 0.74 },
-      { title: 'Bassline Pressure', artist: 'Apex Pulse', album: 'Overdrive', genre: 'electronic', duration: 210, bpm: 129, energy: 0.95, valence: 0.78 },
+      const releaseYear = track.releaseDate ? new Date(track.releaseDate).getFullYear() : undefined;
+      const album = await AlbumService.createAlbum({
+        title: albumTitle,
+        artist: artistId,
+        genre: genreMap.get(genreSlug),
+        coverImage: upscaleArtwork(track.artworkUrl100),
+        releaseYear,
+        albumType: 'album',
+        totalTracks: 1,
+        tags: [genreSlug],
+      });
+      albumMap.set(key, album._id as string);
+    }
 
-      // R&B / Soul Songs (28-33)
-      { title: 'Velvet Rain', artist: 'Velvet Groove', album: 'Midnight Lounge', genre: 'r-and-b', duration: 230, bpm: 82, energy: 0.55, valence: 0.65 },
-      { title: 'Midnight Silk', artist: 'Velvet Groove', album: 'Midnight Lounge', genre: 'r-and-b', duration: 245, bpm: 85, energy: 0.50, valence: 0.60 },
-      { title: 'Soul Connection', artist: 'Velvet Groove', album: 'Midnight Lounge', genre: 'r-and-b', duration: 220, bpm: 88, energy: 0.60, valence: 0.72 },
-      { title: 'Moonlight Serenade', artist: 'Velvet Groove', album: 'Midnight Lounge', genre: 'r-and-b', duration: 210, bpm: 80, energy: 0.48, valence: 0.58 },
-      { title: 'Deepest Desire', artist: 'Velvet Groove', album: 'Midnight Lounge', genre: 'r-and-b', duration: 250, bpm: 84, energy: 0.52, valence: 0.64 },
-      { title: 'Slow Burn', artist: 'Velvet Groove', album: 'Midnight Lounge', genre: 'r-and-b', duration: 238, bpm: 86, energy: 0.58, valence: 0.66 },
+    // 5. Seed real Songs, using each song's own real cover art
+    console.log('🎶 Seeding real Songs...');
+    const songs = [];
+    let audioIdx = 0;
+    for (const { track, genreSlug } of resolved) {
+      const artistId = artistMap.get(track.artistName);
+      const genreId = genreMap.get(genreSlug);
+      if (!artistId || !genreId) continue;
 
-      // Jazz & Blues Songs (34-39)
-      { title: 'Blue Velvet Solitude', artist: 'Blue Horizon', album: 'Midnight in Harlem', genre: 'jazz', duration: 280, bpm: 75, energy: 0.42, valence: 0.50 },
-      { title: 'Harlem Saxophone', artist: 'Blue Horizon', album: 'Midnight in Harlem', genre: 'jazz', duration: 310, bpm: 88, energy: 0.48, valence: 0.62 },
-      { title: 'Autumn Leaf Waltz', artist: 'Blue Horizon', album: 'Midnight in Harlem', genre: 'jazz', duration: 265, bpm: 92, energy: 0.45, valence: 0.55 },
-      { title: 'Smokey Corner', artist: 'Blue Horizon', album: 'Midnight in Harlem', genre: 'jazz', duration: 295, bpm: 78, energy: 0.40, valence: 0.48 },
-      { title: 'Midnight Jam Session', artist: 'Blue Horizon', album: 'Midnight in Harlem', genre: 'jazz', duration: 320, bpm: 105, energy: 0.65, valence: 0.75 },
-      { title: 'Whispering Winds', artist: 'Blue Horizon', album: 'Midnight in Harlem', genre: 'jazz', duration: 270, bpm: 82, energy: 0.44, valence: 0.52 },
+      const albumTitle = track.collectionName || track.trackName;
+      const albumId = albumMap.get(`${track.artistName}::${albumTitle}`);
+      const defaults = GENRE_AUDIO_DEFAULTS[genreSlug] || GENRE_AUDIO_DEFAULTS.pop;
+      const releaseYear = track.releaseDate ? new Date(track.releaseDate).getFullYear() : undefined;
+      const duration = track.trackTimeMillis ? Math.round(track.trackTimeMillis / 1000) : 210;
+      const sampleAudioUrl = AUDIO_SAMPLE_URLS[audioIdx % AUDIO_SAMPLE_URLS.length];
+      audioIdx += 1;
 
-      // Classical Songs (40-44)
-      { title: 'Nocturne in C Minor', artist: 'Starlight Quartet', album: 'Symphony of Lights', genre: 'classical', duration: 340, bpm: 68, energy: 0.35, valence: 0.40 },
-      { title: 'Violin Concerto No. 4', artist: 'Starlight Quartet', album: 'Symphony of Lights', genre: 'classical', duration: 390, bpm: 110, energy: 0.62, valence: 0.58 },
-      { title: 'Moonlit Sonata', artist: 'Starlight Quartet', album: 'Symphony of Lights', genre: 'classical', duration: 310, bpm: 72, energy: 0.38, valence: 0.42 },
-      { title: 'Overture of Stars', artist: 'Starlight Quartet', album: 'Symphony of Lights', genre: 'classical', duration: 360, bpm: 115, energy: 0.70, valence: 0.65 },
-      { title: 'Elegiac Adagio', artist: 'Starlight Quartet', album: 'Symphony of Lights', genre: 'classical', duration: 330, bpm: 60, energy: 0.30, valence: 0.35 },
-
-      // Indie & Folk Songs (45-50)
-      { title: 'Whispering Pines', artist: 'Acoustic Drift', album: 'Woodland Echoes', genre: 'indie', duration: 225, bpm: 98, energy: 0.50, valence: 0.62 },
-      { title: 'Mountain Mist', artist: 'Acoustic Drift', album: 'Woodland Echoes', genre: 'indie', duration: 240, bpm: 95, energy: 0.45, valence: 0.58 },
-      { title: 'Campfire Stories', artist: 'Acoustic Drift', album: 'Woodland Echoes', genre: 'indie', duration: 210, bpm: 102, energy: 0.55, valence: 0.70 },
-      { title: 'Echoes in the Fog', artist: 'Luna Resonance', album: 'Celestial Whispers', genre: 'indie', duration: 250, bpm: 90, energy: 0.48, valence: 0.52 },
-      { title: 'Celestial Horizon', artist: 'Luna Resonance', album: 'Celestial Whispers', genre: 'indie', duration: 235, bpm: 104, energy: 0.60, valence: 0.75 },
-      { title: 'Folk Tales of October', artist: 'Acoustic Drift', album: 'Woodland Echoes', genre: 'indie', duration: 260, bpm: 92, energy: 0.42, valence: 0.50 },
-    ];
-
-    const songs = await Promise.all(
-      songTemplates.map((tmpl, idx) => {
-        const artistId = artistMap.get(tmpl.artist);
-        const albumId = albumMap.get(tmpl.album);
-        const genreId = genreMap.get(tmpl.genre);
-        if (!artistId || !genreId) throw new Error(`Seed error: unknown artist/genre for "${tmpl.title}"`);
-        const sampleAudioUrl = AUDIO_SAMPLE_URLS[idx % AUDIO_SAMPLE_URLS.length];
-        const playCount = Math.floor(Math.random() * 450000) + 5000;
-        const releaseYear = 2020 + (idx % 6);
-
-        return SongService.createSong({
-          title: tmpl.title,
-          artist: artistId,
-          album: albumId,
-          genre: genreId,
-          duration: tmpl.duration,
-          coverImage: `https://images.unsplash.com/photo-${1518709268805 + idx}?w=500&auto=format&fit=crop`,
-          audioUrl: sampleAudioUrl,
-          releaseYear,
-          audioFeatures: {
-            bpm: tmpl.bpm,
-            energy: tmpl.energy,
-            danceability: Math.round((0.5 + Math.random() * 0.4) * 100) / 100,
-            valence: tmpl.valence,
-            acousticness: tmpl.genre === 'classical' || tmpl.genre === 'indie' || tmpl.genre === 'jazz' ? 0.8 : 0.2,
-            instrumentalness: tmpl.genre === 'classical' ? 0.9 : 0.1,
-          },
-          tags: [tmpl.genre, 'harmonyai-seed', tmpl.bpm > 120 ? 'upbeat' : 'chill'],
-          language: 'English',
-          explicit: false,
-        });
-      })
-    );
+      const song = await SongService.createSong({
+        title: track.trackName,
+        artist: artistId,
+        album: albumId,
+        genre: genreId,
+        duration,
+        coverImage: upscaleArtwork(track.artworkUrl100),
+        audioUrl: sampleAudioUrl,
+        releaseYear,
+        audioFeatures: {
+          bpm: defaults.bpm,
+          energy: defaults.energy,
+          danceability: Math.round((0.5 + Math.random() * 0.4) * 100) / 100,
+          valence: defaults.valence,
+          acousticness: defaults.acousticness,
+          instrumentalness: defaults.instrumentalness,
+        },
+        tags: [genreSlug, 'harmonyai-seed'],
+        language: 'English',
+        explicit: false,
+      });
+      songs.push(song);
+    }
 
     console.log('\n==================================================');
     console.log('🎉 HarmonyAI Database Seeding Complete Successfully!');
     console.log('==================================================');
-    console.log(`📊 Total Genres Created: ${genres.length}`);
-    console.log(`🎤 Total Artists Created: ${artists.length}`);
-    console.log(`💿 Total Albums Created:  ${albums.length}`);
+    console.log(`📊 Total Genres Created:  ${genres.length}`);
+    console.log(`🎤 Total Artists Created: ${artistMap.size}`);
+    console.log(`💿 Total Albums Created:  ${albumMap.size}`);
     console.log(`🎶 Total Songs Created:   ${songs.length}`);
     console.log('==================================================\n');
 
