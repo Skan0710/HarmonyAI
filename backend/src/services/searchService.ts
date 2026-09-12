@@ -2,6 +2,7 @@ import { supabase } from '../config/supabase.js';
 import { mapSongRow } from './songService.js';
 import { mapArtistRow } from './artistService.js';
 import { mapAlbumRow } from './albumService.js';
+import { escapePostgrestFilterValue } from '../utils/postgrestFilter.js';
 
 export interface GroupedSearchResults {
   songs: any[];
@@ -26,7 +27,7 @@ export const searchCatalog = async (
   }
 
   const safeLimit = Math.max(1, Math.min(50, limit));
-  const pattern = `%${trimmedQuery}%`;
+  const pattern = escapePostgrestFilterValue(`%${trimmedQuery}%`);
 
   const [songsRes, artistsRes, albumsRes] = await Promise.all([
     supabase

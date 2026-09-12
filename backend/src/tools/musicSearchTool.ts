@@ -3,6 +3,7 @@ import { supabase } from '../config/supabase.js';
 import { mapSongRow } from '../services/songService.js';
 export type ISong = any;
 import { searchCatalog, GroupedSearchResults } from '../services/searchService.js';
+import { escapePostgrestFilterValue } from '../utils/postgrestFilter.js';
 
 export interface MusicSearchInput {
   query: string;
@@ -110,7 +111,7 @@ export class MusicSearchTool implements AssistantTool<MusicSearchInput, MusicSea
 
     // Fallback: direct Supabase query when catalog search yields no results
     if (songs.length === 0) {
-      const pattern = `%${query.trim()}%`;
+      const pattern = escapePostgrestFilterValue(`%${query.trim()}%`);
       const { data: fallbackRows } = await supabase
         .from('songs')
         .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
