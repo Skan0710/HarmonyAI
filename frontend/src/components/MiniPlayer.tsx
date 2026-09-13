@@ -134,7 +134,17 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     let cancelled = false;
     fetchYoutubeVideoIdApi(currentSong._id)
       .then((videoId) => {
-        if (!cancelled) setYoutubeVideoId(videoId);
+        if (!cancelled) {
+          setYoutubeVideoId(videoId);
+          if (videoId) {
+            usePlayerStore.setState((state) => ({
+              currentSong: state.currentSong?._id === currentSong._id
+                ? { ...state.currentSong, youtubeVideoId: videoId }
+                : state.currentSong,
+              queue: state.queue.map((s) => s._id === currentSong._id ? { ...s, youtubeVideoId: videoId } : s),
+            }));
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setYoutubeVideoId(null);
@@ -146,6 +156,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   }, [currentSong?._id, currentSong?.youtubeVideoId, setYoutubeVideoId]);
 
   const usingYoutubeEngine = Boolean(youtubeVideoId);
+  const usingNativeAudio = youtubeVideoId === null && Boolean(currentSong?.audioUrl);
 
   const onSongEnd = () => {
     const currentRepeatMode = usePlayerStore.getState().repeatMode;
@@ -153,7 +164,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     if (currentRepeatMode === 'one' || (currentRepeatMode === 'all' && currentQueue.length === 1)) {
       if (usingYoutubeEngine) {
         youtubeEngineRef.current?.replay();
-      } else if (audioRef.current) {
+      } else if (usingNativeAudio && audioRef.current) {
         audioRef.current.currentTime = 0;
         audioRef.current.play().catch(() => {});
       }
@@ -170,7 +181,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
         if (isPlaying) {
           youtubeEngineRef.current?.play();
         }
-      } else if (audioRef.current) {
+      } else if (usingNativeAudio && audioRef.current) {
         audioRef.current.currentTime = seekRequest;
         if (isPlaying) {
           audioRef.current.play().catch(() => {});
@@ -178,14 +189,18 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
       }
       clearSeekRequest();
     }
-  }, [seekRequest, usingYoutubeEngine, isPlaying, clearSeekRequest]);
+  }, [seekRequest, usingYoutubeEngine, usingNativeAudio, isPlaying, clearSeekRequest]);
 
   // Native <audio> engine — only active for the placeholder-audio fallback
-  // path (no YouTube match resolved for this track).
+  // path when YouTube match explicitly resolved to null (never while loading).
   useEffect(() => {
-    if (usingYoutubeEngine) return;
     const audio = audioRef.current;
     if (!audio) return;
+
+    if (!usingNativeAudio) {
+      audio.pause();
+      return;
+    }
 
     if (isPlaying) {
       const playPromise = audio.play();
@@ -200,14 +215,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     } else {
       audio.pause();
     }
-  }, [isPlaying, currentSong, pause, usingYoutubeEngine]);
+  }, [isPlaying, currentSong, pause, usingNativeAudio]);
 
   useEffect(() => {
-    if (usingYoutubeEngine) return;
+    if (!usingNativeAudio) return;
     const audio = audioRef.current;
     if (!audio) return;
     audio.volume = isMuted ? 0 : volume;
-  }, [volume, isMuted, usingYoutubeEngine]);
+  }, [volume, isMuted, usingNativeAudio]);
 
   if (!currentSong) return null;
 
@@ -396,7 +411,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   return (
     <>
       <div className="fixed bottom-0 left-0 right-0 z-[var(--z-player)] bg-surface-1/95 border-t border-border-subtle backdrop-blur-xl px-3 py-2.5 sm:px-5 sm:py-3">
-      {!usingYoutubeEngine && (
+      {usingNativeAudio && currentSong.audioUrl && (
         <audio
           ref={audioRef}
           src={currentSong.audioUrl}

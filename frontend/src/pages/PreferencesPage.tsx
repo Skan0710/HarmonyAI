@@ -52,22 +52,20 @@ export const PreferencesPage: React.FC = () => {
   useEffect(() => {
     const trimmed = artistSearch.trim();
     if (!trimmed) {
-      setSearchResults([]);
-      setSearching(false);
+      setSearching(true);
+      fetchArtists({ limit: 12 }).then((res) => {
+        setSearchResults(res.artists || []);
+        setSearching(false);
+      });
       return;
     }
 
     setSearching(true);
     const handler = setTimeout(async () => {
-      const res = await fetchArtists();
-      if (res.artists) {
-        const filtered = res.artists.filter((a) =>
-          a.name.toLowerCase().includes(trimmed.toLowerCase())
-        );
-        setSearchResults(filtered);
-      }
+      const res = await fetchArtists({ search: trimmed, limit: 20 });
+      setSearchResults(res.artists || []);
       setSearching(false);
-    }, 300);
+    }, 250);
 
     return () => clearTimeout(handler);
   }, [artistSearch]);
@@ -84,9 +82,11 @@ export const PreferencesPage: React.FC = () => {
   }, []);
 
   const handleSelectArtist = async (artist: Artist) => {
-    await addArtist(artist);
-    setArtistSearch('');
-    setIsDropdownOpen(false);
+    if (isFavoriteArtist(artist._id)) {
+      await removeArtist(artist._id);
+    } else {
+      await addArtist(artist);
+    }
   };
 
   const handleToggleGenre = async (genre: Genre) => {
@@ -177,12 +177,19 @@ export const PreferencesPage: React.FC = () => {
                 <Search className="w-4 h-4 absolute left-3 top-2.5 text-text-tertiary pointer-events-none" strokeWidth={1.75} />
 
                 {/* Artist Search Results Dropdown */}
-                {isDropdownOpen && artistSearch.trim() && (
+                {isDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-surface-1 border border-border-default rounded-[var(--radius-lg)] shadow-lg p-2 max-h-56 overflow-y-auto space-y-1">
+                    {!artistSearch.trim() && (
+                      <div className="px-2 py-1 text-[10px] uppercase font-bold text-text-tertiary tracking-wider">
+                        Suggested Artists
+                      </div>
+                    )}
                     {searching ? (
-                      <div className="p-3 text-center text-xs text-accent">Searching...</div>
+                      <div className="p-3 text-center text-xs text-accent">Searching artists...</div>
                     ) : searchResults.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-text-tertiary">No artists found</div>
+                      <div className="p-3 text-center text-xs text-text-tertiary">
+                        No artists found {artistSearch.trim() ? `for "${artistSearch.trim()}"` : ''}
+                      </div>
                     ) : (
                       searchResults.map((artist) => {
                         const isFav = isFavoriteArtist(artist._id);
@@ -201,7 +208,7 @@ export const PreferencesPage: React.FC = () => {
                               <span className="text-text-primary truncate font-semibold">{artist.name}</span>
                             </div>
 
-                            <span className={`text-[10px] px-2 py-0.5 rounded-[var(--radius-pill)] font-bold ${isFav ? 'bg-success/15 text-success' : 'bg-accent-wash text-accent'}`}>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-[var(--radius-pill)] font-bold transition-all ${isFav ? 'bg-success/15 text-success hover:bg-danger/15 hover:text-danger' : 'bg-accent-wash text-accent hover:bg-accent hover:text-white'}`}>
                               {isFav ? 'Added ✓' : '+ Add'}
                             </span>
                           </div>

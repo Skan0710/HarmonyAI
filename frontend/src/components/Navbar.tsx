@@ -138,13 +138,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
       <div className="flex items-center gap-3 text-sm shrink-0">
         <button
           onClick={openCommandPalette}
-          aria-label="Open command palette"
-          title="Open command palette"
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-pill)] bg-surface-2 hover:bg-surface-3 text-text-tertiary hover:text-text-primary transition-colors cursor-pointer"
+          aria-label="Open Command Palette & Quick Search (Ctrl+K / ⌘K)"
+          title="Open Command Palette & Quick Search (Ctrl+K / ⌘K)"
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-pill)] bg-surface-2 hover:bg-surface-3 border border-border-default hover:border-accent/40 text-text-secondary hover:text-text-primary transition-all duration-200 cursor-pointer group shadow-sm"
         >
-          <Command size={13} strokeWidth={1.75} />
-          <kbd className="flex items-center gap-0.5 font-sans text-[11px] font-medium">
-            <span className="leading-none">⌘</span>K
+          <Command size={13} className="text-text-tertiary group-hover:text-accent transition-colors shrink-0" strokeWidth={2} />
+          <span className="text-xs font-medium text-text-secondary group-hover:text-text-primary transition-colors">
+            Quick Actions
+          </span>
+          <kbd className="flex items-center px-1.5 py-0.5 font-mono text-[10px] font-semibold bg-surface-1 border border-border-subtle rounded text-text-tertiary group-hover:text-text-secondary">
+            {typeof navigator !== 'undefined' && (navigator as any).userAgent?.includes('Mac') ? '⌘K' : 'Ctrl K'}
           </kbd>
         </button>
 
