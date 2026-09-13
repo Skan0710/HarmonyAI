@@ -21,6 +21,7 @@ export const usePlayer = () => {
   const pause = usePlayerStore((state) => state.pause);
   const stop = usePlayerStore((state) => state.stop);
   const setCurrentTime = usePlayerStore((state) => state.setCurrentTime);
+  const seekTo = usePlayerStore((state) => state.seekTo);
   const setDuration = usePlayerStore((state) => state.setDuration);
   const setVolume = usePlayerStore((state) => state.setVolume);
   const toggleMute = usePlayerStore((state) => state.toggleMute);
@@ -62,6 +63,7 @@ export const usePlayer = () => {
     pause,
     stop,
     setCurrentTime,
+    seekTo,
     setDuration,
     setVolume,
     toggleMute,

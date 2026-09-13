@@ -43,8 +43,9 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
     isMuted,
     isShuffle,
     repeatMode,
+    isQueueOpen,
     togglePlay,
-    setCurrentTime,
+    seekTo,
     setVolume,
     toggleMute,
     toggleShuffle,
@@ -52,19 +53,31 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
     nextSong,
     previousSong,
     toggleQueueOpen,
+    setQueueOpen,
   } = usePlayer();
 
   const isLiked = useLikedSongsStore((state) => (currentSong ? state.isLiked(currentSong._id) : false));
   const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
 
+  const handleClose = () => {
+    setQueueOpen(false);
+    onClose();
+  };
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (isQueueOpen) {
+          setQueueOpen(false);
+        } else {
+          handleClose();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, isQueueOpen, onClose]);
 
   useEffect(() => {
     setImgError(false);
@@ -87,7 +100,8 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCurrentTime(parseFloat(e.target.value));
+    const newTime = parseFloat(e.target.value);
+    seekTo(newTime);
   };
 
   return (
@@ -109,7 +123,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
             <div className="relative h-full flex flex-col px-6 sm:px-10 py-6">
               <div className="flex items-center justify-between shrink-0">
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="p-2 text-text-secondary hover:text-text-primary rounded-full hover:bg-surface-2 transition-colors cursor-pointer"
                   aria-label="Minimize player"
                 >
@@ -118,14 +132,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                 <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-text-tertiary">
                   Now Playing
                 </span>
-                <IconButton
-                  size="md"
-                  variant={isLiked ? 'active' : 'default'}
-                  onClick={() => toggleLikeSong(currentSong)}
-                  aria-label={isLiked ? 'Unlike song' : 'Like song'}
-                >
-                  <Heart size={17} fill={isLiked ? 'currentColor' : 'none'} strokeWidth={1.75} />
-                </IconButton>
+                <div className="w-9 h-9" aria-hidden="true" />
               </div>
 
               <div className="flex-1 flex flex-col items-center justify-center min-h-0 gap-8 max-w-md mx-auto w-full">
@@ -138,9 +145,28 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                   />
                 </div>
 
-                <div className="text-center w-full">
-                  <h1 className="font-display text-xl sm:text-2xl text-text-primary line-clamp-2 leading-snug">{currentSong.title}</h1>
-                  <p className="text-sm text-text-tertiary mt-1.5 truncate">{getArtistName()}</p>
+                <div className="flex items-center justify-between w-full gap-3 px-1">
+                  <div className="min-w-0 text-left flex-1">
+                    <h1 className="font-display text-xl sm:text-2xl text-text-primary line-clamp-2 leading-snug">
+                      {currentSong.title}
+                    </h1>
+                    <p className="text-sm text-text-tertiary mt-1.5 truncate">{getArtistName()}</p>
+                  </div>
+                  <button
+                    onClick={() => toggleLikeSong(currentSong)}
+                    className={`p-3 rounded-full hover:bg-surface-2 transition-all cursor-pointer shrink-0 flex items-center justify-center ${
+                      isLiked ? 'text-accent' : 'text-text-tertiary hover:text-text-primary'
+                    }`}
+                    aria-label={isLiked ? 'Unlike song' : 'Like song'}
+                    title={isLiked ? 'Unlike song' : 'Like song'}
+                  >
+                    <Heart
+                      size={26}
+                      fill={isLiked ? 'currentColor' : 'none'}
+                      strokeWidth={2}
+                      className={`transition-transform duration-200 active:scale-125 ${isLiked ? 'scale-110' : ''}`}
+                    />
+                  </button>
                 </div>
 
                 <div className="w-full space-y-2">
@@ -152,10 +178,10 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                       step={0.1}
                       value={currentTime}
                       onChange={handleSeek}
-                      className="w-full h-1 bg-surface-2 rounded-full appearance-none cursor-pointer accent-[var(--accent)] relative z-10"
+                      className="w-full h-1.5 bg-white/20 hover:bg-white/30 rounded-full appearance-none cursor-pointer accent-[var(--accent)] relative z-10 transition-colors"
                     />
                     <div
-                      className="absolute left-0 h-1 bg-accent rounded-full pointer-events-none"
+                      className="absolute left-0 h-1.5 bg-accent rounded-full pointer-events-none"
                       style={{ width: `${Math.min(100, Math.max(0, progressPercentage))}%` }}
                     />
                   </div>
@@ -175,7 +201,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                     <Shuffle strokeWidth={1.75} />
                   </IconButton>
                   <IconButton size="md" onClick={previousSong} disabled={queue.length <= 1} aria-label="Previous song">
-                    <SkipBack fill="currentColor" strokeWidth={0} />
+                    <SkipBack size={20} fill="currentColor" strokeWidth={2} />
                   </IconButton>
                   <motion.button
                     whileTap={{ scale: 0.94 }}
@@ -190,7 +216,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                     )}
                   </motion.button>
                   <IconButton size="md" onClick={nextSong} aria-label="Next song">
-                    <SkipForward fill="currentColor" strokeWidth={0} />
+                    <SkipForward size={20} fill="currentColor" strokeWidth={2} />
                   </IconButton>
                   <IconButton
                     size="md"
@@ -214,26 +240,41 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
               </div>
 
               <div className="flex items-center justify-between shrink-0 max-w-md mx-auto w-full">
-                <div className="flex items-center gap-2">
-                  <button onClick={toggleMute} className="text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" aria-label="Mute">
-                    {isMuted || volume === 0 ? <VolumeX size={16} className="text-danger" /> : <Volume2 size={16} />}
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={toggleMute}
+                    className="text-text-tertiary hover:text-text-primary transition-colors cursor-pointer"
+                    aria-label={isMuted || volume === 0 ? 'Unmute' : 'Mute'}
+                  >
+                    {isMuted || volume === 0 ? <VolumeX size={17} className="text-danger" /> : <Volume2 size={17} />}
                   </button>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={isMuted ? 0 : volume}
-                    onChange={(e) => setVolume(parseFloat(e.target.value))}
-                    className="w-20 h-1 bg-surface-2 rounded-full appearance-none cursor-pointer accent-[var(--accent)]"
-                  />
+                  <div className="relative flex items-center w-24 sm:w-28 group">
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={isMuted ? 0 : volume}
+                      onChange={(e) => setVolume(parseFloat(e.target.value))}
+                      className="w-full h-1.5 bg-white/20 hover:bg-white/30 rounded-full appearance-none cursor-pointer accent-[var(--accent)] relative z-10 transition-colors"
+                    />
+                    <div
+                      className="absolute left-0 h-1.5 bg-accent rounded-full pointer-events-none transition-all"
+                      style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}
+                    />
+                  </div>
                 </div>
                 <button
                   onClick={toggleQueueOpen}
-                  className="flex items-center gap-1.5 text-xs font-medium text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer"
+                  className={`flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer px-2.5 py-1.5 rounded-full ${
+                    isQueueOpen
+                      ? 'text-accent bg-accent-wash'
+                      : 'text-text-tertiary hover:text-text-primary hover:bg-surface-2'
+                  }`}
+                  aria-label="Toggle playback queue"
                 >
-                  <ListMusic size={15} />
-                  Queue · {queue.length}
+                  <ListMusic size={16} strokeWidth={2} />
+                  <span>Queue · {queue.length}</span>
                 </button>
               </div>
             </div>

@@ -94,10 +94,10 @@
 
   /* ---------- Layering ---------- */
   --z-nav: 30;
-  --z-drawer: 40;
   --z-player: 50;
   --z-modal: 60;
-  --z-toast: 70;
+  --z-drawer: 70;
+  --z-toast: 80;
 }
 
 @media (prefers-reduced-motion: reduce) {

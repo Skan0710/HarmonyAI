@@ -63,6 +63,9 @@ interface PlayerState {
   play: () => void;
   pause: () => void;
   stop: () => void;
+  seekRequest: number | null;
+  seekTo: (time: number) => void;
+  clearSeekRequest: () => void;
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
   setVolume: (volume: number) => void;
@@ -93,6 +96,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isPlaying: false,
   currentTime: 0,
   duration: 0,
+  seekRequest: null,
   queue: [],
   queueIndex: -1,
   volume: getInitialVolume(),
@@ -164,6 +168,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   setCurrentTime: (time) => set({ currentTime: time }),
+
+  seekTo: (time) => {
+    const clamped = Math.max(0, time);
+    set({ currentTime: clamped, seekRequest: clamped });
+  },
+
+  clearSeekRequest: () => set({ seekRequest: null }),
 
   setDuration: (duration) => set({ duration }),
 
@@ -618,7 +629,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (queue.length === 0) return;
 
     if (currentTime > 3) {
-      set({ currentTime: 0 });
+      get().seekTo(0);
       return;
     }
 

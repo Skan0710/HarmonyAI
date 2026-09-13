@@ -33,6 +33,17 @@ export const YoutubePlayerEngine = forwardRef<PlaybackEngineHandle, YoutubePlaye
     const pollRef = useRef<number | null>(null);
     const isReadyRef = useRef(false);
 
+    const onTimeUpdateRef = useRef(onTimeUpdate);
+    onTimeUpdateRef.current = onTimeUpdate;
+    const onDurationRef = useRef(onDuration);
+    onDurationRef.current = onDuration;
+    const onEndedRef = useRef(onEnded);
+    onEndedRef.current = onEnded;
+    const onReadyRef = useRef(onReady);
+    onReadyRef.current = onReady;
+    const onErrorRef = useRef(onError);
+    onErrorRef.current = onError;
+
     useImperativeHandle(ref, () => ({
       seekTo: (seconds: number) => {
         playerRef.current?.seekTo(seconds, true);
@@ -58,14 +69,17 @@ export const YoutubePlayerEngine = forwardRef<PlaybackEngineHandle, YoutubePlaye
             onReady: (event) => {
               isReadyRef.current = true;
               event.target.setVolume(isMuted ? 0 : volume * 100);
-              onDuration(event.target.getDuration());
-              onReady();
+              const dur = event.target.getDuration();
+              if (dur && dur > 0) onDurationRef.current(dur);
+              onReadyRef.current();
               if (isPlaying) event.target.playVideo();
             },
             onStateChange: (event) => {
-              if (event.data === YT_STATE_ENDED) onEnded();
+              if (event.data === YT_STATE_ENDED) onEndedRef.current();
+              const dur = event.target?.getDuration?.();
+              if (dur && dur > 0) onDurationRef.current(dur);
             },
-            onError: () => onError(),
+            onError: () => onErrorRef.current(),
           },
         });
       });
@@ -99,13 +113,19 @@ export const YoutubePlayerEngine = forwardRef<PlaybackEngineHandle, YoutubePlaye
       if (pollRef.current) window.clearInterval(pollRef.current);
       pollRef.current = window.setInterval(() => {
         if (isReadyRef.current && playerRef.current) {
-          onTimeUpdate(playerRef.current.getCurrentTime());
+          const t = playerRef.current.getCurrentTime();
+          if (typeof t === 'number' && !isNaN(t)) {
+            onTimeUpdateRef.current(t);
+          }
+          const dur = playerRef.current.getDuration();
+          if (dur && dur > 0) {
+            onDurationRef.current(dur);
+          }
         }
-      }, 500);
+      }, 250);
       return () => {
         if (pollRef.current) window.clearInterval(pollRef.current);
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return <div ref={containerRef} className="w-full h-full bg-black" />;

@@ -12,8 +12,11 @@ import {
   Volume2,
   VolumeX,
   X,
+  Heart,
 } from 'lucide-react';
 import { usePlayer } from '../hooks/usePlayer';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { usePlayerKeyboardShortcuts } from '../hooks/usePlayerKeyboardShortcuts';
 import { formatTime } from '../utils/formatters';
 import { IconButton } from './ui/IconButton';
@@ -54,6 +57,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     pause,
     stop,
     setCurrentTime,
+    seekTo,
     setDuration,
     setVolume,
     toggleMute,
@@ -65,6 +69,12 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     handleSongEnd,
     toggleQueueOpen,
   } = usePlayer();
+
+  const isLiked = useLikedSongsStore((state) => (currentSong ? state.isLiked(currentSong._id) : false));
+  const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
+
+  const seekRequest = usePlayerStore((state) => state.seekRequest);
+  const clearSeekRequest = usePlayerStore((state) => state.clearSeekRequest);
 
   useEffect(() => {
     setIsLoadingAudio(true);
@@ -93,6 +103,17 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   }, [currentSong?._id, currentSong?.youtubeVideoId]);
 
   const usingYoutubeEngine = Boolean(youtubeVideoId);
+
+  useEffect(() => {
+    if (seekRequest !== null) {
+      if (usingYoutubeEngine) {
+        youtubeEngineRef.current?.seekTo(seekRequest);
+      } else if (audioRef.current) {
+        audioRef.current.currentTime = seekRequest;
+      }
+      clearSeekRequest();
+    }
+  }, [seekRequest, usingYoutubeEngine, clearSeekRequest]);
 
   // Native <audio> engine — only active for the placeholder-audio fallback
   // path (no YouTube match resolved for this track).
@@ -133,8 +154,10 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     return String(currentSong.artist);
   };
 
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
+  const handleTimeUpdate = (seconds?: number | React.SyntheticEvent<HTMLAudioElement>) => {
+    if (typeof seconds === 'number') {
+      setCurrentTime(seconds);
+    } else if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
     }
   };
@@ -165,12 +188,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
-    if (usingYoutubeEngine) {
-      youtubeEngineRef.current?.seekTo(newTime);
-    } else if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
-    }
-    setCurrentTime(newTime);
+    seekTo(newTime);
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,6 +253,17 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
               <p className="text-xs text-text-tertiary truncate mt-0.5">{getArtistName()}</p>
               {audioError && <p className="text-[10px] text-danger truncate mt-0.5 font-medium">{audioError}</p>}
             </div>
+          </button>
+
+          <button
+            onClick={() => toggleLikeSong(currentSong)}
+            className={`p-1.5 rounded-full hover:bg-surface-2 transition-colors cursor-pointer shrink-0 hidden sm:flex items-center justify-center ${
+              isLiked ? 'text-accent' : 'text-text-tertiary hover:text-text-primary'
+            }`}
+            aria-label={isLiked ? 'Unlike song' : 'Like song'}
+            title={isLiked ? 'Unlike song' : 'Like song'}
+          >
+            <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} strokeWidth={1.75} />
           </button>
 
           <button onClick={stop} className="sm:hidden text-text-tertiary hover:text-text-primary p-1" aria-label="Close Player">
@@ -325,10 +354,10 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
                 step={0.1}
                 value={currentTime}
                 onChange={handleSeek}
-                className="w-full h-1 bg-surface-2 rounded-full appearance-none cursor-pointer accent-[var(--accent)] relative z-10"
+                className="w-full h-1.5 bg-white/20 hover:bg-white/30 rounded-full appearance-none cursor-pointer accent-[var(--accent)] relative z-10 transition-colors"
               />
               <div
-                className="absolute left-0 h-1 bg-accent rounded-full pointer-events-none"
+                className="absolute left-0 h-1.5 bg-accent rounded-full pointer-events-none"
                 style={{ width: `${Math.min(100, Math.max(0, progressPercentage))}%` }}
               />
             </div>
@@ -354,15 +383,21 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             <button onClick={toggleMute} className="text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" aria-label="Mute / Unmute">
               {isMuted || volume === 0 ? <VolumeX size={16} className="text-danger" /> : <Volume2 size={16} />}
             </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={isMuted ? 0 : volume}
-              onChange={handleVolumeChange}
-              className="w-20 h-1 bg-surface-2 rounded-full appearance-none cursor-pointer accent-[var(--accent)]"
-            />
+            <div className="relative flex items-center w-20 sm:w-24 group">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={isMuted ? 0 : volume}
+                onChange={handleVolumeChange}
+                className="w-full h-1.5 bg-white/20 hover:bg-white/30 rounded-full appearance-none cursor-pointer accent-[var(--accent)] relative z-10 transition-colors"
+              />
+              <div
+                className="absolute left-0 h-1.5 bg-accent rounded-full pointer-events-none transition-all"
+                style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}
+              />
+            </div>
           </div>
 
           <button onClick={stop} className="text-text-tertiary hover:text-text-primary p-1.5 transition-colors cursor-pointer" aria-label="Close Player" title="Close Player">
