@@ -34,6 +34,7 @@ export const YoutubePlayerEngine = forwardRef<PlaybackEngineHandle, YoutubePlaye
     const playerRef = useRef<YoutubePlayer | null>(null);
     const pollRef = useRef<number | null>(null);
     const isReadyRef = useRef(false);
+    const pendingSeekRef = useRef<number | null>(null);
 
     const onTimeUpdateRef = useRef(onTimeUpdate);
     onTimeUpdateRef.current = onTimeUpdate;
@@ -48,14 +49,26 @@ export const YoutubePlayerEngine = forwardRef<PlaybackEngineHandle, YoutubePlaye
 
     useImperativeHandle(ref, () => ({
       seekTo: (seconds: number) => {
-        playerRef.current?.seekTo(seconds, true);
+        if (isReadyRef.current && playerRef.current) {
+          try {
+            playerRef.current.seekTo(seconds, true);
+          } catch {}
+        } else {
+          pendingSeekRef.current = seconds;
+        }
       },
       play: () => {
         playerRef.current?.playVideo();
       },
       replay: () => {
-        playerRef.current?.seekTo(0, true);
-        playerRef.current?.playVideo();
+        if (isReadyRef.current && playerRef.current) {
+          try {
+            playerRef.current.seekTo(0, true);
+            playerRef.current.playVideo();
+          } catch {}
+        } else {
+          pendingSeekRef.current = 0;
+        }
       },
     }));
 
@@ -81,6 +94,10 @@ export const YoutubePlayerEngine = forwardRef<PlaybackEngineHandle, YoutubePlaye
               const dur = event.target.getDuration();
               if (dur && dur > 0) onDurationRef.current(dur);
               onReadyRef.current();
+              if (pendingSeekRef.current !== null) {
+                event.target.seekTo(pendingSeekRef.current, true);
+                pendingSeekRef.current = null;
+              }
               if (isPlaying) event.target.playVideo();
             },
             onStateChange: (event) => {

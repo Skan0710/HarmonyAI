@@ -163,11 +163,27 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
     Boolean((currentSong as any).sources);
 
   const cover = imgError || !currentSong.coverImage ? fallbackCover : currentSong.coverImage;
-  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
+
+  const displayTime = isScrubbing && scrubTime !== null ? scrubTime : currentTime;
+  const progressPercentage = duration > 0 ? (displayTime / duration) * 100 : 0;
+
+  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
-    seekTo(newTime);
+    if (isScrubbing) {
+      setScrubTime(newTime);
+    } else {
+      seekTo(newTime);
+    }
+  };
+
+  const handleSeekEnd = (e: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
+    const val = scrubTime !== null ? scrubTime : parseFloat((e.target as HTMLInputElement).value);
+    seekTo(val);
+    setIsScrubbing(false);
+    setScrubTime(null);
   };
 
   return (
@@ -290,8 +306,18 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                       min={0}
                       max={duration || 100}
                       step={0.1}
-                      value={currentTime}
-                      onChange={handleSeek}
+                      value={displayTime}
+                      onMouseDown={() => {
+                        setIsScrubbing(true);
+                        setScrubTime(displayTime);
+                      }}
+                      onTouchStart={() => {
+                        setIsScrubbing(true);
+                        setScrubTime(displayTime);
+                      }}
+                      onChange={handleSeekChange}
+                      onMouseUp={handleSeekEnd}
+                      onTouchEnd={handleSeekEnd}
                       className="w-full h-1.5 bg-white/20 hover:bg-white/30 rounded-full appearance-none cursor-pointer accent-[var(--accent)] relative z-10 transition-colors"
                     />
                     <div
@@ -300,7 +326,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                     />
                   </div>
                   <div className="flex items-center justify-between text-2xs font-mono text-text-tertiary tabular-nums">
-                    <span>{formatTime(currentTime)}</span>
+                    <span>{formatTime(displayTime)}</span>
                     <span>{formatTime(duration)}</span>
                   </div>
                 </div>

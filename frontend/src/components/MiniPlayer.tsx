@@ -178,9 +178,6 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     if (seekRequest !== null) {
       if (usingYoutubeEngine) {
         youtubeEngineRef.current?.seekTo(seekRequest);
-        if (isPlaying) {
-          youtubeEngineRef.current?.play();
-        }
       } else if (usingNativeAudio && audioRef.current) {
         audioRef.current.currentTime = seekRequest;
         if (isPlaying) {
@@ -296,9 +293,26 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     pause();
   };
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
+
+  const displayTime = isScrubbing && scrubTime !== null ? scrubTime : currentTime;
+  const progressPercentage = duration > 0 ? (displayTime / duration) * 100 : 0;
+
+  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
-    seekTo(newTime);
+    if (isScrubbing) {
+      setScrubTime(newTime);
+    } else {
+      seekTo(newTime);
+    }
+  };
+
+  const handleSeekEnd = (e: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
+    const val = scrubTime !== null ? scrubTime : parseFloat((e.target as HTMLInputElement).value);
+    seekTo(val);
+    setIsScrubbing(false);
+    setScrubTime(null);
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -308,7 +322,6 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   const fallbackCover =
     'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23d9a15b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231b1815;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
 
-  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
   const isVideoExpanded = Boolean(isFullPlayerOpen && mediaMode === 'video' && videoSlotRect);
 
   const renderVideoPortal = () => {
@@ -553,15 +566,25 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
           </div>
 
           <div className="flex items-center gap-2.5 w-full text-2xs text-text-tertiary font-mono tabular-nums">
-            <span className="w-9 text-right shrink-0">{formatTime(currentTime)}</span>
+            <span className="w-9 text-right shrink-0">{formatTime(displayTime)}</span>
             <div className="relative flex-1 flex items-center group">
               <input
                 type="range"
                 min={0}
                 max={duration || 100}
                 step={0.1}
-                value={currentTime}
-                onChange={handleSeek}
+                value={displayTime}
+                onMouseDown={() => {
+                  setIsScrubbing(true);
+                  setScrubTime(displayTime);
+                }}
+                onTouchStart={() => {
+                  setIsScrubbing(true);
+                  setScrubTime(displayTime);
+                }}
+                onChange={handleSeekChange}
+                onMouseUp={handleSeekEnd}
+                onTouchEnd={handleSeekEnd}
                 className="w-full h-1.5 bg-white/20 hover:bg-white/30 rounded-full appearance-none cursor-pointer accent-[var(--accent)] relative z-10 transition-colors"
               />
               <div

@@ -97,6 +97,8 @@ interface PlayerState {
   setYoutubeVideoId: (id: string | null | undefined) => void;
   videoSlotRect: { top: number; left: number; width: number; height: number } | null;
   setVideoSlotRect: (rect: { top: number; left: number; width: number; height: number } | null) => void;
+  targetSeekTime: number | null;
+  seekLockUntil: number;
 
   toggleQueueOpen: () => void;
   setQueueOpen: (isOpen: boolean) => void;
@@ -108,6 +110,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   currentTime: 0,
   duration: 0,
   seekRequest: null,
+  targetSeekTime: null,
+  seekLockUntil: 0,
   queue: [],
   queueIndex: -1,
   volume: getInitialVolume(),
@@ -143,6 +147,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       youtubeVideoId: song.youtubeVideoId ?? undefined,
       isPlaying: true,
       currentTime: 0,
+      targetSeekTime: null,
+      seekLockUntil: 0,
       queue: currentQueue,
       queueIndex: index >= 0 ? index : 0,
       lastAutoplaySeedKey: null,
@@ -182,16 +188,34 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       currentSong: null,
       isPlaying: false,
       currentTime: 0,
+      targetSeekTime: null,
+      seekLockUntil: 0,
       duration: 0,
       autoplayQueue: [],
     });
   },
 
-  setCurrentTime: (time) => set({ currentTime: time }),
+  setCurrentTime: (time) => {
+    const { targetSeekTime, seekLockUntil } = get();
+    if (seekLockUntil && Date.now() < seekLockUntil) {
+      // If the playback engine has caught up near target seek time, clear lock and accept new time
+      if (targetSeekTime !== null && Math.abs(time - targetSeekTime) < 1.5) {
+        set({ currentTime: time, targetSeekTime: null, seekLockUntil: 0 });
+      }
+      // Otherwise drop stale pre-seek time updates from engine buffer
+      return;
+    }
+    set({ currentTime: time, targetSeekTime: null, seekLockUntil: 0 });
+  },
 
   seekTo: (time) => {
     const clamped = Math.max(0, time);
-    set({ currentTime: clamped, seekRequest: clamped });
+    set({
+      currentTime: clamped,
+      seekRequest: clamped,
+      targetSeekTime: clamped,
+      seekLockUntil: Date.now() + 1500,
+    });
   },
 
   clearSeekRequest: () => set({ seekRequest: null }),
