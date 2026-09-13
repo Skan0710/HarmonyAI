@@ -120,8 +120,15 @@ export const fetchGenres = async (): Promise<{ genres: Genre[]; error?: string }
   return { genres: result.data || [], error: result.error || undefined };
 };
 
-export const fetchArtists = async (): Promise<{ artists: Artist[]; error?: string }> => {
-  const response = await apiClient<{ success: boolean; data: Artist[] }>('/artists', { method: 'GET' });
+export const fetchArtists = async (params: { search?: string; limit?: number; page?: number } = {}): Promise<{ artists: Artist[]; error?: string }> => {
+  const queryParams = new URLSearchParams();
+  if (params.search) queryParams.append('search', params.search);
+  if (params.limit) queryParams.append('limit', String(params.limit));
+  if (params.page) queryParams.append('page', String(params.page));
+
+  const qs = queryParams.toString();
+  const endpoint = `/artists${qs ? `?${qs}` : ''}`;
+  const response = await apiClient<{ success: boolean; data: Artist[] }>(endpoint, { method: 'GET' });
   const result = extractEnvelopeData(response, 'Failed to load artists');
   return { artists: result.data || [], error: result.error || undefined };
 };

@@ -52,7 +52,7 @@ export class PlaylistService {
         visibility: data.visibility || 'public',
         is_collaborative: Boolean(data.isCollaborative),
       })
-      .select('*, users(*)')
+      .select('*, users!owner_id(*)')
       .single();
 
     if (error) throw new Error(`Failed to create playlist: ${error.message}`);
@@ -62,13 +62,13 @@ export class PlaylistService {
   static async getUserPlaylists(userId: string): Promise<any[]> {
     const { data: ownedPlaylists } = await supabase
       .from('playlists')
-      .select('*, users(*)')
+      .select('*, users!owner_id(*)')
       .eq('owner_id', userId)
       .order('updated_at', { ascending: false });
 
     const { data: collabPlaylists } = await supabase
       .from('playlist_collaborators')
-      .select('playlists(*, users(*))')
+      .select('playlists(*, users!owner_id(*))')
       .eq('user_id', userId);
 
     const all = [...(ownedPlaylists || [])];
@@ -86,7 +86,7 @@ export class PlaylistService {
   static async getPlaylistById(playlistId: string, userId?: string): Promise<any | null> {
     const { data: playlist, error } = await supabase
       .from('playlists')
-      .select('*, users(*)')
+      .select('*, users!owner_id(*)')
       .eq('id', playlistId)
       .maybeSingle();
 
@@ -95,7 +95,7 @@ export class PlaylistService {
     // Fetch songs in playlist
     const { data: pSongs } = await supabase
       .from('playlist_songs')
-      .select('position, songs(*, artists(*), albums(*), genres(*))')
+      .select('position, songs(*, artists!songs_artist_id_fkey(*), albums(*), genres(*))')
       .eq('playlist_id', playlistId)
       .order('position', { ascending: true });
 
@@ -184,7 +184,7 @@ export class PlaylistService {
     const { data: updated, error } = await (supabase.from('playlists') as any)
       .update(updatePayload as any)
       .eq('id', playlistId)
-      .select('*, users(*)')
+      .select('*, users!owner_id(*)')
       .maybeSingle();
 
     if (error || !updated) return null;
