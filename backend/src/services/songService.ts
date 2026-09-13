@@ -81,7 +81,7 @@ export interface RecommendationParams {
   limit?: number;
 }
 
-export function mapSongRow(row: any) {
+export function mapSongRow(row: any): any {
   if (!row) return null;
   const artistObj = row.artists || row['artists!songs_artist_id_fkey'] || null;
   const albumObj = row.albums || row['albums!songs_album_id_fkey'] || null;

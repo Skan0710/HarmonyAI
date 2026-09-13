@@ -4,6 +4,7 @@ import { Play, Pause, Heart, ListPlus, Check } from 'lucide-react';
 import type { Song } from '../types/music';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
+import { useContextMenuStore } from '../store/useContextMenuStore';
 import { formatTime } from '../utils/formatters';
 
 interface SongRowProps {
@@ -27,6 +28,7 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
   const togglePlay = usePlayerStore((state) => state.togglePlay);
   const isLiked = useLikedSongsStore((state) => state.isLiked(song._id));
   const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
+  const openContextMenu = useContextMenuStore((state) => state.openContextMenu);
 
   const isCurrent = activeSong?._id === song._id;
   const isCurrentlyPlaying = isCurrent && activeIsPlaying;
@@ -51,6 +53,7 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
   return (
     <div
       onClick={() => song._id && navigate(`/songs/${song._id}`)}
+      onContextMenu={(e) => openContextMenu(e, song)}
       className="group flex items-center gap-3.5 py-2.5 px-2 -mx-2 rounded-[var(--radius-sm)] hover:bg-surface-2 transition-colors cursor-pointer"
     >
       <span className="w-5 text-center text-2xs font-mono text-text-tertiary shrink-0 tabular-nums">

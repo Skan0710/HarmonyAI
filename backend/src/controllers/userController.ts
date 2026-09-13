@@ -35,8 +35,8 @@ export const updateCurrentUser = controllerWrapper(async (req: Request, res: Res
 
   const { name, profilePicture } = req.body;
 
-  if (!isValidHttpUrl(profilePicture)) {
-    throw new ControllerError(400, 'profilePicture must be a valid http(s) URL');
+  if (profilePicture !== undefined && !isValidHttpUrl(profilePicture)) {
+    throw new ControllerError(400, 'profilePicture must be a valid http(s) URL or image data');
   }
 
   const updatedUser = await UserService.updateProfile(user._id.toString(), {

@@ -4,6 +4,7 @@ import { Play, Pause, Plus, Heart, Sparkles, AudioLines, ListPlus, Check } from 
 import type { Song } from '../types/music';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
+import { useContextMenuStore } from '../store/useContextMenuStore';
 import { AddToPlaylistModal } from './AddToPlaylistModal';
 import { WhyThisSongModal } from './RecommendationExplanationModal';
 import { trackRecommendationInteraction } from '../services/recommendationTrackingService';
@@ -31,6 +32,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
 
   const isLiked = useLikedSongsStore((state) => state.isLiked(song._id));
   const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
+  const openContextMenu = useContextMenuStore((state) => state.openContextMenu);
 
   const hasRecommendationInfo =
     Boolean((song as any).componentScores) ||
@@ -134,6 +136,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
     <>
       <div
         onClick={handleCardClick}
+        onContextMenu={(e) => openContextMenu(e, song)}
         className={`group relative cursor-pointer bg-surface-1 hover:bg-surface-2 rounded-[var(--radius-md)] p-3 transition-colors duration-[var(--duration-base)] flex flex-col justify-between overflow-hidden ${
           isCurrentTrackPlaying ? 'ring-1 ring-accent/50 bg-surface-2' : ''
         }`}

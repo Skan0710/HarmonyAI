@@ -37,13 +37,14 @@ interface AuthState {
   register: (userData: { name: string; email: string; password?: string }) => Promise<boolean>;
   logout: () => Promise<void>;
   fetchCurrentUser: () => Promise<void>;
+  updateUser: (partial: Partial<User>) => void;
   clearError: () => void;
 }
 
 // The session token lives only in an httpOnly cookie the browser manages —
 // there is nothing for this store to read synchronously on init, so auth
 // state starts unknown and is resolved by fetchCurrentUser() on app mount.
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: false,
@@ -138,6 +139,13 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
         isInitializing: false,
       });
+    }
+  },
+
+  updateUser: (partial) => {
+    const current = get().user;
+    if (current) {
+      set({ user: { ...current, ...partial } });
     }
   },
 

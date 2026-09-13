@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Play, Shuffle } from 'lucide-react';
 import type { Album, Song } from '../types/music';
 import { fetchAlbumById, fetchSongs } from '../services/songService';
 import { MusicGrid } from '../components/MusicGrid';
@@ -49,6 +50,16 @@ export const AlbumDetailPage: React.FC = () => {
 
   const handlePlaySong = (song: Song) => {
     playSong(song, albumSongs);
+  };
+
+  const handlePlayAlbum = (shuffle = false) => {
+    if (albumSongs.length === 0) return;
+    if (shuffle) {
+      const shuffled = [...albumSongs].sort(() => Math.random() - 0.5);
+      playSong(shuffled[0], shuffled);
+    } else {
+      playSong(albumSongs[0], albumSongs);
+    }
   };
 
   const getArtistId = (): string | null => {
@@ -115,7 +126,7 @@ export const AlbumDetailPage: React.FC = () => {
       <Breadcrumbs
         items={[
           { label: 'Music Library', path: '/library' },
-          { label: 'Albums' },
+          { label: 'Albums', path: '/albums' },
           { label: album.title },
         ]}
       />
@@ -178,6 +189,26 @@ export const AlbumDetailPage: React.FC = () => {
                 <span className="font-bold text-accent text-sm">{album.releaseYear || 'N/A'}</span>
               </div>
             </div>
+
+            {/* Play Whole Album & Shuffle Action Buttons */}
+            {albumSongs.length > 0 && (
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-1">
+                <button
+                  onClick={() => handlePlayAlbum(false)}
+                  className="px-5 py-2.5 bg-accent hover:bg-accent-strong text-text-on-accent font-semibold text-xs sm:text-sm rounded-[var(--radius-pill)] transition-all flex items-center gap-2 shadow-lg shadow-accent/20 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                >
+                  <Play size={15} fill="currentColor" />
+                  Play Album
+                </button>
+                <button
+                  onClick={() => handlePlayAlbum(true)}
+                  className="px-4 py-2.5 bg-surface-2 hover:bg-surface-3 text-text-primary font-medium text-xs sm:text-sm rounded-[var(--radius-pill)] border border-border-subtle transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                >
+                  <Shuffle size={14} />
+                  Shuffle
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

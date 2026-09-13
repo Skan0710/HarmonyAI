@@ -22,6 +22,9 @@ import { HistoryPage } from './pages/HistoryPage';
 import { SongDetailPage } from './pages/SongDetailPage';
 import { ArtistDetailPage } from './pages/ArtistDetailPage';
 import { AlbumDetailPage } from './pages/AlbumDetailPage';
+import { AlbumsPage } from './pages/AlbumsPage';
+import { ToastContainer } from './components/ui/Toast';
+import { SongContextMenu } from './components/SongContextMenu';
 import { RecommendationEvaluationDashboardPage } from './pages/RecommendationEvaluationDashboardPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { LoginPage } from './pages/LoginPage';
@@ -83,6 +86,7 @@ function App() {
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/songs/:id" element={<SongDetailPage />} />
             <Route path="/artists/:id" element={<ArtistDetailPage />} />
+            <Route path="/albums" element={<AlbumsPage />} />
             <Route path="/albums/:id" element={<AlbumDetailPage />} />
             {/* Developer Diagnostic Dashboard */}
             <Route path="/admin/recommendations" element={<RecommendationEvaluationDashboardPage />} />
@@ -93,6 +97,8 @@ function App() {
             unknown URL should see a real 404, not get redirected to /login. */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <ToastContainer />
+      <SongContextMenu />
     </BrowserRouter>
     </AppErrorBoundary>
   );

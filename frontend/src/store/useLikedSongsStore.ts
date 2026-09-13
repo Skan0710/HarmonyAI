@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Song } from '../types/music';
 import { fetchLikedSongsApi, likeSongApi, unlikeSongApi } from '../services/userService';
+import { toast } from './useToastStore';
 
 interface LikedSongsState {
   likedSongIds: string[];
@@ -44,22 +45,30 @@ export const useLikedSongsStore = create<LikedSongsState>((set, get) => ({
         likedSongIds: likedSongIds.filter((id) => id !== songId),
         likedSongs: likedSongs.filter((s) => s._id !== songId),
       });
+      toast.info('Removed from Liked Songs');
 
       const { likedSongs: updatedIds, error } = await unlikeSongApi(songId);
       if (error && updatedIds === null) {
         // Rollback on error
         set({ likedSongIds, likedSongs });
+        toast.error('Failed to update liked songs');
+      } else if (updatedIds) {
+        set({ likedSongIds: updatedIds });
       }
     } else {
       set({
         likedSongIds: [...likedSongIds, songId],
-        likedSongs: [...likedSongs, song],
+        likedSongs: [song, ...likedSongs.filter((s) => s._id !== songId)],
       });
+      toast.success('Added to Liked Songs!');
 
       const { likedSongs: updatedIds, error } = await likeSongApi(songId);
       if (error && updatedIds === null) {
         // Rollback on error
         set({ likedSongIds, likedSongs });
+        toast.error('Failed to add to liked songs');
+      } else if (updatedIds) {
+        set({ likedSongIds: updatedIds });
       }
     }
   },

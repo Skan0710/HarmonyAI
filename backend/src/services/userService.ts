@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase.js';
+import { mapSongRow } from './songService.js';
 
 export class UserService {
   static async getUserById(userId: string): Promise<any | null> {
@@ -77,51 +78,24 @@ export class UserService {
   }
 
   static async getLikedSongs(userId: string): Promise<any[]> {
-    const { data: liked, error } = await supabase
+    const { data: likedRows, error: likedErr } = await supabase
       .from('user_liked_songs')
-      .select('songs(*, artists(*), albums(*), genres(*))')
+      .select('song_id, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (error || !liked) return [];
+    if (likedErr || !likedRows || likedRows.length === 0) return [];
+    const songIds = likedRows.map((r: any) => r.song_id);
 
-    return liked.map((l: any) => {
-      const s = l.songs;
-      if (!s) return null;
-      return {
-        _id: s.id,
-        id: s.id,
-        title: s.title,
-        artist: s.artists ? {
-          _id: s.artists.id,
-          id: s.artists.id,
-          name: s.artists.name,
-          avatar: s.artists.avatar || s.artists.profile_image,
-          verified: s.artists.verified,
-        } : s.artist_id,
-        album: s.albums ? {
-          _id: s.albums.id,
-          id: s.albums.id,
-          title: s.albums.title,
-          coverImage: s.albums.cover_image,
-          releaseYear: s.albums.release_year,
-        } : s.album_id,
-        genre: s.genres ? {
-          _id: s.genres.id,
-          id: s.genres.id,
-          name: s.genres.name,
-          slug: s.genres.slug,
-        } : s.genre_id,
-        duration: s.duration,
-        coverImage: s.cover_image,
-        audioUrl: s.audio_url,
-        releaseYear: s.release_year,
-        playCount: s.play_count,
-        audioFeatures: s.audio_features,
-        mood: s.mood,
-        tags: s.tags,
-      };
-    }).filter(Boolean);
+    const { data: songs, error: songsErr } = await supabase
+      .from('songs')
+      .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+      .in('id', songIds);
+
+    if (songsErr || !songs) return [];
+
+    const songMap = new Map(songs.map((s: any) => [s.id, mapSongRow(s)]));
+    return songIds.map((id: string) => songMap.get(id)).filter(Boolean);
   }
 
   static async likeSong(userId: string, songId: string): Promise<string[]> {

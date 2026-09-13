@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, ListMusic, History, SlidersHorizontal, LogOut, Mail, CalendarDays } from 'lucide-react';
+import { Heart, ListMusic, History, SlidersHorizontal, LogOut, Mail, CalendarDays, Camera } from 'lucide-react';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { Seo } from '../components/Seo';
 import { AnimatedLink } from '../components/ui/AnimatedLink';
@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { fetchUserPlaylistsApi } from '../services/playlistService';
 import { fetchListeningHistoryApi } from '../services/historyService';
+import { EditProfilePictureModal } from '../components/EditProfilePictureModal';
 
 export const ProfilePage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -16,6 +17,12 @@ export const ProfilePage: React.FC = () => {
 
   const [playlistCount, setPlaylistCount] = useState<number | null>(null);
   const [historyCount, setHistoryCount] = useState<number | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [avatarError, setAvatarError] = useState<boolean>(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.profilePicture]);
 
   useEffect(() => {
     (async () => {
@@ -55,6 +62,8 @@ export const ProfilePage: React.FC = () => {
 
   if (!user) return null;
 
+  const hasValidPicture = Boolean(user.profilePicture && !avatarError);
+
   return (
     <div className="space-y-8 pb-16">
       <Seo title="Your Profile" description="View and manage your HarmonyAI profile, liked songs, playlists, and listening history." path="/profile" noIndex />
@@ -63,17 +72,31 @@ export const ProfilePage: React.FC = () => {
       {/* Header Hero Banner */}
       <div className="relative overflow-hidden rounded-[var(--radius-lg)] bg-surface-1 border border-border-subtle p-6 sm:p-10">
         <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-end gap-6">
-          {user.profilePicture ? (
-            <img
-              src={user.profilePicture}
-              alt={user.name}
-              className="w-24 h-24 sm:w-32 sm:h-32 rounded-[var(--radius-lg)] object-cover shrink-0 border border-border-subtle"
-            />
-          ) : (
-            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-[var(--radius-lg)] bg-accent-wash text-accent flex items-center justify-center shrink-0 border border-accent/30">
-              <span className="text-3xl sm:text-4xl font-semibold">{getInitials(user.name)}</span>
+          {/* Avatar with Hover Change Trigger */}
+          <div
+            onClick={() => setIsEditModalOpen(true)}
+            className="group relative w-24 h-24 sm:w-32 sm:h-32 rounded-[var(--radius-lg)] overflow-hidden shrink-0 border border-border-subtle cursor-pointer shadow-lg"
+            title="Click to change profile picture"
+          >
+            {hasValidPicture ? (
+              <img
+                src={user.profilePicture}
+                alt={user.name}
+                onError={() => setAvatarError(true)}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+              />
+            ) : (
+              <div className="w-full h-full bg-accent-wash text-accent flex items-center justify-center border border-accent/30 font-display">
+                <span className="text-3xl sm:text-4xl font-semibold">{getInitials(user.name)}</span>
+              </div>
+            )}
+
+            {/* Hover overlay with camera icon */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-1">
+              <Camera size={20} />
+              <span className="text-[10px] font-semibold tracking-wide uppercase">Change</span>
             </div>
-          )}
+          </div>
 
           <div className="flex-1 text-center sm:text-left space-y-2">
             <span className="px-3 py-1 bg-accent-wash text-accent text-xs font-bold uppercase tracking-wider rounded-[var(--radius-pill)] border border-accent/30">
@@ -94,13 +117,23 @@ export const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-          <button
-            onClick={handleSignOut}
-            className="shrink-0 px-4 py-2.5 bg-surface-2 hover:bg-danger-wash text-text-secondary hover:text-danger font-medium text-sm rounded-[var(--radius-pill)] transition-colors flex items-center gap-2 cursor-pointer"
-          >
-            <LogOut size={15} strokeWidth={1.75} />
-            Sign Out
-          </button>
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="px-4 py-2.5 bg-surface-2 hover:bg-surface-3 text-text-primary font-medium text-sm rounded-[var(--radius-pill)] border border-border-subtle transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              <Camera size={15} strokeWidth={1.75} />
+              Change Picture
+            </button>
+
+            <button
+              onClick={handleSignOut}
+              className="px-4 py-2.5 bg-surface-2 hover:bg-danger-wash text-text-secondary hover:text-danger font-medium text-sm rounded-[var(--radius-pill)] transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              <LogOut size={15} strokeWidth={1.75} />
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
 
@@ -148,6 +181,14 @@ export const ProfilePage: React.FC = () => {
           </AnimatedLink>
         </div>
       </div>
+
+      {/* Edit Profile Picture Modal */}
+      <EditProfilePictureModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        currentPicture={user.profilePicture}
+        userName={user.name}
+      />
     </div>
   );
 };

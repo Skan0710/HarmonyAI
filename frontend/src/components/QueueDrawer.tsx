@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { X, Zap, RefreshCw, ListMusic, Play, Trash2, Plus, Check, GripVertical, ListPlus } from 'lucide-react';
 import { usePlayer } from '../hooks/usePlayer';
 import { useAuth } from '../hooks/useAuth';
+import { useContextMenuStore } from '../store/useContextMenuStore';
 import { fetchSessionRecommendationsApi } from '../services/recommendationService';
 import type { SessionItemResponse } from '../services/recommendationService';
 import { ScrollArea } from './ui/scroll-area';
@@ -40,6 +41,7 @@ export const QueueDrawer: React.FC = () => {
   const [playNextIds, setPlayNextIds] = useState<Set<string>>(new Set());
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const openContextMenu = useContextMenuStore((state) => state.openContextMenu);
 
   const loadSessionRecommendations = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -242,6 +244,7 @@ export const QueueDrawer: React.FC = () => {
                           setDragOverIndex(null);
                         }}
                         onClick={() => playQueueIndex(idx)}
+                        onContextMenu={(e) => openContextMenu(e, song)}
                         className={`group relative cursor-pointer rounded-[var(--radius-sm)] p-2.5 transition-all flex items-center justify-between gap-2.5 ${
                           isCurrent ? 'bg-accent-wash' : 'hover:bg-surface-2'
                         } ${isDragging ? 'opacity-40 scale-[0.98]' : ''} ${

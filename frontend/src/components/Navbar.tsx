@@ -155,8 +155,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
               className="hidden sm:flex items-center gap-2 px-2 py-1 -mx-2 -my-1 rounded-[var(--radius-pill)] hover:bg-surface-2 transition-colors cursor-pointer"
               title="View profile"
             >
-              <div className="w-7 h-7 rounded-full bg-accent-wash text-accent text-xs font-semibold flex items-center justify-center">
-                {getInitials(user.name)}
+              <div className="w-7 h-7 rounded-full overflow-hidden bg-accent-wash text-accent text-xs font-semibold flex items-center justify-center border border-border-subtle shrink-0">
+                {user.profilePicture ? (
+                  <img
+                    src={user.profilePicture}
+                    alt={user.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  getInitials(user.name)
+                )}
               </div>
               <span className="text-text-secondary font-medium text-xs">{user.name}</span>
             </Link>

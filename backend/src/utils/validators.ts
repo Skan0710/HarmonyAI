@@ -35,8 +35,10 @@ export function validateObjectIds(ids: unknown[]): string[] {
  */
 export function isValidHttpUrl(value: unknown): boolean {
   if (typeof value !== 'string' || !value.trim()) return true; // absent/empty is allowed
+  const trimmed = value.trim();
+  if (trimmed.startsWith('data:image/')) return true; // allow uploaded image data URIs
   try {
-    const url = new URL(value.trim());
+    const url = new URL(trimmed);
     return url.protocol === 'http:' || url.protocol === 'https:';
   } catch {
     return false;
