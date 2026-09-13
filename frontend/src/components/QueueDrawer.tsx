@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { X, Zap, RefreshCw, ListMusic, Play, Trash2, Plus, Check } from 'lucide-react';
+import { X, Zap, RefreshCw, ListMusic, Play, Trash2, Plus, Check, GripVertical, ListPlus } from 'lucide-react';
 import { usePlayer } from '../hooks/usePlayer';
 import { useAuth } from '../hooks/useAuth';
 import { fetchSessionRecommendationsApi } from '../services/recommendationService';
@@ -28,6 +28,8 @@ export const QueueDrawer: React.FC = () => {
     removeFromQueue,
     clearQueue,
     addToQueue,
+    playNext,
+    reorderQueue,
   } = usePlayer();
 
   const { isAuthenticated } = useAuth();
@@ -35,6 +37,9 @@ export const QueueDrawer: React.FC = () => {
   const [sessionRecs, setSessionRecs] = useState<SessionItemResponse[]>([]);
   const [loadingRecs, setLoadingRecs] = useState<boolean>(false);
   const [addedRecIds, setAddedRecIds] = useState<Set<string>>(new Set());
+  const [playNextIds, setPlayNextIds] = useState<Set<string>>(new Set());
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const loadSessionRecommendations = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -58,6 +63,20 @@ export const QueueDrawer: React.FC = () => {
     if (!item.song) return;
     addToQueue(item.song);
     setAddedRecIds((prev) => new Set(prev).add(item.song._id));
+  };
+
+  const handlePlayNextSong = (e: React.MouseEvent, song: any) => {
+    e.stopPropagation();
+    if (!song) return;
+    playNext(song);
+    setPlayNextIds((prev) => new Set(prev).add(song._id));
+    setTimeout(() => {
+      setPlayNextIds((prev) => {
+        const next = new Set(prev);
+        next.delete(song._id);
+        return next;
+      });
+    }, 1500);
   };
 
   const getArtistName = (artist: any): string => {
@@ -178,7 +197,7 @@ export const QueueDrawer: React.FC = () => {
                 <div className="flex items-center justify-between px-1">
                   <h4 className="text-2xs font-semibold uppercase tracking-wide text-text-tertiary">Active Queue</h4>
                   <span className="text-2xs font-mono text-text-tertiary">
-                    {queue.length > 0 ? `${queueIndex + 1} of ${queue.length}` : '0 songs'}
+                    {queue.length > 0 ? `${queueIndex + 1} of ${queue.length} · drag to reorder` : '0 songs'}
                   </span>
                 </div>
 
@@ -190,15 +209,55 @@ export const QueueDrawer: React.FC = () => {
                 ) : (
                   queue.map((song, idx) => {
                     const isCurrent = idx === queueIndex || currentSong?._id === song._id;
+                    const isDragging = draggedIndex === idx;
+                    const isOver = dragOverIndex === idx && draggedIndex !== idx;
+
                     return (
                       <div
                         key={`${song._id}-${idx}`}
+                        draggable={true}
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = 'move';
+                          e.dataTransfer.setData('text/plain', String(idx));
+                          setDraggedIndex(idx);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                          if (dragOverIndex !== idx) setDragOverIndex(idx);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverIndex === idx) setDragOverIndex(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedIndex(null);
+                          setDragOverIndex(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (draggedIndex !== null && draggedIndex !== idx) {
+                            reorderQueue(draggedIndex, idx);
+                          }
+                          setDraggedIndex(null);
+                          setDragOverIndex(null);
+                        }}
                         onClick={() => playQueueIndex(idx)}
-                        className={`group relative cursor-pointer rounded-[var(--radius-sm)] p-2.5 transition-colors flex items-center justify-between gap-3 ${
+                        className={`group relative cursor-pointer rounded-[var(--radius-sm)] p-2.5 transition-all flex items-center justify-between gap-2.5 ${
                           isCurrent ? 'bg-accent-wash' : 'hover:bg-surface-2'
+                        } ${isDragging ? 'opacity-40 scale-[0.98]' : ''} ${
+                          isOver ? 'border-t-2 border-accent bg-accent-wash/30' : ''
                         }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div
+                            className="text-text-tertiary hover:text-text-primary p-0.5 cursor-grab active:cursor-grabbing shrink-0"
+                            title="Drag to reorder"
+                            aria-label="Drag to reorder"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <GripVertical size={14} />
+                          </div>
+
                           <div className="w-5 text-center text-2xs font-mono text-text-tertiary shrink-0">
                             {isCurrent ? (
                               isPlaying ? (
@@ -313,6 +372,16 @@ export const QueueDrawer: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button
+                            onClick={(e) => handlePlayNextSong(e, song)}
+                            className={`p-1.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
+                              playNextIds.has(song._id) ? 'text-success' : 'text-text-tertiary hover:text-gold hover:bg-gold/10'
+                            }`}
+                            aria-label={`Play ${song.title} next`}
+                            title={playNextIds.has(song._id) ? 'Playing next' : 'Play next'}
+                          >
+                            {playNextIds.has(song._id) ? <Check size={13} /> : <ListPlus size={13} />}
+                          </button>
+                          <button
                             onClick={() => skipToAutoplayTrack(idx)}
                             className="p-1.5 text-gold hover:text-text-on-accent hover:bg-gold rounded-[var(--radius-sm)] transition-colors cursor-pointer"
                             aria-label={`Play ${song.title} now`}
@@ -379,16 +448,29 @@ export const QueueDrawer: React.FC = () => {
                               <p className="text-2xs text-text-tertiary truncate mt-0.5">{getArtistName(song.artist)}</p>
                             </div>
                           </div>
-                          <button
-                            onClick={(e) => handleAddRecToQueue(e, item)}
-                            disabled={isAdded}
-                            className={`p-1.5 rounded-[var(--radius-sm)] transition-colors shrink-0 cursor-pointer ${
-                              isAdded ? 'text-success' : 'text-text-tertiary hover:text-accent hover:bg-accent-wash'
-                            }`}
-                            aria-label={isAdded ? 'Added to queue' : 'Add to queue'}
-                          >
-                            {isAdded ? <Check size={14} /> : <Plus size={14} />}
-                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={(e) => handlePlayNextSong(e, song)}
+                              className={`p-1.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
+                                playNextIds.has(song._id) ? 'text-success' : 'text-text-tertiary hover:text-accent hover:bg-accent-wash'
+                              }`}
+                              aria-label={playNextIds.has(song._id) ? 'Playing next' : 'Play next'}
+                              title={playNextIds.has(song._id) ? 'Playing next' : 'Play next'}
+                            >
+                              {playNextIds.has(song._id) ? <Check size={14} /> : <ListPlus size={14} />}
+                            </button>
+                            <button
+                              onClick={(e) => handleAddRecToQueue(e, item)}
+                              disabled={isAdded}
+                              className={`p-1.5 rounded-[var(--radius-sm)] transition-colors shrink-0 cursor-pointer ${
+                                isAdded ? 'text-success' : 'text-text-tertiary hover:text-accent hover:bg-accent-wash'
+                              }`}
+                              aria-label={isAdded ? 'Added to queue' : 'Add to queue'}
+                              title={isAdded ? 'Added to queue' : 'Add to queue'}
+                            >
+                              {isAdded ? <Check size={14} /> : <Plus size={14} />}
+                            </button>
+                          </div>
                         </div>
                       );
                     })}

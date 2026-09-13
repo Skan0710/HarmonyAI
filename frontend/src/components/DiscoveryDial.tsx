@@ -23,10 +23,10 @@ export const DiscoveryDial: React.FC<DiscoveryDialProps> = ({ modes, selected, o
         <span>Experimental</span>
       </div>
 
-      <div className="relative h-14">
-        <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-border-default" />
+      <div className="relative">
+        <div className="absolute left-6 right-6 top-3 -translate-y-1/2 h-px bg-border-default pointer-events-none" />
 
-        <div className="relative flex items-center h-full">
+        <div className="relative flex items-start">
           {ordered.map((mode) => {
             const isSelected = mode.mode === selected;
             return (
@@ -34,22 +34,22 @@ export const DiscoveryDial: React.FC<DiscoveryDialProps> = ({ modes, selected, o
                 key={mode.mode}
                 onClick={() => onSelect(mode.mode)}
                 aria-pressed={isSelected}
-                className="relative flex-1 min-w-0 flex flex-col items-center gap-2.5 cursor-pointer group px-0.5"
+                className="relative flex-1 min-w-0 flex flex-col items-center gap-2 cursor-pointer group px-0.5"
               >
-                <span className="relative flex items-center justify-center w-4 h-4 shrink-0">
+                <div className="relative flex items-center justify-center w-6 h-6 shrink-0">
                   {isSelected && (
                     <motion.span
                       layoutId="dial-indicator"
                       transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                      className="absolute inset-0 rounded-full bg-accent"
+                      className="absolute w-4 h-4 rounded-full bg-accent shadow-sm"
                     />
                   )}
                   <span
-                    className={`relative w-2 h-2 rounded-full transition-colors ${
-                      isSelected ? 'bg-transparent' : 'bg-border-strong group-hover:bg-text-tertiary'
+                    className={`relative w-2 h-2 rounded-full transition-colors z-10 ${
+                      isSelected ? 'bg-transparent' : 'bg-border-strong group-hover:bg-text-secondary'
                     }`}
                   />
-                </span>
+                </div>
                 <span
                   className={`w-full text-center truncate text-2xs sm:text-xs font-medium transition-colors ${
                     isSelected ? 'text-text-primary font-semibold' : 'text-text-tertiary group-hover:text-text-secondary'

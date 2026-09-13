@@ -73,6 +73,8 @@ export const usePlayer = () => {
     setAutoplayEnabled,
     setListeningContext: usePlayerStore((state) => state.setListeningContext),
     addToQueue,
+    playNext: usePlayerStore((state) => state.playNext),
+    reorderQueue: usePlayerStore((state) => state.reorderQueue),
     removeFromQueue,
     removeAutoplayTrack: usePlayerStore((state) => state.removeAutoplayTrack),
     skipToAutoplayTrack: usePlayerStore((state) => state.skipToAutoplayTrack),

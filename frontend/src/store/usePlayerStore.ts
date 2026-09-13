@@ -76,6 +76,8 @@ interface PlayerState {
   setAutoplayEnabled: (enabled: boolean) => void;
   setListeningContext: (context: string | null) => void;
   addToQueue: (song: Song) => void;
+  playNext: (song: Song) => void;
+  reorderQueue: (fromIndex: number, toIndex: number) => void;
   removeFromQueue: (index: number) => void;
   removeAutoplayTrack: (index: number) => void;
   skipToAutoplayTrack: (index?: number) => void;
@@ -262,6 +264,46 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     // Manual tracks appended to active queue always take priority over future autoplay
     set({ queue: [...queue, song] });
+  },
+
+  playNext: (song) => {
+    const { queue, queueIndex, currentSong } = get();
+    if (!currentSong || queue.length === 0) {
+      get().playSong(song, [song]);
+      return;
+    }
+    const newQueue = [...queue];
+    const insertIndex = queueIndex >= 0 ? queueIndex + 1 : 0;
+    newQueue.splice(insertIndex, 0, song);
+    set({ queue: newQueue });
+  },
+
+  reorderQueue: (fromIndex, toIndex) => {
+    const { queue, queueIndex } = get();
+    if (
+      fromIndex < 0 ||
+      fromIndex >= queue.length ||
+      toIndex < 0 ||
+      toIndex >= queue.length ||
+      fromIndex === toIndex
+    ) {
+      return;
+    }
+
+    const newQueue = [...queue];
+    const [moved] = newQueue.splice(fromIndex, 1);
+    newQueue.splice(toIndex, 0, moved);
+
+    let newIndex = queueIndex;
+    if (queueIndex === fromIndex) {
+      newIndex = toIndex;
+    } else if (fromIndex < queueIndex && toIndex >= queueIndex) {
+      newIndex = queueIndex - 1;
+    } else if (fromIndex > queueIndex && toIndex <= queueIndex) {
+      newIndex = queueIndex + 1;
+    }
+
+    set({ queue: newQueue, queueIndex: newIndex });
   },
 
   removeFromQueue: (index) => {

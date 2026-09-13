@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Shuffle,
   SkipBack,
@@ -61,7 +62,6 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     togglePlay,
     pause,
     stop,
-    setCurrentTime,
     seekTo,
     setDuration,
     setVolume,
@@ -69,11 +69,43 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     toggleShuffle,
     toggleRepeatMode,
     toggleAutoplay,
+    setCurrentTime,
+    handleSongEnd,
     nextSong,
     previousSong,
-    handleSongEnd,
     toggleQueueOpen,
   } = usePlayer();
+
+  const miniArtworkRef = useRef<HTMLDivElement | null>(null);
+  const [miniSlotRect, setMiniSlotRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    const updateMiniRect = () => {
+      if (miniArtworkRef.current) {
+        const rect = miniArtworkRef.current.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          setMiniSlotRect({
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+          });
+        }
+      }
+    };
+
+    updateMiniRect();
+    window.addEventListener('resize', updateMiniRect);
+    window.addEventListener('scroll', updateMiniRect);
+    const ro = new ResizeObserver(updateMiniRect);
+    if (miniArtworkRef.current) ro.observe(miniArtworkRef.current);
+
+    return () => {
+      window.removeEventListener('resize', updateMiniRect);
+      window.removeEventListener('scroll', updateMiniRect);
+      ro.disconnect();
+    };
+  }, [currentSong?._id]);
 
   const isLiked = useLikedSongsStore((state) => (currentSong ? state.isLiked(currentSong._id) : false));
   const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
@@ -246,8 +278,106 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
   const isVideoExpanded = Boolean(isFullPlayerOpen && mediaMode === 'video' && videoSlotRect);
 
+  const renderVideoPortal = () => {
+    if (!usingYoutubeEngine || !youtubeVideoId) return null;
+
+    let containerStyle: React.CSSProperties = {
+      position: 'fixed',
+      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+    };
+
+    if (isVideoExpanded && videoSlotRect) {
+      containerStyle = {
+        ...containerStyle,
+        top: videoSlotRect.top,
+        left: videoSlotRect.left,
+        width: videoSlotRect.width,
+        height: videoSlotRect.height,
+        zIndex: 65,
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow-lg)',
+        pointerEvents: 'auto',
+        opacity: 1,
+      };
+    } else if (isFullPlayerOpen && mediaMode === 'song') {
+      containerStyle = {
+        ...containerStyle,
+        top: -9999,
+        left: -9999,
+        width: 320,
+        height: 180,
+        zIndex: -1,
+        opacity: 0,
+        pointerEvents: 'none',
+      };
+    } else if (miniSlotRect) {
+      containerStyle = {
+        ...containerStyle,
+        top: miniSlotRect.top,
+        left: miniSlotRect.left,
+        width: miniSlotRect.width,
+        height: miniSlotRect.height,
+        zIndex: 55,
+        borderRadius: 'var(--radius-artwork)',
+        overflow: 'hidden',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+        pointerEvents: 'auto',
+        opacity: 1,
+      };
+    } else {
+      containerStyle = {
+        ...containerStyle,
+        bottom: 12,
+        left: 16,
+        width: 44,
+        height: 44,
+        zIndex: 55,
+        borderRadius: 'var(--radius-artwork)',
+        overflow: 'hidden',
+        pointerEvents: 'auto',
+        opacity: 1,
+      };
+    }
+
+    return createPortal(
+      <div
+        style={containerStyle}
+        className="bg-black flex items-center justify-center group/yt"
+        onClick={(e) => {
+          if (!isFullPlayerOpen && onExpand) {
+            e.stopPropagation();
+            onExpand();
+          }
+        }}
+      >
+        <YoutubePlayerEngine
+          ref={youtubeEngineRef}
+          videoId={youtubeVideoId as string}
+          isPlaying={isPlaying}
+          volume={volume}
+          isMuted={isMuted}
+          onTimeUpdate={handleTimeUpdate}
+          onDuration={(seconds) => setDuration(seconds || currentSong.duration || 0)}
+          onEnded={onSongEnd}
+          onReady={handleCanPlay}
+          onError={handleError}
+        />
+        {!isFullPlayerOpen && (
+          <div
+            className="absolute inset-0 bg-transparent cursor-pointer"
+            title="Expand player"
+            aria-label="Expand player"
+          />
+        )}
+      </div>,
+      document.body
+    );
+  };
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[var(--z-player)] bg-surface-1/95 border-t border-border-subtle backdrop-blur-xl px-3 py-2.5 sm:px-5 sm:py-3">
+    <>
+      <div className="fixed bottom-0 left-0 right-0 z-[var(--z-player)] bg-surface-1/95 border-t border-border-subtle backdrop-blur-xl px-3 py-2.5 sm:px-5 sm:py-3">
       {!usingYoutubeEngine && (
         <audio
           ref={audioRef}
@@ -271,52 +401,18 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             className="flex items-center gap-3 min-w-0 cursor-pointer text-left"
             aria-label="Expand player"
           >
-            <div className="w-11 h-11 rounded-[var(--radius-artwork)] overflow-hidden bg-surface-2 shrink-0 relative">
-              {usingYoutubeEngine ? (
-                <>
-                  {isVideoExpanded && (
-                    <img
-                      src={currentSong.coverImage || fallbackCover}
-                      alt={currentSong.title}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                  <div
-                    className={
-                      isVideoExpanded
-                        ? 'fixed z-[65] overflow-hidden rounded-[var(--radius-lg)] shadow-2xl transition-all duration-200 bg-black flex items-center justify-center'
-                        : 'w-full h-full overflow-hidden relative'
-                    }
-                    style={
-                      isVideoExpanded && videoSlotRect
-                        ? {
-                            top: videoSlotRect.top,
-                            left: videoSlotRect.left,
-                            width: videoSlotRect.width,
-                            height: videoSlotRect.height,
-                          }
-                        : undefined
-                    }
-                  >
-                    <YoutubePlayerEngine
-                      ref={youtubeEngineRef}
-                      videoId={youtubeVideoId as string}
-                      isPlaying={isPlaying}
-                      volume={volume}
-                      isMuted={isMuted}
-                      onTimeUpdate={handleTimeUpdate}
-                      onDuration={(seconds) => setDuration(seconds || currentSong.duration || 0)}
-                      onEnded={onSongEnd}
-                      onReady={handleCanPlay}
-                      onError={handleError}
-                    />
-                  </div>
-                </>
-              ) : (
-                <img src={currentSong.coverImage || fallbackCover} alt={currentSong.title} className="w-full h-full object-cover" />
-              )}
-              {isLoadingAudio && !isVideoExpanded && (
-                <div className="absolute inset-0 bg-surface-0/70 flex items-center justify-center">
+            <div
+              ref={miniArtworkRef}
+              id="miniplayer-artwork-slot"
+              className="w-11 h-11 rounded-[var(--radius-artwork)] overflow-hidden bg-surface-2 shrink-0 relative"
+            >
+              <img
+                src={currentSong.coverImage || fallbackCover}
+                alt={currentSong.title}
+                className="w-full h-full object-cover"
+              />
+              {isLoadingAudio && (
+                <div className="absolute inset-0 bg-surface-0/70 flex items-center justify-center z-10 pointer-events-none">
                   <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
@@ -485,5 +581,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
         </div>
       </div>
     </div>
+    {renderVideoPortal()}
+  </>
   );
 };

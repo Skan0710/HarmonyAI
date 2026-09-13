@@ -63,8 +63,8 @@ const sections: NavSection[] = [
   {
     title: 'Create',
     items: [
-      { to: '/ai-playlist', label: 'AI Playlist Generator', icon: Wand2, tag: 'AI' },
-      { to: '/assistant', label: 'AI Assistant', icon: Sparkles, tag: 'Chat' },
+      { to: '/ai-playlist', label: 'AI Playlist Generator', icon: Wand2 },
+      { to: '/assistant', label: 'AI Assistant', icon: Sparkles },
     ],
   },
 ];
@@ -83,7 +83,7 @@ const SidebarContent: React.FC<{ onNavigate?: () => void }> = ({ onNavigate }) =
               {section.title}
             </p>
             <div className="flex flex-col gap-0.5">
-              {section.items.map(({ to, label, icon: Icon, end, tag }) => (
+              {section.items.map(({ to, label, icon: Icon, end }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -109,11 +109,6 @@ const SidebarContent: React.FC<{ onNavigate?: () => void }> = ({ onNavigate }) =
                           {label}
                         </LineHoverText>
                       </span>
-                      {tag && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-gold px-1.5 py-0.5 rounded-sm bg-gold-wash">
-                          {tag}
-                        </span>
-                      )}
                     </>
                   )}
                 </NavLink>

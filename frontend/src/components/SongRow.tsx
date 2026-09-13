@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Pause, Heart } from 'lucide-react';
+import { Play, Pause, Heart, ListPlus, Check } from 'lucide-react';
 import type { Song } from '../types/music';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
@@ -18,10 +18,12 @@ const fallbackCover =
 export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
   const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
+  const [playedNext, setPlayedNext] = useState(false);
 
   const activeSong = usePlayerStore((state) => state.currentSong);
   const activeIsPlaying = usePlayerStore((state) => state.isPlaying);
   const playSong = usePlayerStore((state) => state.playSong);
+  const playNext = usePlayerStore((state) => state.playNext);
   const togglePlay = usePlayerStore((state) => state.togglePlay);
   const isLiked = useLikedSongsStore((state) => state.isLiked(song._id));
   const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
@@ -83,6 +85,24 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
         <h4 className={`text-sm font-medium truncate ${isCurrent ? 'text-accent' : 'text-text-primary'}`}>{song.title}</h4>
         <p className="text-xs text-text-tertiary truncate mt-0.5">{getArtistName()}</p>
       </div>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          playNext(song);
+          setPlayedNext(true);
+          setTimeout(() => setPlayedNext(false), 1500);
+        }}
+        aria-label="Play next"
+        title={playedNext ? 'Playing next' : 'Play next'}
+        className={`p-1.5 rounded-[var(--radius-sm)] transition-all cursor-pointer shrink-0 ${
+          playedNext
+            ? 'opacity-100 text-success'
+            : 'text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+        }`}
+      >
+        {playedNext ? <Check size={14} /> : <ListPlus size={14} strokeWidth={1.75} />}
+      </button>
 
       <button
         onClick={(e) => {

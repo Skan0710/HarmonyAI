@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Pause, Plus, Heart, Sparkles, AudioLines } from 'lucide-react';
+import { Play, Pause, Plus, Heart, Sparkles, AudioLines, ListPlus, Check } from 'lucide-react';
 import type { Song } from '../types/music';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
@@ -21,10 +21,12 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
   const [imgError, setImgError] = useState(false);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
   const [isExplanationModalOpen, setIsExplanationModalOpen] = useState(false);
+  const [playedNext, setPlayedNext] = useState(false);
 
   const activeSong = usePlayerStore((state) => state.currentSong);
   const activeIsPlaying = usePlayerStore((state) => state.isPlaying);
   const playSong = usePlayerStore((state) => state.playSong);
+  const playNext = usePlayerStore((state) => state.playNext);
   const togglePlay = usePlayerStore((state) => state.togglePlay);
 
   const isLiked = useLikedSongsStore((state) => state.isLiked(song._id));
@@ -116,6 +118,13 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
     setIsPlaylistModalOpen(true);
   };
 
+  const handlePlayNextClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    playNext(song);
+    setPlayedNext(true);
+    setTimeout(() => setPlayedNext(false), 1500);
+  };
+
   const handleExplanationClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsExplanationModalOpen(true);
@@ -146,6 +155,17 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
             </div>
 
             <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5">
+                <button
+                  onClick={handlePlayNextClick}
+                  className={`p-1.5 rounded-full bg-surface-0/70 hover:bg-surface-0 backdrop-blur-md transition-colors cursor-pointer ${
+                    playedNext ? 'text-success' : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                  title={playedNext ? 'Playing next' : 'Play next'}
+                  aria-label="Play next"
+                >
+                  {playedNext ? <Check size={15} /> : <ListPlus size={15} strokeWidth={1.75} />}
+                </button>
+
                 <button
                   onClick={handlePlaylistClick}
                   className="p-1.5 rounded-full bg-surface-0/70 hover:bg-surface-0 backdrop-blur-md transition-colors text-text-secondary hover:text-text-primary cursor-pointer"
