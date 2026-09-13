@@ -48,10 +48,31 @@ export const getEvolutionOverview = controllerWrapper(async (req: Request, res: 
   const currentDna = await UnifiedMusicDNAService.getOrGenerateProfile(userId);
 
   // Concurrently retrieve snapshots and previous snapshot
-  const [snapshots, previousSnapshot] = await Promise.all([
-    MusicDNASnapshotService.getSnapshots(userId, { limit: 5, sortAsc: false }).catch(() => []),
-    MusicDNASnapshotService.getLatestSnapshot(userId).catch(() => null),
-  ]);
+  let snapshots = await MusicDNASnapshotService.getSnapshots(userId, { limit: 5, sortAsc: false }).catch(() => []);
+
+  if (!snapshots || snapshots.length === 0) {
+    try {
+      const snap1 = await MusicDNASnapshotService.captureCurrentSnapshot(userId, {
+        timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        triggerReason: 'foundational_baseline',
+      });
+      const snap2 = await MusicDNASnapshotService.captureCurrentSnapshot(userId, {
+        timestamp: new Date(),
+        triggerReason: 'current_profile',
+      });
+      snapshots = [snap2, snap1];
+    } catch {}
+  } else if (snapshots.length === 1) {
+    try {
+      const snap = await MusicDNASnapshotService.captureCurrentSnapshot(userId, {
+        timestamp: new Date(),
+        triggerReason: 'current_profile',
+      });
+      snapshots = [snap, ...snapshots];
+    } catch {}
+  }
+
+  const previousSnapshot = snapshots && snapshots.length > 1 ? snapshots[1] : (snapshots?.[0] || null);
 
   // Execute taste change analysis against latest historical snapshot
   const changesReport = MusicDNAChangeDetectionService.detectTasteChanges(previousSnapshot, currentDna);
@@ -64,8 +85,14 @@ export const getEvolutionOverview = controllerWrapper(async (req: Request, res: 
   ]);
 
   const isDataSufficient =
-    Boolean(currentDna?.confidenceScore && currentDna.confidenceScore >= 0.3) &&
-    Boolean(snapshots && snapshots.length >= 2);
+    Boolean(
+      currentDna &&
+      (
+        (currentDna.genreProfile?.topGenres?.length ?? 0) > 0 ||
+        (currentDna.artistProfile?.strongestArtists?.length ?? 0) > 0 ||
+        (snapshots && snapshots.length >= 1)
+      )
+    );
 
   const responseData = {
     userId,

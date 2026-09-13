@@ -323,7 +323,7 @@ export class MusicDNAChangeDetectionService {
     thresholds: ChangeDetectionThresholds = DEFAULT_CHANGE_THRESHOLDS
   ): MusicDNAChangeAnalysis {
     const userId = current?.userId?.toString() || previous?.userId?.toString() || 'unknown';
-    const currentTimestamp = current?.timestamp || current?.lastRefreshedAt || new Date();
+    const currentTimestamp = new Date(current?.timestamp || current?.lastRefreshedAt || new Date());
 
     // Insufficient history guard
     if (!previous) {
@@ -352,7 +352,7 @@ export class MusicDNAChangeDetectionService {
       };
     }
 
-    const previousTimestamp = previous.timestamp || previous.createdAt || new Date();
+    const previousTimestamp = new Date(previous.timestamp || previous.createdAt || new Date());
     const elapsedDays = Math.max(
       0,
       Number(((currentTimestamp.getTime() - previousTimestamp.getTime()) / (1000 * 60 * 60 * 24)).toFixed(1))

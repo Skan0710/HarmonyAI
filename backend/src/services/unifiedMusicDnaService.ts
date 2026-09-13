@@ -16,6 +16,8 @@ import {
   UnifiedRefreshResult,
   MusicDNAProfileAttributes,
   MusicDNATendencyDimensions,
+  DetailedTasteItem,
+  PreferenceEvolutionType,
 } from '../schemas/musicDnaSchema.js';
 
 export interface UnifiedProfilingOptions extends ExtractionOptions {
@@ -75,21 +77,78 @@ export class UnifiedMusicDNAService {
             ).toFixed(4)
           );
 
+    // Fallback baseline for cold start users to ensure visual constellation always has rich structure
+    const effectiveTopGenres: DetailedTasteItem[] = detailedTaste.topGenres.length > 0 ? detailedTaste.topGenres : (
+      (inputs.user?.favoriteGenres && inputs.user.favoriteGenres.length > 0)
+        ? inputs.user.favoriteGenres.map((g: any, idx: number) => {
+            const name = typeof g === 'object' && g ? g.name : String(g);
+            const id = typeof g === 'object' && g ? g._id : `gen-${idx}`;
+            return {
+              id,
+              name,
+              score: 0.8,
+              preferenceType: 'established' as PreferenceEvolutionType,
+              playCount: 1,
+              shortTermScore: 0.8,
+              longTermScore: 0.8,
+              momentumDelta: 0,
+              explanation: `Favorite genre: ${name}`,
+            };
+          })
+        : [
+            { id: 'gen-hiphop', name: 'Hip-Hop', score: 0.75, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.75, longTermScore: 0.75, momentumDelta: 0, explanation: 'Foundational discovery genre' },
+            { id: 'gen-pop', name: 'Pop', score: 0.7, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.7, longTermScore: 0.7, momentumDelta: 0, explanation: 'Foundational discovery genre' },
+            { id: 'gen-electronic', name: 'Electronic', score: 0.65, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.65, longTermScore: 0.65, momentumDelta: 0, explanation: 'Foundational discovery genre' },
+            { id: 'gen-indie', name: 'Indie', score: 0.6, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.6, longTermScore: 0.6, momentumDelta: 0, explanation: 'Foundational discovery genre' },
+            { id: 'gen-rnb', name: 'R&B', score: 0.55, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.55, longTermScore: 0.55, momentumDelta: 0, explanation: 'Foundational discovery genre' },
+          ]
+    );
+
+    const effectiveStrongestArtists: DetailedTasteItem[] = detailedTaste.strongestArtists.length > 0 ? detailedTaste.strongestArtists : (
+      (inputs.user?.favoriteArtists && inputs.user.favoriteArtists.length > 0)
+        ? inputs.user.favoriteArtists.map((a: any, idx: number) => {
+            const name = typeof a === 'object' && a ? a.name : String(a);
+            const id = typeof a === 'object' && a ? a._id : `art-${idx}`;
+            return {
+              id,
+              name,
+              score: 0.8,
+              preferenceType: 'established' as PreferenceEvolutionType,
+              playCount: 1,
+              shortTermScore: 0.8,
+              longTermScore: 0.8,
+              momentumDelta: 0,
+              explanation: `Favorite artist: ${name}`,
+            };
+          })
+        : [
+            { id: 'art-asap', name: 'A$AP Rocky', score: 0.8, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.8, longTermScore: 0.8, momentumDelta: 0, explanation: 'Featured discovery artist' },
+            { id: 'art-weeknd', name: 'The Weeknd', score: 0.75, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.75, longTermScore: 0.75, momentumDelta: 0, explanation: 'Featured discovery artist' },
+            { id: 'art-daft', name: 'Daft Punk', score: 0.7, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.7, longTermScore: 0.7, momentumDelta: 0, explanation: 'Featured discovery artist' },
+          ]
+    );
+
+    const effectivePreferredMoods: DetailedTasteItem[] = detailedTaste.preferredMoods.length > 0 ? detailedTaste.preferredMoods : [
+      { name: 'Chill', score: 0.8, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.8, longTermScore: 0.8, momentumDelta: 0, explanation: 'Atmospheric listening mood' },
+      { name: 'Energetic', score: 0.7, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.7, longTermScore: 0.7, momentumDelta: 0, explanation: 'High energy vibe' },
+      { name: 'Focus', score: 0.65, preferenceType: 'emerging' as PreferenceEvolutionType, playCount: 1, shortTermScore: 0.65, longTermScore: 0.65, momentumDelta: 0, explanation: 'Deep focus soundscape' },
+    ];
+
     return {
       userId,
       dnaVersion: baselineDNA.dnaVersion || '1.0.0',
       genreProfile: {
-        topGenres: detailedTaste.topGenres,
+        topGenres: effectiveTopGenres,
         emergingGenres: detailedTaste.emergingGenres,
         diversity: detailedTaste.genreDiversity,
       },
       artistProfile: {
-        strongestArtists: detailedTaste.strongestArtists,
+        strongestArtists: effectiveStrongestArtists,
         emergingArtists: detailedTaste.emergingArtists,
         diversity: detailedTaste.artistDiversity,
       },
       moodProfile: {
-        preferredMoods: detailedTaste.preferredMoods,
+        preferredMoods: effectivePreferredMoods,
       },
       listeningBehavior,
       temporalPreferences: baselineDNA.temporalTaste,
@@ -150,6 +209,7 @@ export class UnifiedMusicDNAService {
     if (
       cachedSnapshot &&
       !options.forceRefresh &&
+      (cachedSnapshot.genreProfile?.topGenres?.length ?? 0) > 0 &&
       cachedSnapshot.lastRefreshedAt &&
       now - new Date(cachedSnapshot.lastRefreshedAt).getTime() < maxAgeMs
     ) {

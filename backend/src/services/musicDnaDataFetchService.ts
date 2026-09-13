@@ -74,12 +74,13 @@ export async function fetchMusicDnaRawInputs(
   const sessionLimit = options.sessionLimit ?? 50;
   const interactionLimit = options.interactionLimit ?? 100;
 
-  const [likedSongsRes, favGenresRes, favArtistsRes, historyRes, sessionsRes, interactionsRes] =
+  const [likedRowsRes, favGenresRes, favArtistsRes, historyRowsRes, sessionsRes, interactionsRes] =
     await Promise.all([
       supabase
         .from('user_liked_songs')
-        .select('songs(*, artists(*), albums(*), genres(*))')
-        .eq('user_id', userId),
+        .select('song_id, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
       supabase
         .from('user_favorite_genres')
         .select('genres(id, name)')
@@ -90,7 +91,7 @@ export async function fetchMusicDnaRawInputs(
         .eq('user_id', userId),
       supabase
         .from('listening_history')
-        .select('played_at, completed, skipped, progress_percent, songs(*, artists(*), albums(*), genres(*))')
+        .select('song_id, played_at, completed, skipped, progress_percent')
         .eq('user_id', userId)
         .order('played_at', { ascending: false }),
       supabase
@@ -107,8 +108,31 @@ export async function fetchMusicDnaRawInputs(
         .limit(interactionLimit),
     ]);
 
-  const likedSongs = (likedSongsRes.data || [])
-    .map((row: any) => mapSongRow(row.songs))
+  const likedRows = likedRowsRes.data || [];
+  const historyRows = historyRowsRes.data || [];
+
+  const allSongIds = Array.from(
+    new Set([
+      ...likedRows.map((r: any) => r.song_id),
+      ...historyRows.map((r: any) => r.song_id),
+    ].filter(Boolean))
+  );
+
+  const songMap = new Map<string, any>();
+  if (allSongIds.length > 0) {
+    const { data: songsData } = await supabase
+      .from('songs')
+      .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+      .in('id', allSongIds);
+    if (songsData) {
+      for (const s of songsData) {
+        songMap.set(s.id, mapSongRow(s));
+      }
+    }
+  }
+
+  const likedSongs = likedRows
+    .map((row: any) => songMap.get(row.song_id))
     .filter(Boolean);
 
   const favoriteGenres = ((favGenresRes.data || []) as any[])
@@ -119,8 +143,8 @@ export async function fetchMusicDnaRawInputs(
     .map((row) => (row.artists ? { _id: row.artists.id, name: row.artists.name } : null))
     .filter((v): v is { _id: string; name: string } => Boolean(v));
 
-  const history = ((historyRes.data || []) as any[]).map((row) => ({
-    song: mapSongRow(row.songs),
+  const history = historyRows.map((row: any) => ({
+    song: songMap.get(row.song_id) || null,
     playedAt: row.played_at ? new Date(row.played_at) : undefined,
     completed: row.completed ?? undefined,
     skipped: row.skipped ?? undefined,
