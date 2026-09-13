@@ -253,14 +253,21 @@ const normalizeAlbumTitle = (title: string): string =>
     .replace(/\s*[([][^)\]]*(deluxe|remaster|anniversary|expanded|edition|version|bonus|explicit)[^)\]]*[)\]]/gi, '')
     .trim();
 
-async function fetchArtistAlbums(artistId: number, limit = 25): Promise<ITunesAlbum[]> {
+async function fetchArtistAlbums(artistId: number, limit = 200): Promise<ITunesAlbum[]> {
   const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=album&${ITUNES_LOCALE}&limit=${limit}`;
   try {
     const response = await fetch(url);
     if (!response.ok) return [];
     const body = (await response.json()) as { results?: ITunesAlbum[] };
+    // Accept Album/EP/Single collection types — a strict "Album" filter drops
+    // EPs and singles-as-releases, which is why some artists' catalogs came
+    // back thin. Compilations (best-ofs, deluxe repackagings of other albums
+    // we already have) are excluded to avoid bulk duplicate tracks.
     const albums = (body.results || []).filter(
-      (r: any) => r.wrapperType === 'collection' && r.collectionType === 'Album'
+      (r: any) =>
+        r.wrapperType === 'collection' &&
+        (r.collectionType === 'Album' || r.collectionType === 'EP' || r.collectionType === 'Single') &&
+        r.collectionType !== 'Compilation'
     );
 
     const seenTitles = new Set<string>();
@@ -306,22 +313,44 @@ const upscaleArtwork = (url?: string): string => {
 // Capped per artist (not globally) so the catalog stays broad across artists
 // rather than exhausting API calls on a handful of acts. Every album that
 // IS included is seeded with its full, real tracklist — no partial albums.
-const MAX_ALBUMS_PER_ARTIST = 8;
+const MAX_ALBUMS_PER_ARTIST = 10;
+
+// These artists' full discographies matter more than breadth across the
+// roster (explicitly requested) — pull their whole Album/EP catalog, not
+// just the top N.
+const UNCAPPED_ARTISTS = new Set(['Travis Scott', 'Playboi Carti', 'Kanye West', 'A$AP Rocky']);
+
+// Real albums/EPs first, singles only as a fallback when an artist's album
+// catalog is thin — iTunes lists every single as its own "collection", so
+// treating singles as equal to albums buries real albums under dozens of
+// one-off single releases instead of supplementing them.
+function selectAlbumsForArtist(albums: ITunesAlbum[], uncapped: boolean): ITunesAlbum[] {
+  const albumsAndEps = albums.filter((a) => a.collectionType !== 'Single');
+  const singles = albums.filter((a) => a.collectionType === 'Single');
+
+  if (uncapped) {
+    // iTunes' "Album" type includes a lot of regional/bootleg noise for
+    // these artists (50+ "albums" that aren't real releases) — 25 real
+    // releases is already far beyond any of their actual discographies,
+    // while keeping total run time bounded.
+    const base = albumsAndEps.slice(0, 25);
+    if (base.length >= 8) return base;
+    return [...base, ...singles.slice(0, 15 - base.length)];
+  }
+
+  if (albumsAndEps.length >= MAX_ALBUMS_PER_ARTIST) return albumsAndEps.slice(0, MAX_ALBUMS_PER_ARTIST);
+  return [...albumsAndEps, ...singles.slice(0, MAX_ALBUMS_PER_ARTIST - albumsAndEps.length)];
+}
 
 const seedDatabase = async () => {
   try {
     console.log('🌱 Starting HarmonyAI Database Seed...');
 
-    // Clear existing catalog data to prevent duplicate accumulation.
-    // Order matters: songs/albums reference artists/genres via foreign keys.
-    console.log('🧹 Clearing existing Songs, Albums, Artists, and Genres...');
-    await supabase.from('songs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await supabase.from('albums').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await supabase.from('artist_genres').delete().neq('artist_id', '00000000-0000-0000-0000-000000000000');
-    await supabase.from('artists').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    // 1. Seed Genres. Cleared and reseeded up front since this step is
+    // instant — unlike the slow artist/album/song resolution below, there's
+    // no risk window where a crash leaves genres empty for long.
+    console.log('🧹 Clearing existing Genres...');
     await supabase.from('genres').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-    // 1. Seed Genres
     console.log('🎵 Seeding Genres...');
     const genreData = [
       {
@@ -416,14 +445,14 @@ const seedDatabase = async () => {
         continue;
       }
 
-      const albums = await fetchArtistAlbums(artistId, 25);
+      const albums = await fetchArtistAlbums(artistId, 200);
       await sleep(150);
       if (albums.length === 0) {
         console.warn(`  ⚠️  No albums found for "${artistDef.name}", skipping`);
         continue;
       }
 
-      const selectedAlbums = albums.slice(0, MAX_ALBUMS_PER_ARTIST);
+      const selectedAlbums = selectAlbumsForArtist(albums, UNCAPPED_ARTISTS.has(artistDef.name));
       let albumsAdded = 0;
       let tracksAdded = 0;
       for (const album of selectedAlbums) {
@@ -463,6 +492,17 @@ const seedDatabase = async () => {
     }
 
     console.log(`✅ Resolved ${resolved.length} real songs total`);
+
+    // Clear old catalog data only now that the new catalog is fully resolved
+    // in memory and ready to replace it immediately — clearing this earlier
+    // (before the slow iTunes resolution loop above) left a window where a
+    // crash/interrupt mid-resolution wiped the library with nothing to
+    // replace it, which is exactly what happened last run.
+    console.log('🧹 Clearing existing Songs, Albums, and Artists...');
+    await supabase.from('songs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('albums').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('artist_genres').delete().neq('artist_id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('artists').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
     // 3. Seed real Artists (deduped by the artist name iTunes returns)
     console.log('🎤 Seeding real Artists...');
