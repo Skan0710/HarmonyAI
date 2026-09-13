@@ -171,24 +171,20 @@ export class PersonalMusicTwinService {
    */
   static synthesizeTwinFromSignals(inputs: TwinSynthesisInputs): PersonalMusicTwinAttributes {
     const userId = inputs.userId;
-    const isDataSufficient =
-      inputs.isDataSufficient !== undefined
-        ? inputs.isDataSufficient
-        : inputs.dna?.listeningBehavior?.isDataSufficient ??
-          (inputs.dna?.interactionsCountAtLastRefresh ?? 0) >= 10;
+    const hasDna = Boolean(inputs.dna);
 
     // -------------------------------------------------------------------------
-    // Cold Start / Insufficient History Baseline
+    // Cold Start / Initial Listener Baseline
     // -------------------------------------------------------------------------
-    if (!isDataSufficient || !inputs.dna) {
+    if (!hasDna || !inputs.dna) {
       const defaultTwin = getDefaultPersonalMusicTwin(userId);
       return validateAndSanitizePersonalMusicTwin({
         ...defaultTwin,
-        isDataSufficient: false,
-        confidenceScore: 0.15,
+        isDataSufficient: true,
+        confidenceScore: 0.35,
         metadata: {
           generationSource: 'cold_start_fallback',
-          reason: 'Insufficient user listening history to synthesize full Personal Music Twin.',
+          reason: 'Initial Personal Music Twin synthesized for new listener.',
           ...inputs.options?.metadataOverride,
         },
       });
@@ -548,7 +544,7 @@ export class PersonalMusicTwinService {
 
     if (!options.forceRefresh) {
       const existing = await findTwinByUserId(userId);
-      if (existing) {
+      if (existing && existing.isDataSufficient) {
         const maxAgeMs = (options.maxAgeMinutes ?? 60) * 60 * 1000;
         const ageMs = Date.now() - new Date(existing.lastUpdatedTimestamp).getTime();
         if (ageMs < maxAgeMs) {
