@@ -1,6 +1,7 @@
 import React, { useMemo, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Line } from '@react-three/drei';
+import { OrbitControls, QuadraticBezierLine, Stars, Float } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { TasteItem } from '../services/musicIntelligenceService';
 
@@ -14,8 +15,8 @@ export interface DnaNode {
 
 const CATEGORY_COLOR: Record<DnaNodeCategory, string> = {
   genre: '#ff6a43',
-  artist: '#d9a15b',
-  mood: '#7ba98a',
+  artist: '#e8b04f',
+  mood: '#6fcf9e',
 };
 
 const CATEGORY_BAND: Record<DnaNodeCategory, [number, number]> = {
@@ -52,66 +53,146 @@ function buildPositions(nodes: DnaNode[]): Map<string, [number, number, number]>
   return positions;
 }
 
+// Each category reads as a distinct "kind of matter" in the constellation —
+// genres are the broad, rounded masses; artists are faceted crystals; moods
+// are open rings drifting further out. Swapping in per-category geometry
+// (instead of one repeated low-poly icosahedron everywhere) is what makes
+// the scene read as a structured system rather than a scatter of identical gems.
+const CategoryGeometry: React.FC<{ category: DnaNodeCategory; size: number }> = ({ category, size }) => {
+  switch (category) {
+    case 'genre':
+      return <icosahedronGeometry args={[size, 3]} />;
+    case 'artist':
+      return <octahedronGeometry args={[size * 1.15, 0]} />;
+    case 'mood':
+    default:
+      return <torusGeometry args={[size * 0.9, size * 0.34, 12, 28]} />;
+  }
+};
+
 interface NodeMeshProps {
   node: DnaNode;
   position: [number, number, number];
   isHovered: boolean;
   isSelected: boolean;
+  dimmed: boolean;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
 }
 
-const NodeMesh: React.FC<NodeMeshProps> = ({ node, position, isHovered, isSelected, onHover, onSelect }) => {
+const NodeMesh: React.FC<NodeMeshProps> = ({ node, position, isHovered, isSelected, dimmed, onHover, onSelect }) => {
   const score = Math.max(0.05, Math.min(1, node.item.score ?? 0.5));
-  const size = 0.09 + score * 0.16;
+  const size = 0.1 + score * 0.17;
   const color = CATEGORY_COLOR[node.category];
   const emphasis = isHovered || isSelected;
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }, delta) => {
+    if (!meshRef.current) return;
+    meshRef.current.rotation.y += delta * (node.category === 'artist' ? 0.35 : 0.15);
+    meshRef.current.rotation.x = Math.sin(clock.getElapsedTime() * 0.4 + position[0]) * 0.15;
+  });
+
+  const origin = useMemo<[number, number, number]>(() => [0, 0, 0], []);
+  const mid = useMemo<[number, number, number]>(
+    () => [position[0] * 0.5, position[1] * 0.5 + 0.25, position[2] * 0.5],
+    [position]
+  );
 
   return (
     <group position={position}>
-      <Line points={[[0, 0, 0], [-position[0], -position[1], -position[2]]]} color={color} transparent opacity={0.08 + score * 0.18} lineWidth={1} />
-      <mesh
-        scale={emphasis ? 1.4 : 1}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          onHover(node.id);
-        }}
-        onPointerOut={(e) => {
-          e.stopPropagation();
-          onHover(null);
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelect(node.id);
-        }}
-      >
-        <icosahedronGeometry args={[size, 0]} />
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={emphasis ? 0.9 : 0.25 + score * 0.3}
-          roughness={0.4}
-          metalness={0.1}
-        />
-      </mesh>
+      <QuadraticBezierLine
+        start={[-position[0], -position[1], -position[2]]}
+        end={origin}
+        mid={[mid[0] - position[0], mid[1] - position[1], mid[2] - position[2]]}
+        color={color}
+        transparent
+        opacity={dimmed ? 0.04 : 0.1 + score * 0.22}
+        lineWidth={emphasis ? 1.6 : 0.8}
+      />
+      <Float speed={1.4} rotationIntensity={0.2} floatIntensity={0.6}>
+        <mesh
+          ref={meshRef}
+          scale={emphasis ? 1.45 : 1}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            onHover(node.id);
+          }}
+          onPointerOut={(e) => {
+            e.stopPropagation();
+            onHover(null);
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(node.id);
+          }}
+        >
+          <CategoryGeometry category={node.category} size={size} />
+          <meshPhysicalMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={emphasis ? 1.4 : dimmed ? 0.15 : 0.5 + score * 0.4}
+            roughness={0.25}
+            metalness={0.15}
+            clearcoat={0.6}
+            clearcoatRoughness={0.3}
+            transparent
+            opacity={dimmed ? 0.35 : 1}
+          />
+        </mesh>
+      </Float>
     </group>
   );
 };
 
 const CoreNode: React.FC<{ spin: boolean }> = ({ spin }) => {
-  const ref = useRef<THREE.Mesh>(null);
-  useFrame(({ clock }) => {
-    if (!ref.current || !spin) return;
+  const coreRef = useRef<THREE.Mesh>(null);
+  const shellRef = useRef<THREE.Mesh>(null);
+  const ringARef = useRef<THREE.Mesh>(null);
+  const ringBRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }, delta) => {
     const t = clock.getElapsedTime();
-    const s = 1 + Math.sin(t * 1.2) * 0.04;
-    ref.current.scale.setScalar(s);
+    if (coreRef.current) {
+      const s = 1 + Math.sin(t * 1.2) * 0.05;
+      coreRef.current.scale.setScalar(s);
+    }
+    if (shellRef.current && spin) {
+      shellRef.current.rotation.y += delta * 0.12;
+      shellRef.current.rotation.x += delta * 0.05;
+    }
+    // Two counter-rotating rings suggest a double-helix strand orbiting the
+    // core — a much stronger "this is your DNA" read than a static sphere.
+    if (ringARef.current && spin) ringARef.current.rotation.y += delta * 0.5;
+    if (ringBRef.current && spin) ringBRef.current.rotation.y -= delta * 0.5;
   });
 
   return (
-    <mesh ref={ref}>
-      <icosahedronGeometry args={[0.34, 1]} />
-      <meshStandardMaterial color="#ff6a43" emissive="#ff6a43" emissiveIntensity={0.6} roughness={0.3} />
-    </mesh>
+    <group>
+      <mesh ref={coreRef}>
+        <icosahedronGeometry args={[0.32, 4]} />
+        <meshPhysicalMaterial
+          color="#ff6a43"
+          emissive="#ff6a43"
+          emissiveIntensity={0.85}
+          roughness={0.15}
+          metalness={0.2}
+          clearcoat={1}
+        />
+      </mesh>
+      <mesh ref={shellRef}>
+        <icosahedronGeometry args={[0.46, 1]} />
+        <meshBasicMaterial color="#ffb08a" wireframe transparent opacity={0.25} />
+      </mesh>
+      <mesh ref={ringARef} rotation={[Math.PI / 2.3, 0, 0]}>
+        <torusGeometry args={[0.62, 0.008, 8, 64]} />
+        <meshBasicMaterial color="#ff8a5c" transparent opacity={0.55} />
+      </mesh>
+      <mesh ref={ringBRef} rotation={[Math.PI / 2.3, Math.PI / 2, 0]}>
+        <torusGeometry args={[0.62, 0.008, 8, 64]} />
+        <meshBasicMaterial color="#d9a15b" transparent opacity={0.4} />
+      </mesh>
+    </group>
   );
 };
 
@@ -125,6 +206,7 @@ const Scene: React.FC<{
 }> = ({ nodes, spin, hoveredId, selectedId, onHover, onSelect }) => {
   const positions = useMemo(() => buildPositions(nodes), [nodes]);
   const groupRef = useRef<THREE.Group>(null);
+  const activeId = hoveredId || selectedId;
 
   useFrame((_, delta) => {
     if (groupRef.current && spin) {
@@ -134,9 +216,11 @@ const Scene: React.FC<{
 
   return (
     <>
-      <ambientLight intensity={0.5} />
-      <pointLight position={[4, 4, 4]} intensity={40} color="#ffe0d0" />
-      <pointLight position={[-4, -3, -3]} intensity={15} color="#d9a15b" />
+      <ambientLight intensity={0.35} />
+      <pointLight position={[4, 4, 4]} intensity={45} color="#ffe0d0" />
+      <pointLight position={[-4, -3, -3]} intensity={18} color="#d9a15b" />
+      <pointLight position={[0, 0, 0]} intensity={12} color="#ff8a5c" distance={4} />
+      <Stars radius={7} depth={12} count={900} factor={0.7} saturation={0} fade speed={0.4} />
       <group ref={groupRef}>
         <CoreNode spin={spin} />
         {nodes.map((node) => {
@@ -149,19 +233,18 @@ const Scene: React.FC<{
               position={pos}
               isHovered={hoveredId === node.id}
               isSelected={selectedId === node.id}
+              dimmed={Boolean(activeId) && activeId !== node.id}
               onHover={onHover}
               onSelect={onSelect}
             />
           );
         })}
       </group>
-      <OrbitControls
-        enablePan={false}
-        enableZoom={true}
-        minDistance={3.2}
-        maxDistance={7}
-        autoRotate={false}
-      />
+      <OrbitControls enablePan={false} enableZoom minDistance={3.2} maxDistance={7} autoRotate={false} />
+      <EffectComposer>
+        <Bloom intensity={0.55} luminanceThreshold={0.2} luminanceSmoothing={0.35} mipmapBlur radius={0.6} />
+        <Vignette eskil={false} offset={0.15} darkness={0.6} />
+      </EffectComposer>
     </>
   );
 };
@@ -189,6 +272,8 @@ export const MusicDnaConstellation: React.FC<MusicDnaConstellationProps> = ({
       dpr={[1, 1.75]}
       gl={{ antialias: true, powerPreference: 'low-power' }}
     >
+      <color attach="background" args={['#0c0a09']} />
+      <fog attach="fog" args={['#0c0a09', 6, 11]} />
       <Scene
         nodes={nodes}
         spin={!reducedMotion}
