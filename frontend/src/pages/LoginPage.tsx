@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AudioLines, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
@@ -8,13 +8,24 @@ import AnimatedButton from '../components/ui/animated-button';
 import { Seo } from '../components/Seo';
 import { PublicFooter } from '../components/PublicFooter';
 import { StickyMobileCta } from '../components/StickyMobileCta';
+import { OAuthButtons } from '../components/OAuthButtons';
 
 export const LoginPage: React.FC = () => {
   const { isAuthenticated, isInitializing, login, isLoading, error } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  const oauthError = searchParams.get('error');
+  const oauthErrorMessage = oauthError
+    ? oauthError.endsWith('_not_configured')
+      ? 'That sign-in option is not set up yet.'
+      : oauthError.endsWith('_denied')
+      ? 'Sign-in was cancelled.'
+      : 'Sign-in failed. Please try again or use email and password.'
+    : null;
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -74,9 +85,19 @@ export const LoginPage: React.FC = () => {
           <p className="text-xs text-text-tertiary mt-1">Enter your credentials to continue</p>
         </div>
 
-        {error && (
-          <div className="p-3 bg-danger-wash rounded-[var(--radius-sm)] text-danger text-xs">{error}</div>
+        {(error || oauthErrorMessage) && (
+          <div className="p-3 bg-danger-wash rounded-[var(--radius-sm)] text-danger text-xs">
+            {error || oauthErrorMessage}
+          </div>
         )}
+
+        <OAuthButtons />
+
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-border-subtle"></div>
+          <span className="flex-shrink mx-3 text-text-tertiary text-2xs">OR</span>
+          <div className="flex-grow border-t border-border-subtle"></div>
+        </div>
 
         <form onSubmit={handleStandardLogin} className="space-y-4">
           <div>

@@ -7,6 +7,7 @@ import { AnimatedLink } from '../components/ui/AnimatedLink';
 import { Seo } from '../components/Seo';
 import { PublicFooter } from '../components/PublicFooter';
 import { Testimonials } from '../components/Testimonials';
+import { OAuthButtons } from '../components/OAuthButtons';
 
 export const RegisterPage: React.FC = () => {
   const { isAuthenticated, isInitializing, register, isLoading, error } = useAuth();
@@ -67,6 +68,14 @@ export const RegisterPage: React.FC = () => {
         {error && (
           <div className="p-3 bg-danger-wash rounded-[var(--radius-sm)] text-danger text-xs">{error}</div>
         )}
+
+        <OAuthButtons />
+
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-border-subtle"></div>
+          <span className="flex-shrink mx-3 text-text-tertiary text-2xs">OR</span>
+          <div className="flex-grow border-t border-border-subtle"></div>
+        </div>
 
         <form onSubmit={handleStandardRegister} className="space-y-4">
           <div>

@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { GenreService } from '../services/genreService.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
+import { cached, invalidateCache } from '../utils/simpleCache.js';
+
+const CACHE_TTL_MS = 60_000;
 
 export const createGenre = controllerWrapper(async (req: Request, res: Response) => {
   const { name, description, coverImage, parentGenre, tags, isFeatured } = req.body;
@@ -18,6 +21,8 @@ export const createGenre = controllerWrapper(async (req: Request, res: Response)
     isFeatured,
   });
 
+  invalidateCache('genres:');
+
   res.status(201).json({
     success: true,
     message: 'Genre created successfully',
@@ -29,8 +34,10 @@ export const getGenres = controllerWrapper(async (req: Request, res: Response) =
   const isFeatured = req.query.isFeatured !== undefined ? req.query.isFeatured === 'true' : undefined;
   const search = req.query.search ? String(req.query.search) : undefined;
 
-  const genres = await GenreService.getAllGenres({ isFeatured, search });
+  const cacheKey = `genres:list:${isFeatured ?? ''}:${search ?? ''}`;
+  const genres = await cached(cacheKey, CACHE_TTL_MS, () => GenreService.getAllGenres({ isFeatured, search }));
 
+  res.set('Cache-Control', 'public, max-age=30');
   res.status(200).json({ success: true, data: genres });
 });
 
@@ -63,6 +70,8 @@ export const updateGenre = controllerWrapper(async (req: Request, res: Response)
     throw new ControllerError(404, 'Genre not found');
   }
 
+  invalidateCache('genres:');
+
   res.status(200).json({
     success: true,
     message: 'Genre updated successfully',
@@ -77,6 +86,8 @@ export const deleteGenre = controllerWrapper(async (req: Request, res: Response)
   if (!deletedGenre) {
     throw new ControllerError(404, 'Genre not found');
   }
+
+  invalidateCache('genres:');
 
   res.status(200).json({
     success: true,

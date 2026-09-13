@@ -14,6 +14,14 @@ export interface LoginInput {
   password?: string;
 }
 
+export interface OAuthLoginInput {
+  provider: 'google' | 'discord';
+  providerId: string;
+  email: string | null;
+  name: string;
+  profilePicture?: string;
+}
+
 export interface AuthResult {
   user: {
     id: string;
@@ -137,6 +145,82 @@ export class AuthService {
         createdAt: user.created_at ? new Date(user.created_at) : new Date(),
       },
       token,
+    };
+  }
+
+  /**
+   * Finds or creates a user for a "Sign in with Google/Discord" login.
+   * Lookup order: existing account already linked to this exact provider ID,
+   * then an existing local-password (or other-provider) account with the
+   * same verified email (linking it rather than creating a duplicate),
+   * then a brand-new OAuth-only account (no password_hash).
+   */
+  static async loginOrRegisterWithOAuth(input: OAuthLoginInput): Promise<AuthResult> {
+    const { provider, providerId, email, name, profilePicture } = input;
+    const providerColumn = provider === 'google' ? 'google_id' : 'discord_id';
+    const normalizedEmail = email ? email.toLowerCase().trim() : null;
+
+    const { data: existingByProvider } = await supabase
+      .from('users')
+      .select('*')
+      .eq(providerColumn, providerId)
+      .maybeSingle();
+
+    if (existingByProvider) {
+      return this.toAuthResult(existingByProvider);
+    }
+
+    if (normalizedEmail) {
+      const { data: existingByEmail } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      if (existingByEmail) {
+        const { data: linked, error: linkError } = await supabase
+          .from('users')
+          .update({ [providerColumn]: providerId, updated_at: new Date().toISOString() } as any)
+          .eq('id', existingByEmail.id)
+          .select()
+          .single();
+
+        if (linkError || !linked) {
+          throw new Error(`Failed to link ${provider} account: ${linkError?.message}`);
+        }
+        return this.toAuthResult(linked);
+      }
+    }
+
+    const { data: created, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        name,
+        email: normalizedEmail || `${provider}-${providerId}@no-email.harmonyai.local`,
+        password_hash: null,
+        profile_picture: profilePicture || '',
+        [providerColumn]: providerId,
+      } as any)
+      .select()
+      .single();
+
+    if (insertError || !created) {
+      throw new Error(`${provider} sign-in failed: ${insertError?.message}`);
+    }
+
+    return this.toAuthResult(created);
+  }
+
+  private static toAuthResult(user: any): AuthResult {
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        profilePicture: user.profile_picture || undefined,
+        createdAt: user.created_at ? new Date(user.created_at) : new Date(),
+      },
+      token: generateToken(user.id),
     };
   }
 

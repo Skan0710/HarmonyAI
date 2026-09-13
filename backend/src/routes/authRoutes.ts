@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { register, login, getMe, logout } from '../controllers/authController.js';
+import { googleAuthStart, googleAuthCallback, discordAuthStart, discordAuthCallback } from '../controllers/oauthController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
 const router = Router();
@@ -27,5 +28,13 @@ router.post('/register', registerLimiter, register);
 router.post('/login', loginLimiter, login);
 router.post('/logout', logout);
 router.get('/me', protect, getMe);
+
+// "Sign in with Google/Discord" — full-page redirects (not JSON), so the
+// frontend just navigates the browser to /google or /discord directly
+// rather than calling these through the fetch-based apiClient.
+router.get('/google', loginLimiter, googleAuthStart);
+router.get('/google/callback', googleAuthCallback);
+router.get('/discord', loginLimiter, discordAuthStart);
+router.get('/discord/callback', discordAuthCallback);
 
 export default router;

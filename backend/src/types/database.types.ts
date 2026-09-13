@@ -1018,7 +1018,9 @@ export type Database = {
         Row: {
           clerk_id: string | null
           created_at: string | null
+          discord_id: string | null
           email: string
+          google_id: string | null
           id: string
           name: string
           password_hash: string | null
@@ -1029,7 +1031,9 @@ export type Database = {
         Insert: {
           clerk_id?: string | null
           created_at?: string | null
+          discord_id?: string | null
           email: string
+          google_id?: string | null
           id?: string
           name: string
           password_hash?: string | null
@@ -1040,7 +1044,9 @@ export type Database = {
         Update: {
           clerk_id?: string | null
           created_at?: string | null
+          discord_id?: string | null
           email?: string
+          google_id?: string | null
           id?: string
           name?: string
           password_hash?: string | null

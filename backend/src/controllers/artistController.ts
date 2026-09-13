@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import { ArtistService } from '../services/artistService.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
 import { extractQueryParams, sanitizeString } from '../utils/validators.js';
+import { cached, invalidateCache } from '../utils/simpleCache.js';
+
+const CACHE_TTL_MS = 60_000;
 
 export const createArtist = controllerWrapper(async (req: Request, res: Response) => {
   const {
@@ -44,6 +47,8 @@ export const createArtist = controllerWrapper(async (req: Request, res: Response
     recommendationMetadata,
   });
 
+  invalidateCache('artists:');
+
   res.status(201).json({
     success: true,
     message: 'Artist created successfully',
@@ -69,16 +74,20 @@ export const getArtists = controllerWrapper(async (req: Request, res: Response) 
   const page = q.page || 1;
   const limit = q.limit || 20;
 
-  const result = await ArtistService.getAllArtists({
-    search,
-    genreId,
-    verified,
-    sortBy,
-    sortOrder,
-    page,
-    limit,
-  });
+  const cacheKey = `artists:list:${search ?? ''}:${genreId ?? ''}:${verified ?? ''}:${sortBy}:${sortOrder}:${page}:${limit}`;
+  const result = await cached(cacheKey, CACHE_TTL_MS, () =>
+    ArtistService.getAllArtists({
+      search,
+      genreId,
+      verified,
+      sortBy,
+      sortOrder,
+      page,
+      limit,
+    })
+  );
 
+  res.set('Cache-Control', 'public, max-age=30');
   res.status(200).json({
     success: true,
     data: result.artists,
@@ -120,6 +129,8 @@ export const updateArtist = controllerWrapper(async (req: Request, res: Response
     throw new ControllerError(404, 'Artist not found');
   }
 
+  invalidateCache('artists:');
+
   res.status(200).json({
     success: true,
     message: 'Artist updated successfully',
@@ -134,6 +145,8 @@ export const deleteArtist = controllerWrapper(async (req: Request, res: Response
   if (!deletedArtist) {
     throw new ControllerError(404, 'Artist not found');
   }
+
+  invalidateCache('artists:');
 
   res.status(200).json({
     success: true,

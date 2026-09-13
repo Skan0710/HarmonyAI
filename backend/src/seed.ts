@@ -190,14 +190,26 @@ const GENRE_AUDIO_DEFAULTS: Record<
 interface ITunesTrack {
   trackName: string;
   artistName: string;
+  collectionId?: number;
   collectionName?: string;
   artworkUrl100?: string;
   releaseDate?: string;
   trackTimeMillis?: number;
+  trackNumber?: number;
   primaryGenreName?: string;
   trackExplicitness?: string;
   wrapperType?: string;
   kind?: string;
+}
+
+interface ITunesAlbum {
+  collectionId: number;
+  collectionName: string;
+  artistName: string;
+  artworkUrl100?: string;
+  releaseDate?: string;
+  collectionType?: string;
+  trackCount?: number;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -232,26 +244,55 @@ async function fetchArtistId(name: string): Promise<number | null> {
   }
 }
 
-async function fetchArtistTracks(artistId: number, limit = 25): Promise<ITunesTrack[]> {
-  const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=song&${ITUNES_LOCALE}&limit=${limit}`;
+// Deluxe/remastered/anniversary reissues of the same underlying record share
+// a title save for a parenthetical/bracketed suffix — normalize those away
+// so we don't seed the same album twice under two different titles.
+const normalizeAlbumTitle = (title: string): string =>
+  title
+    .toLowerCase()
+    .replace(/\s*[([][^)\]]*(deluxe|remaster|anniversary|expanded|edition|version|bonus|explicit)[^)\]]*[)\]]/gi, '')
+    .trim();
+
+async function fetchArtistAlbums(artistId: number, limit = 25): Promise<ITunesAlbum[]> {
+  const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=album&${ITUNES_LOCALE}&limit=${limit}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    const body = (await response.json()) as { results?: ITunesAlbum[] };
+    const albums = (body.results || []).filter(
+      (r: any) => r.wrapperType === 'collection' && r.collectionType === 'Album'
+    );
+
+    const seenTitles = new Set<string>();
+    const deduped: ITunesAlbum[] = [];
+    for (const a of albums) {
+      const key = normalizeAlbumTitle(a.collectionName || '');
+      if (!key || seenTitles.has(key)) continue;
+      seenTitles.add(key);
+      deduped.push(a);
+    }
+
+    // Most-recent-first, so the artist's better-known/latest work is what
+    // gets included when we cap albums per artist below.
+    deduped.sort((a, b) => new Date(b.releaseDate || 0).getTime() - new Date(a.releaseDate || 0).getTime());
+    return deduped;
+  } catch {
+    return [];
+  }
+}
+
+// Fetches every real track on a specific album release (not a capped top-N
+// search hit) so an album we seed is always seeded whole, never a partial
+// handful of its songs.
+async function fetchAlbumTracks(collectionId: number): Promise<ITunesTrack[]> {
+  const url = `https://itunes.apple.com/lookup?id=${collectionId}&entity=song&${ITUNES_LOCALE}&limit=200`;
   try {
     const response = await fetch(url);
     if (!response.ok) return [];
     const body = (await response.json()) as { results?: ITunesTrack[] };
     const tracks = (body.results || []).filter((r) => r.wrapperType === 'track' && r.kind === 'song');
-
-    // The same track title often reappears across deluxe editions/reissues
-    // with identical metadata but a different album artwork URL — keep the
-    // first (usually original) occurrence only.
-    const seenTitles = new Set<string>();
-    const deduped: ITunesTrack[] = [];
-    for (const t of tracks) {
-      const key = t.trackName.toLowerCase().trim();
-      if (seenTitles.has(key)) continue;
-      seenTitles.add(key);
-      deduped.push(t);
-    }
-    return deduped;
+    tracks.sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
+    return tracks;
   } catch {
     return [];
   }
@@ -262,7 +303,10 @@ const upscaleArtwork = (url?: string): string => {
   return url.replace(/\d+x\d+bb\.(jpg|png)$/, '600x600bb.$1');
 };
 
-const MAX_TRACKS_PER_ARTIST = 14;
+// Capped per artist (not globally) so the catalog stays broad across artists
+// rather than exhausting API calls on a handful of acts. Every album that
+// IS included is seeded with its full, real tracklist — no partial albums.
+const MAX_ALBUMS_PER_ARTIST = 8;
 
 const seedDatabase = async () => {
   try {
@@ -354,38 +398,55 @@ const seedDatabase = async () => {
     );
     const genreMap = new Map(genreData.map((g, i) => [g.key, genres[i]._id as string]));
 
-    // 2. Resolve real song metadata from the iTunes catalog: pull each
-    // artist's real catalog in bulk (not just one hand-picked single), plus
-    // a curated list of classical pieces (composers don't map to "artists").
-    console.log('🔎 Resolving real song metadata from the iTunes catalog (this pulls each artist\'s real catalog, expect a few minutes)...');
+    // 2. Resolve real song metadata from the iTunes catalog: for each artist,
+    // pull their real albums, then pull each selected album's COMPLETE real
+    // tracklist (not a capped top-N grab) — every album we seed ends up
+    // whole, never missing tracks — plus a curated list of classical pieces
+    // (composers don't map to "artists").
+    console.log('🔎 Resolving real album metadata from the iTunes catalog (this pulls each artist\'s full albums, expect several minutes)...');
     const resolved: { track: ITunesTrack; genreSlug: string }[] = [];
     const seenTracks = new Set<string>(); // guards against two sources resolving to the same real track
+    const albumTrackCounts = new Map<string, number>(); // keyed the same way as albumMap below
 
     for (const artistDef of ARTISTS) {
       const artistId = await fetchArtistId(artistDef.name);
-      await sleep(200);
+      await sleep(150);
       if (!artistId) {
         console.warn(`  ⚠️  No iTunes artist match for "${artistDef.name}", skipping`);
         continue;
       }
 
-      const tracks = await fetchArtistTracks(artistId, 25);
-      await sleep(200);
-      if (tracks.length === 0) {
-        console.warn(`  ⚠️  No tracks found for "${artistDef.name}", skipping`);
+      const albums = await fetchArtistAlbums(artistId, 25);
+      await sleep(150);
+      if (albums.length === 0) {
+        console.warn(`  ⚠️  No albums found for "${artistDef.name}", skipping`);
         continue;
       }
 
-      let added = 0;
-      for (const track of tracks) {
-        if (added >= MAX_TRACKS_PER_ARTIST) break;
-        const dedupeKey = `${track.artistName}::${track.trackName}`.toLowerCase();
-        if (seenTracks.has(dedupeKey)) continue;
-        seenTracks.add(dedupeKey);
-        resolved.push({ track, genreSlug: artistDef.genre });
-        added += 1;
+      const selectedAlbums = albums.slice(0, MAX_ALBUMS_PER_ARTIST);
+      let albumsAdded = 0;
+      let tracksAdded = 0;
+      for (const album of selectedAlbums) {
+        const tracks = await fetchAlbumTracks(album.collectionId);
+        await sleep(150);
+        if (tracks.length === 0) continue;
+
+        const albumKey = `${artistDef.name}::${album.collectionId}`;
+        let addedFromAlbum = 0;
+        for (const track of tracks) {
+          const dedupeKey = `${track.artistName}::${track.trackName}`.toLowerCase();
+          if (seenTracks.has(dedupeKey)) continue;
+          seenTracks.add(dedupeKey);
+          resolved.push({ track, genreSlug: artistDef.genre });
+          addedFromAlbum += 1;
+        }
+        if (addedFromAlbum > 0) {
+          albumTrackCounts.set(albumKey, addedFromAlbum);
+          albumsAdded += 1;
+          tracksAdded += addedFromAlbum;
+        }
       }
-      console.log(`  ✓ ${artistDef.name}: added ${added} real tracks`);
+      console.log(`  ✓ ${artistDef.name}: added ${albumsAdded} full albums (${tracksAdded} tracks)`);
     }
 
     for (const query of CLASSICAL_PIECES) {
@@ -423,12 +484,17 @@ const seedDatabase = async () => {
       artistMap.set(name, artist._id as string);
     }
 
-    // 4. Seed real Albums (deduped by artist + album title)
+    // 4. Seed real Albums (deduped by artist + iTunes collectionId — a
+    // stable per-release key, unlike title which can collide across
+    // artists or reissues). totalTracks reflects the real, complete
+    // tracklist we just resolved for that album, not a placeholder.
     console.log('💿 Seeding real Albums...');
     const albumMap = new Map<string, string>();
     for (const { track, genreSlug } of resolved) {
       const albumTitle = track.collectionName || track.trackName;
-      const key = `${track.artistName}::${albumTitle}`;
+      const key = track.collectionId
+        ? `${track.artistName}::${track.collectionId}`
+        : `${track.artistName}::${albumTitle}`;
       if (albumMap.has(key)) continue;
 
       const artistId = artistMap.get(track.artistName);
@@ -442,7 +508,7 @@ const seedDatabase = async () => {
         coverImage: upscaleArtwork(track.artworkUrl100),
         releaseYear,
         albumType: 'album',
-        totalTracks: 1,
+        totalTracks: albumTrackCounts.get(key) || 1,
         tags: [genreSlug],
       });
       albumMap.set(key, album._id as string);
@@ -458,7 +524,10 @@ const seedDatabase = async () => {
       if (!artistId || !genreId) continue;
 
       const albumTitle = track.collectionName || track.trackName;
-      const albumId = albumMap.get(`${track.artistName}::${albumTitle}`);
+      const albumKey = track.collectionId
+        ? `${track.artistName}::${track.collectionId}`
+        : `${track.artistName}::${albumTitle}`;
+      const albumId = albumMap.get(albumKey);
       const defaults = GENRE_AUDIO_DEFAULTS[genreSlug] || GENRE_AUDIO_DEFAULTS.pop;
       const releaseYear = track.releaseDate ? new Date(track.releaseDate).getFullYear() : undefined;
       const duration = track.trackTimeMillis ? Math.round(track.trackTimeMillis / 1000) : 210;

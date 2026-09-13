@@ -4,6 +4,9 @@ import { AlbumService } from '../services/albumService.js';
 import { AlbumType } from '../types/domainModels.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
 import { extractQueryParams, sanitizeString, isValidObjectId } from '../utils/validators.js';
+import { cached, invalidateCache } from '../utils/simpleCache.js';
+
+const CACHE_TTL_MS = 60_000;
 
 // Postgres `artists.id` is a uuid, not a Mongo ObjectId - isValidObjectId()
 // (still used by updateAlbum below, out of scope for this port) would reject every
@@ -59,6 +62,8 @@ export const createAlbum = controllerWrapper(async (req: Request, res: Response)
     tags,
   });
 
+  invalidateCache('albums:');
+
   res.status(201).json({
     success: true,
     message: 'Album created successfully',
@@ -85,16 +90,20 @@ export const getAlbums = controllerWrapper(async (req: Request, res: Response) =
   const page = q.page || 1;
   const limit = q.limit || 20;
 
-  const result = await AlbumService.getAllAlbums({
-    search,
-    artistId,
-    genreId,
-    albumType,
-    releaseYear,
-    page,
-    limit,
-  });
+  const cacheKey = `albums:list:${search ?? ''}:${artistId ?? ''}:${genreId ?? ''}:${albumType ?? ''}:${releaseYear ?? ''}:${page}:${limit}`;
+  const result = await cached(cacheKey, CACHE_TTL_MS, () =>
+    AlbumService.getAllAlbums({
+      search,
+      artistId,
+      genreId,
+      albumType,
+      releaseYear,
+      page,
+      limit,
+    })
+  );
 
+  res.set('Cache-Control', 'public, max-age=30');
   res.status(200).json({
     success: true,
     data: result.albums,
@@ -140,6 +149,8 @@ export const updateAlbum = controllerWrapper(async (req: Request, res: Response)
     throw new ControllerError(404, 'Album not found');
   }
 
+  invalidateCache('albums:');
+
   res.status(200).json({
     success: true,
     message: 'Album updated successfully',
@@ -154,6 +165,8 @@ export const deleteAlbum = controllerWrapper(async (req: Request, res: Response)
   if (!deletedAlbum) {
     throw new ControllerError(404, 'Album not found');
   }
+
+  invalidateCache('albums:');
 
   res.status(200).json({
     success: true,
