@@ -1,9 +1,6 @@
 import dotenv from 'dotenv';
 import { supabase } from './config/supabase.js';
 import { GenreService } from './services/genreService.js';
-import { ArtistService } from './services/artistService.js';
-import { AlbumService } from './services/albumService.js';
-import { SongService } from './services/songService.js';
 
 dotenv.config();
 
@@ -504,59 +501,94 @@ const seedDatabase = async () => {
     await supabase.from('artist_genres').delete().neq('artist_id', '00000000-0000-0000-0000-000000000000');
     await supabase.from('artists').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
+    // Bulk-insert in chunks rather than one row (+ a joined select-back) at
+    // a time — with thousands of songs, per-row inserts through the
+    // service layer's joined `.select()` took over an hour end to end.
+    // A single INSERT statement's RETURNING preserves the input row order,
+    // so we can zip inserted ids back to their source rows by position.
+    async function insertInChunks(
+      table: string,
+      rows: any[],
+      chunkSize = 500,
+      selectCols: string | null = 'id'
+    ): Promise<{ id: string }[]> {
+      const insertedRows: { id: string }[] = [];
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const chunk = rows.slice(i, i + chunkSize);
+        const query = (supabase.from(table as any) as any).insert(chunk);
+        const { data, error } = selectCols ? await query.select(selectCols) : await query;
+        if (error) throw new Error(`Failed to bulk insert into ${table}: ${error.message}`);
+        if (data) insertedRows.push(...(data as { id: string }[]));
+      }
+      return insertedRows;
+    }
+
     // 3. Seed real Artists (deduped by the artist name iTunes returns)
     console.log('🎤 Seeding real Artists...');
     const artistNames = Array.from(new Set(resolved.map((r) => r.track.artistName)));
-    const artistMap = new Map<string, string>();
-    for (const name of artistNames) {
-      const first = resolved.find((r) => r.track.artistName === name)!;
+    const firstByArtist = new Map(artistNames.map((name) => [name, resolved.find((r) => r.track.artistName === name)!]));
+    const artistRows = artistNames.map((name) => {
+      const first = firstByArtist.get(name)!;
       const image = upscaleArtwork(first.track.artworkUrl100);
-      const artist = await ArtistService.createArtist({
+      return {
         name,
         bio: `${name} — real recording artist, catalogued from public music metadata.`,
-        profileImage: image,
-        bannerImage: image,
-        genres: [genreMap.get(first.genreSlug)].filter(Boolean) as string[],
-        monthlyListeners: Math.floor(Math.random() * 3000000) + 200000,
+        profile_image: image,
+        avatar: image,
+        banner_image: image,
+        monthly_listeners: Math.floor(Math.random() * 3000000) + 200000,
         verified: true,
         tags: [first.genreSlug],
-      });
-      artistMap.set(name, artist._id as string);
-    }
+      };
+    });
+    const insertedArtists = await insertInChunks('artists', artistRows);
+    const artistMap = new Map<string, string>();
+    artistNames.forEach((name, i) => artistMap.set(name, insertedArtists[i].id));
+
+    const genreLinkRows = artistNames
+      .map((name, i) => ({ artist_id: insertedArtists[i].id, genre_id: genreMap.get(firstByArtist.get(name)!.genreSlug) }))
+      .filter((r) => r.genre_id);
+    if (genreLinkRows.length > 0) await insertInChunks('artist_genres', genreLinkRows, 1000, null);
 
     // 4. Seed real Albums (deduped by artist + iTunes collectionId — a
     // stable per-release key, unlike title which can collide across
     // artists or reissues). totalTracks reflects the real, complete
     // tracklist we just resolved for that album, not a placeholder.
     console.log('💿 Seeding real Albums...');
-    const albumMap = new Map<string, string>();
+    const albumKeys: string[] = [];
+    const albumRows: any[] = [];
+    const seenAlbumKeys = new Set<string>();
     for (const { track, genreSlug } of resolved) {
       const albumTitle = track.collectionName || track.trackName;
       const key = track.collectionId
         ? `${track.artistName}::${track.collectionId}`
         : `${track.artistName}::${albumTitle}`;
-      if (albumMap.has(key)) continue;
+      if (seenAlbumKeys.has(key)) continue;
 
       const artistId = artistMap.get(track.artistName);
       if (!artistId) continue;
+      seenAlbumKeys.add(key);
 
-      const releaseYear = track.releaseDate ? new Date(track.releaseDate).getFullYear() : undefined;
-      const album = await AlbumService.createAlbum({
+      const releaseYear = track.releaseDate ? new Date(track.releaseDate).getFullYear() : null;
+      albumKeys.push(key);
+      albumRows.push({
         title: albumTitle,
-        artist: artistId,
-        genre: genreMap.get(genreSlug),
-        coverImage: upscaleArtwork(track.artworkUrl100),
-        releaseYear,
-        albumType: 'album',
-        totalTracks: albumTrackCounts.get(key) || 1,
+        artist_id: artistId,
+        genre_id: genreMap.get(genreSlug) || null,
+        cover_image: upscaleArtwork(track.artworkUrl100),
+        release_year: releaseYear,
+        album_type: 'album',
+        total_tracks: albumTrackCounts.get(key) || 1,
         tags: [genreSlug],
       });
-      albumMap.set(key, album._id as string);
     }
+    const insertedAlbums = await insertInChunks('albums', albumRows);
+    const albumMap = new Map<string, string>();
+    albumKeys.forEach((key, i) => albumMap.set(key, insertedAlbums[i].id));
 
     // 5. Seed real Songs, using each song's own real cover art
     console.log('🎶 Seeding real Songs...');
-    const songs = [];
+    const songRows: any[] = [];
     let audioIdx = 0;
     for (const { track, genreSlug } of resolved) {
       const artistId = artistMap.get(track.artistName);
@@ -567,23 +599,23 @@ const seedDatabase = async () => {
       const albumKey = track.collectionId
         ? `${track.artistName}::${track.collectionId}`
         : `${track.artistName}::${albumTitle}`;
-      const albumId = albumMap.get(albumKey);
+      const albumId = albumMap.get(albumKey) || null;
       const defaults = GENRE_AUDIO_DEFAULTS[genreSlug] || GENRE_AUDIO_DEFAULTS.pop;
-      const releaseYear = track.releaseDate ? new Date(track.releaseDate).getFullYear() : undefined;
+      const releaseYear = track.releaseDate ? new Date(track.releaseDate).getFullYear() : null;
       const duration = track.trackTimeMillis ? Math.round(track.trackTimeMillis / 1000) : 210;
       const sampleAudioUrl = AUDIO_SAMPLE_URLS[audioIdx % AUDIO_SAMPLE_URLS.length];
       audioIdx += 1;
 
-      const song = await SongService.createSong({
+      songRows.push({
         title: track.trackName,
-        artist: artistId,
-        album: albumId,
-        genre: genreId,
+        artist_id: artistId,
+        album_id: albumId,
+        genre_id: genreId,
         duration,
-        coverImage: upscaleArtwork(track.artworkUrl100),
-        audioUrl: sampleAudioUrl,
-        releaseYear,
-        audioFeatures: {
+        cover_image: upscaleArtwork(track.artworkUrl100),
+        audio_url: sampleAudioUrl,
+        release_year: releaseYear,
+        audio_features: {
           bpm: defaults.bpm,
           energy: defaults.energy,
           danceability: Math.round((0.5 + Math.random() * 0.4) * 100) / 100,
@@ -595,8 +627,8 @@ const seedDatabase = async () => {
         language: 'English',
         explicit: track.trackExplicitness === 'explicit',
       });
-      songs.push(song);
     }
+    const songs = await insertInChunks('songs', songRows, 500);
 
     console.log('\n==================================================');
     console.log('🎉 HarmonyAI Database Seeding Complete Successfully!');
