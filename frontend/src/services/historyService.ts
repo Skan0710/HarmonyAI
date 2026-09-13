@@ -21,11 +21,18 @@ export interface RecentlyPlayedResponse {
   message?: string;
 }
 
-export const recordPlaybackApi = async (songId: string): Promise<void> => {
+export const recordPlaybackApi = async (
+  songId: string,
+  details?: { completed?: boolean; skipped?: boolean; progressPercent?: number }
+): Promise<void> => {
   try {
     await apiClient(`/history/record/${songId}`, {
       method: 'POST',
+      body: details ? JSON.stringify(details) : undefined,
     });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('harmony_history_updated', { detail: { songId, ...details } }));
+    }
   } catch {}
 };
 

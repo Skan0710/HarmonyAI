@@ -32,6 +32,13 @@ export const HistoryPage: React.FC = () => {
 
   useEffect(() => {
     loadHistory();
+    const handleUpdate = () => {
+      fetchListeningHistoryApi(50).then(({ history: data }) => {
+        if (data) setHistory(data);
+      });
+    };
+    window.addEventListener('harmony_history_updated', handleUpdate);
+    return () => window.removeEventListener('harmony_history_updated', handleUpdate);
   }, []);
 
   const formatRelativeTime = (dateStr: string): string => {

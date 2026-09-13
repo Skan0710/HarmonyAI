@@ -8,7 +8,12 @@ export const recordPlayback = controllerWrapper(async (req: Request, res: Respon
   if (!user) return;
 
   const { songId } = req.params;
-  const historyItem = await HistoryService.recordPlayback(user._id.toString(), songId);
+  const { completed, skipped, progressPercent } = req.body || {};
+  const historyItem = await HistoryService.recordPlayback(user._id.toString(), songId, {
+    completed,
+    skipped,
+    progressPercent: typeof progressPercent === 'number' ? progressPercent : undefined,
+  });
 
   res.status(200).json({
     success: true,

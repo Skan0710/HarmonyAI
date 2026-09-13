@@ -24,6 +24,7 @@ import { formatTime } from '../utils/formatters';
 import { IconButton } from './ui/IconButton';
 import { YoutubePlayerEngine, type PlaybackEngineHandle } from './YoutubePlayerEngine';
 import { fetchYoutubeVideoIdApi } from '../services/songService';
+import { recordPlaybackApi } from '../services/historyService';
 
 interface MiniPlayerProps {
   onExpand?: () => void;
@@ -77,7 +78,12 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   } = usePlayer();
 
   const miniArtworkRef = useRef<HTMLDivElement | null>(null);
+  const hasRecordedListenRef = useRef<string | null>(null);
   const [miniSlotRect, setMiniSlotRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    hasRecordedListenRef.current = null;
+  }, [currentSong?._id]);
 
   useEffect(() => {
     const updateMiniRect = () => {
@@ -232,10 +238,22 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   };
 
   const handleTimeUpdate = (seconds?: number | React.SyntheticEvent<HTMLAudioElement>) => {
-    if (typeof seconds === 'number') {
-      setCurrentTime(seconds);
-    } else if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
+    const cur = typeof seconds === 'number' ? seconds : audioRef.current?.currentTime;
+    if (typeof cur === 'number') {
+      setCurrentTime(cur);
+
+      // Record listening history once the user has actively listened to the song (>= 30s or >= 50%)
+      if (
+        currentSong?._id &&
+        hasRecordedListenRef.current !== currentSong._id &&
+        (cur >= 30 || (duration > 0 && cur / duration >= 0.5))
+      ) {
+        hasRecordedListenRef.current = currentSong._id;
+        recordPlaybackApi(currentSong._id, {
+          progressPercent: duration > 0 ? Math.round((cur / duration) * 100) : 50,
+          completed: false,
+        });
+      }
     }
   };
 

@@ -1,7 +1,12 @@
 import { supabase } from '../config/supabase.js';
+import { mapSongRow } from './songService.js';
 
 export class HistoryService {
-  static async recordPlayback(userId: string, songId: string): Promise<any> {
+  static async recordPlayback(
+    userId: string,
+    songId: string,
+    details?: { completed?: boolean; skipped?: boolean; progressPercent?: number }
+  ): Promise<any> {
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
 
     const { data: recentRecord } = await supabase
@@ -15,11 +20,19 @@ export class HistoryService {
       .maybeSingle();
 
     const now = new Date().toISOString();
+    const completed = details?.completed ?? true;
+    const skipped = details?.skipped ?? false;
+    const progressPercent = details?.progressPercent ?? (completed ? 100 : 50);
 
     if (recentRecord) {
       const { data: updated } = await supabase
         .from('listening_history')
-        .update({ played_at: now })
+        .update({
+          played_at: now,
+          completed: recentRecord.completed || completed,
+          skipped: skipped,
+          progress_percent: Math.max(Number(recentRecord.progress_percent || 0), progressPercent),
+        })
         .eq('id', recentRecord.id)
         .select()
         .single();
@@ -32,9 +45,9 @@ export class HistoryService {
         user_id: userId,
         song_id: songId,
         played_at: now,
-        completed: true,
-        skipped: false,
-        progress_percent: 100,
+        completed,
+        skipped,
+        progress_percent: progressPercent,
       })
       .select()
       .single();
@@ -46,15 +59,28 @@ export class HistoryService {
   static async getListeningHistory(userId: string, limit: number = 50): Promise<any[]> {
     const { data: history, error } = await supabase
       .from('listening_history')
-      .select('*, songs(*, artists(*), albums(*), genres(*))')
+      .select('*')
       .eq('user_id', userId)
       .order('played_at', { ascending: false })
       .limit(limit);
 
-    if (error || !history) return [];
+    if (error || !history || history.length === 0) return [];
+
+    const songIds = Array.from(new Set(history.map((h: any) => h.song_id).filter(Boolean)));
+    const { data: songs, error: songsErr } = await supabase
+      .from('songs')
+      .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+      .in('id', songIds);
+
+    const songMap = new Map();
+    if (!songsErr && songs) {
+      for (const s of songs) {
+        songMap.set(s.id, mapSongRow(s));
+      }
+    }
 
     return history.map((h: any) => {
-      const s = h.songs;
+      const s = songMap.get(h.song_id) || null;
       return {
         _id: h.id,
         id: h.id,
@@ -62,34 +88,7 @@ export class HistoryService {
         completed: h.completed,
         skipped: h.skipped,
         progressPercent: h.progress_percent,
-        song: s ? {
-          _id: s.id,
-          id: s.id,
-          title: s.title,
-          coverImage: s.cover_image,
-          audioUrl: s.audio_url,
-          duration: s.duration,
-          artist: s.artists ? {
-            _id: s.artists.id,
-            id: s.artists.id,
-            name: s.artists.name,
-            avatar: s.artists.avatar,
-            verified: s.artists.verified,
-          } : null,
-          album: s.albums ? {
-            _id: s.albums.id,
-            id: s.albums.id,
-            title: s.albums.title,
-            coverImage: s.albums.cover_image,
-            releaseYear: s.albums.release_year,
-          } : null,
-          genre: s.genres ? {
-            _id: s.genres.id,
-            id: s.genres.id,
-            name: s.genres.name,
-            slug: s.genres.slug,
-          } : null,
-        } : null,
+        song: s,
       };
     });
   }

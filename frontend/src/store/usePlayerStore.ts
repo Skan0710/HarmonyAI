@@ -725,26 +725,31 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   handleSongEnd: async () => {
-    const { repeatMode, queue, queueIndex, isAutoplayEnabled } = get();
+    const { currentSong, repeatMode, queue, queueIndex, isAutoplayEnabled } = get();
 
-    // 1. Repeat One or single-song queue Repeat All: Replay current track
+    // 1. Record completed listening history entry for current track
+    if (currentSong?._id) {
+      recordPlaybackApi(currentSong._id, { completed: true, progressPercent: 100 }).catch(() => {});
+    }
+
+    // 2. Repeat One or single-song queue Repeat All: Replay current track
     if (repeatMode === 'one' || (repeatMode === 'all' && queue.length === 1)) {
       get().seekTo(0);
       set({ isPlaying: true });
       return;
     }
 
-    // 2. Repeat All at end of queue
+    // 3. Repeat All at end of queue
     if (repeatMode === 'all' && queueIndex + 1 >= queue.length) {
       get().nextSong();
       return;
     }
 
-    // 3. Normal Queue priority: Manually added queue tracks play first
+    // 4. Normal Queue priority: Manually added queue tracks play first
     if (queueIndex + 1 < queue.length) {
       get().nextSong();
     } else if (isAutoplayEnabled) {
-      // 4. Reached end of manual queue: Automatically select next track from Smart Autoplay queue
+      // 5. Reached end of manual queue: Automatically select next track from Smart Autoplay queue
       const autoplayStarted = await get().triggerSmartAutoplay();
       if (!autoplayStarted) {
         set({ isPlaying: false, currentTime: 0 });
