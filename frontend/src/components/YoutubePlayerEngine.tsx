@@ -3,6 +3,8 @@ import { loadYoutubeIframeApi, type YoutubePlayer } from '../lib/youtubeIframeAp
 
 export interface PlaybackEngineHandle {
   seekTo: (seconds: number) => void;
+  play: () => void;
+  replay: () => void;
 }
 
 interface YoutubePlayerEngineProps {
@@ -47,6 +49,13 @@ export const YoutubePlayerEngine = forwardRef<PlaybackEngineHandle, YoutubePlaye
     useImperativeHandle(ref, () => ({
       seekTo: (seconds: number) => {
         playerRef.current?.seekTo(seconds, true);
+      },
+      play: () => {
+        playerRef.current?.playVideo();
+      },
+      replay: () => {
+        playerRef.current?.seekTo(0, true);
+        playerRef.current?.playVideo();
       },
     }));
 

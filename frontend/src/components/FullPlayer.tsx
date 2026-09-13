@@ -14,7 +14,10 @@ import {
   ListMusic,
   Sparkles,
   Heart,
+  Music,
+  Film,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { usePlayer } from '../hooks/usePlayer';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { formatTime } from '../utils/formatters';
@@ -32,6 +35,7 @@ const fallbackCover =
 export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
   const [whyOpen, setWhyOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const navigate = useNavigate();
 
   const {
     currentSong,
@@ -54,7 +58,13 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
     previousSong,
     toggleQueueOpen,
     setQueueOpen,
+    mediaMode,
+    setMediaMode,
+    setVideoSlotRect,
+    youtubeVideoId,
   } = usePlayer();
+
+  const hasVideo = Boolean(youtubeVideoId || currentSong?.youtubeVideoId);
 
   const isLiked = useLikedSongsStore((state) => (currentSong ? state.isLiked(currentSong._id) : false));
   const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
@@ -63,6 +73,62 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
     setQueueOpen(false);
     onClose();
   };
+
+  const getArtistId = (): string | null => {
+    if (!currentSong?.artist) return null;
+    if (typeof currentSong.artist === 'object' && '_id' in currentSong.artist) {
+      return (currentSong.artist as { _id: string })._id;
+    }
+    if (typeof currentSong.artist === 'object' && 'id' in currentSong.artist) {
+      return (currentSong.artist as { id: string }).id;
+    }
+    return typeof currentSong.artist === 'string' ? currentSong.artist : null;
+  };
+
+  const handleArtistClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const artistId = getArtistId();
+    handleClose();
+    if (artistId) {
+      navigate(`/artists/${artistId}`);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen || mediaMode !== 'video' || !hasVideo) {
+      setVideoSlotRect(null);
+      return;
+    }
+
+    const updateRect = () => {
+      const el = document.getElementById('fullplayer-video-slot');
+      if (el) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          setVideoSlotRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+        }
+      }
+    };
+
+    const raf = requestAnimationFrame(() => {
+      updateRect();
+    });
+
+    const el = document.getElementById('fullplayer-video-slot');
+    let ro: ResizeObserver | null = null;
+    if (el) {
+      ro = new ResizeObserver(updateRect);
+      ro.observe(el);
+    }
+    window.addEventListener('resize', updateRect);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+      window.removeEventListener('resize', updateRect);
+      setVideoSlotRect(null);
+    };
+  }, [isOpen, mediaMode, hasVideo, setVideoSlotRect]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -135,22 +201,70 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                 <div className="w-9 h-9" aria-hidden="true" />
               </div>
 
-              <div className="flex-1 flex flex-col items-center justify-center min-h-0 gap-8 max-w-md mx-auto w-full">
-                <div className="w-full max-w-[min(70vw,320px)] sm:max-w-sm aspect-square rounded-[var(--radius-lg)] overflow-hidden shadow-[var(--shadow-lg)] shrink">
-                  <img
-                    src={cover}
-                    alt={currentSong.title}
-                    onError={() => setImgError(true)}
-                    className="w-full h-full object-cover"
-                  />
+              <div className="flex-1 flex flex-col items-center justify-center min-h-0 gap-6 max-w-md mx-auto w-full">
+                {/* Song / Video View Mode Toggle Pill */}
+                <div className="flex items-center p-1 bg-surface-2/90 backdrop-blur rounded-full border border-border-subtle shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setMediaMode('song')}
+                    className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                      mediaMode === 'song'
+                        ? 'bg-surface-3 text-text-primary shadow-sm font-semibold'
+                        : 'text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    <Music size={13} strokeWidth={2} />
+                    <span>Song</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (hasVideo) setMediaMode('video');
+                    }}
+                    disabled={!hasVideo}
+                    className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-all ${
+                      !hasVideo
+                        ? 'opacity-40 cursor-not-allowed text-text-tertiary'
+                        : mediaMode === 'video'
+                        ? 'bg-surface-3 text-text-primary shadow-sm font-semibold cursor-pointer'
+                        : 'text-text-tertiary hover:text-text-secondary cursor-pointer'
+                    }`}
+                    title={hasVideo ? 'Watch Video' : 'No video available for this track'}
+                  >
+                    <Film size={13} strokeWidth={2} />
+                    <span>Video</span>
+                  </button>
                 </div>
+
+                {/* Media Container: Square Cover Art or 16:9 Video Slot */}
+                {mediaMode === 'video' && hasVideo ? (
+                  <div
+                    id="fullplayer-video-slot"
+                    className="w-full max-w-[min(88vw,380px)] sm:max-w-md aspect-video rounded-[var(--radius-lg)] overflow-hidden bg-black shadow-[var(--shadow-lg)] shrink"
+                  />
+                ) : (
+                  <div className="w-full max-w-[min(70vw,320px)] sm:max-w-sm aspect-square rounded-[var(--radius-lg)] overflow-hidden shadow-[var(--shadow-lg)] shrink">
+                    <img
+                      src={cover}
+                      alt={currentSong.title}
+                      onError={() => setImgError(true)}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between w-full gap-3 px-1">
                   <div className="min-w-0 text-left flex-1">
                     <h1 className="font-display text-xl sm:text-2xl text-text-primary line-clamp-2 leading-snug">
                       {currentSong.title}
                     </h1>
-                    <p className="text-sm text-text-tertiary mt-1.5 truncate">{getArtistName()}</p>
+                    <p
+                      onClick={handleArtistClick}
+                      className="text-sm text-text-tertiary hover:text-text-primary hover:underline cursor-pointer mt-1 truncate transition-colors inline-block"
+                      title={`Go to ${getArtistName()}'s page`}
+                    >
+                      {getArtistName()}
+                    </p>
                   </div>
                   <button
                     onClick={() => toggleLikeSong(currentSong)}

@@ -87,6 +87,15 @@ interface PlayerState {
   handleSongEnd: () => void;
   replenishAutoplayQueue: (force?: boolean) => Promise<boolean>;
   triggerSmartAutoplay: () => Promise<boolean>;
+  mediaMode: 'song' | 'video';
+  setMediaMode: (mode: 'song' | 'video') => void;
+  isFullPlayerOpen: boolean;
+  setFullPlayerOpen: (isOpen: boolean) => void;
+  youtubeVideoId: string | null | undefined;
+  setYoutubeVideoId: (id: string | null | undefined) => void;
+  videoSlotRect: { top: number; left: number; width: number; height: number } | null;
+  setVideoSlotRect: (rect: { top: number; left: number; width: number; height: number } | null) => void;
+
   toggleQueueOpen: () => void;
   setQueueOpen: (isOpen: boolean) => void;
 }
@@ -111,6 +120,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   recentPlayedSongIds: [],
   currentListeningContext: null,
   autoplayError: null,
+  mediaMode: 'song',
+  setMediaMode: (mode) => set({ mediaMode: mode }),
+  isFullPlayerOpen: false,
+  setFullPlayerOpen: (isOpen) => set({ isFullPlayerOpen: isOpen }),
+  youtubeVideoId: undefined,
+  setYoutubeVideoId: (id) => set({ youtubeVideoId: id }),
+  videoSlotRect: null,
+  setVideoSlotRect: (rect) => set({ videoSlotRect: rect }),
 
   playSong: (song, queue) => {
     const currentQueue = queue && queue.length > 0 ? queue : get().queue.length > 0 ? get().queue : [song];
@@ -121,6 +138,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     set({
       currentSong: song,
+      youtubeVideoId: song.youtubeVideoId ?? undefined,
       isPlaying: true,
       currentTime: 0,
       queue: currentQueue,
@@ -602,6 +620,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       // 3. Repeat All: Loop back to start of queue
       const nextSongItem = queue[0];
       if (nextSongItem) {
+        if (queue.length === 1) {
+          get().seekTo(0);
+          set({ isPlaying: true });
+          return;
+        }
         const prevRecent = get().recentPlayedSongIds.filter((id) => id !== nextSongItem._id);
         set({
           queueIndex: 0,
@@ -662,9 +685,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   handleSongEnd: async () => {
     const { repeatMode, queue, queueIndex, isAutoplayEnabled } = get();
 
-    // 1. Repeat One: Replay current track
-    if (repeatMode === 'one') {
-      set({ currentTime: 0, isPlaying: true });
+    // 1. Repeat One or single-song queue Repeat All: Replay current track
+    if (repeatMode === 'one' || (repeatMode === 'all' && queue.length === 1)) {
+      get().seekTo(0);
+      set({ isPlaying: true });
       return;
     }
 

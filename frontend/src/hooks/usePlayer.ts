@@ -86,5 +86,13 @@ export const usePlayer = () => {
     triggerSmartAutoplay: usePlayerStore((state) => state.triggerSmartAutoplay),
     toggleQueueOpen,
     setQueueOpen,
+    mediaMode: usePlayerStore((state) => state.mediaMode),
+    setMediaMode: usePlayerStore((state) => state.setMediaMode),
+    isFullPlayerOpen: usePlayerStore((state) => state.isFullPlayerOpen),
+    setFullPlayerOpen: usePlayerStore((state) => state.setFullPlayerOpen),
+    youtubeVideoId: usePlayerStore((state) => state.youtubeVideoId),
+    setYoutubeVideoId: usePlayerStore((state) => state.setYoutubeVideoId),
+    videoSlotRect: usePlayerStore((state) => state.videoSlotRect),
+    setVideoSlotRect: usePlayerStore((state) => state.setVideoSlotRect),
   };
 };

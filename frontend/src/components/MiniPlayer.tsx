@@ -17,6 +17,7 @@ import {
 import { usePlayer } from '../hooks/usePlayer';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
+import { useNavigate } from 'react-router-dom';
 import { usePlayerKeyboardShortcuts } from '../hooks/usePlayerKeyboardShortcuts';
 import { formatTime } from '../utils/formatters';
 import { IconButton } from './ui/IconButton';
@@ -33,9 +34,13 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
 
   const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
   const [audioError, setAudioError] = useState<string | null>(null);
-  // undefined = not resolved yet, null = confirmed no YouTube match (fall back
-  // to the placeholder audioUrl), string = resolved YouTube video ID.
-  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null | undefined>(undefined);
+
+  const navigate = useNavigate();
+  const mediaMode = usePlayerStore((state) => state.mediaMode);
+  const isFullPlayerOpen = usePlayerStore((state) => state.isFullPlayerOpen);
+  const videoSlotRect = usePlayerStore((state) => state.videoSlotRect);
+  const youtubeVideoId = usePlayerStore((state) => state.youtubeVideoId);
+  const setYoutubeVideoId = usePlayerStore((state) => state.setYoutubeVideoId);
 
   usePlayerKeyboardShortcuts();
 
@@ -100,20 +105,42 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     return () => {
       cancelled = true;
     };
-  }, [currentSong?._id, currentSong?.youtubeVideoId]);
+  }, [currentSong?._id, currentSong?.youtubeVideoId, setYoutubeVideoId]);
 
   const usingYoutubeEngine = Boolean(youtubeVideoId);
+
+  const onSongEnd = () => {
+    const currentRepeatMode = usePlayerStore.getState().repeatMode;
+    const currentQueue = usePlayerStore.getState().queue;
+    if (currentRepeatMode === 'one' || (currentRepeatMode === 'all' && currentQueue.length === 1)) {
+      if (usingYoutubeEngine) {
+        youtubeEngineRef.current?.replay();
+      } else if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(() => {});
+      }
+      setCurrentTime(0);
+      return;
+    }
+    handleSongEnd();
+  };
 
   useEffect(() => {
     if (seekRequest !== null) {
       if (usingYoutubeEngine) {
         youtubeEngineRef.current?.seekTo(seekRequest);
+        if (isPlaying) {
+          youtubeEngineRef.current?.play();
+        }
       } else if (audioRef.current) {
         audioRef.current.currentTime = seekRequest;
+        if (isPlaying) {
+          audioRef.current.play().catch(() => {});
+        }
       }
       clearSeekRequest();
     }
-  }, [seekRequest, usingYoutubeEngine, clearSeekRequest]);
+  }, [seekRequest, usingYoutubeEngine, isPlaying, clearSeekRequest]);
 
   // Native <audio> engine — only active for the placeholder-audio fallback
   // path (no YouTube match resolved for this track).
@@ -152,6 +179,24 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
       return currentSong.artist.name;
     }
     return String(currentSong.artist);
+  };
+  const getArtistId = (): string | null => {
+    if (!currentSong?.artist) return null;
+    if (typeof currentSong.artist === 'object' && '_id' in currentSong.artist) {
+      return (currentSong.artist as { _id: string })._id;
+    }
+    if (typeof currentSong.artist === 'object' && 'id' in currentSong.artist) {
+      return (currentSong.artist as { id: string }).id;
+    }
+    return typeof currentSong.artist === 'string' ? currentSong.artist : null;
+  };
+
+  const handleArtistClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const artistId = getArtistId();
+    if (artistId) {
+      navigate(`/artists/${artistId}`);
+    }
   };
 
   const handleTimeUpdate = (seconds?: number | React.SyntheticEvent<HTMLAudioElement>) => {
@@ -199,6 +244,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
     'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23d9a15b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231b1815;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
 
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const isVideoExpanded = Boolean(isFullPlayerOpen && mediaMode === 'video' && videoSlotRect);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[var(--z-player)] bg-surface-1/95 border-t border-border-subtle backdrop-blur-xl px-3 py-2.5 sm:px-5 sm:py-3">
@@ -212,7 +258,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
           onWaiting={handleWaiting}
           onPlaying={handlePlaying}
           onError={handleError}
-          onEnded={handleSongEnd}
+          onEnded={onSongEnd}
           preload="metadata"
         />
       )}
@@ -227,22 +273,49 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
           >
             <div className="w-11 h-11 rounded-[var(--radius-artwork)] overflow-hidden bg-surface-2 shrink-0 relative">
               {usingYoutubeEngine ? (
-                <YoutubePlayerEngine
-                  ref={youtubeEngineRef}
-                  videoId={youtubeVideoId as string}
-                  isPlaying={isPlaying}
-                  volume={volume}
-                  isMuted={isMuted}
-                  onTimeUpdate={handleTimeUpdate}
-                  onDuration={(seconds) => setDuration(seconds || currentSong.duration || 0)}
-                  onEnded={handleSongEnd}
-                  onReady={handleCanPlay}
-                  onError={handleError}
-                />
+                <>
+                  {isVideoExpanded && (
+                    <img
+                      src={currentSong.coverImage || fallbackCover}
+                      alt={currentSong.title}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  <div
+                    className={
+                      isVideoExpanded
+                        ? 'fixed z-[65] overflow-hidden rounded-[var(--radius-lg)] shadow-2xl transition-all duration-200 bg-black flex items-center justify-center'
+                        : 'w-full h-full overflow-hidden relative'
+                    }
+                    style={
+                      isVideoExpanded && videoSlotRect
+                        ? {
+                            top: videoSlotRect.top,
+                            left: videoSlotRect.left,
+                            width: videoSlotRect.width,
+                            height: videoSlotRect.height,
+                          }
+                        : undefined
+                    }
+                  >
+                    <YoutubePlayerEngine
+                      ref={youtubeEngineRef}
+                      videoId={youtubeVideoId as string}
+                      isPlaying={isPlaying}
+                      volume={volume}
+                      isMuted={isMuted}
+                      onTimeUpdate={handleTimeUpdate}
+                      onDuration={(seconds) => setDuration(seconds || currentSong.duration || 0)}
+                      onEnded={onSongEnd}
+                      onReady={handleCanPlay}
+                      onError={handleError}
+                    />
+                  </div>
+                </>
               ) : (
                 <img src={currentSong.coverImage || fallbackCover} alt={currentSong.title} className="w-full h-full object-cover" />
               )}
-              {isLoadingAudio && (
+              {isLoadingAudio && !isVideoExpanded && (
                 <div className="absolute inset-0 bg-surface-0/70 flex items-center justify-center">
                   <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                 </div>
@@ -250,7 +323,13 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             </div>
             <div className="min-w-0">
               <h4 className="text-sm font-semibold text-text-primary truncate">{currentSong.title}</h4>
-              <p className="text-xs text-text-tertiary truncate mt-0.5">{getArtistName()}</p>
+              <p
+                onClick={handleArtistClick}
+                className="text-xs text-text-tertiary hover:text-text-primary hover:underline cursor-pointer truncate mt-0.5"
+                title={`Go to ${getArtistName()}'s page`}
+              >
+                {getArtistName()}
+              </p>
               {audioError && <p className="text-[10px] text-danger truncate mt-0.5 font-medium">{audioError}</p>}
             </div>
           </button>

@@ -8,9 +8,12 @@ import { FullPlayer } from './FullPlayer';
 import { AmbientBackground } from './ui/AmbientBackground';
 import { CommandPalette } from './CommandPalette';
 
+import { usePlayerStore } from '../store/usePlayerStore';
+
 export const MainLayout: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [fullPlayerOpen, setFullPlayerOpen] = useState(false);
+  const isFullPlayerOpen = usePlayerStore((state) => state.isFullPlayerOpen);
+  const setFullPlayerOpen = usePlayerStore((state) => state.setFullPlayerOpen);
 
   return (
     <div className="flex flex-col h-screen text-text-primary">
@@ -24,7 +27,7 @@ export const MainLayout: React.FC = () => {
       </div>
       <MiniPlayer onExpand={() => setFullPlayerOpen(true)} />
       <QueueDrawer />
-      <FullPlayer isOpen={fullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
+      <FullPlayer isOpen={isFullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
       <CommandPalette />
     </div>
   );
