@@ -28,13 +28,13 @@ export const MusicLibraryPage: React.FC = () => {
   const sortBy = searchParams.get('sort') || 'playCount';
   const sortOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
   const page = parseInt(searchParams.get('page') || '1', 10);
-  const limit = parseInt(searchParams.get('limit') || '15', 10);
+  const limit = parseInt(searchParams.get('limit') || '60', 10);
 
   const updateUrlParams = (newParams: Record<string, string | number | undefined | null>) => {
     const nextParams = new URLSearchParams(searchParams);
 
     Object.entries(newParams).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '' && value !== 1 && value !== '15' && value !== 'playCount' && value !== 'desc') {
+      if (value !== undefined && value !== null && value !== '' && value !== 1 && value !== 60 && value !== '60' && value !== 'playCount' && value !== 'desc') {
         nextParams.set(key, String(value));
       } else {
         nextParams.delete(key);

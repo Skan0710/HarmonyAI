@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MainLayout } from './components/MainLayout';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { DiscoverPage } from './pages/DiscoverPage';
@@ -50,6 +51,7 @@ function App() {
   }, [isAuthenticated, fetchLikedSongs, fetchPreferences]);
 
   return (
+    <AppErrorBoundary>
     <BrowserRouter>
       <GoogleAnalytics />
       <Routes>
@@ -92,6 +94,7 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
+    </AppErrorBoundary>
   );
 }
 

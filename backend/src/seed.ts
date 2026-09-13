@@ -23,63 +23,154 @@ const AUDIO_SAMPLE_URLS = [
   'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
 ];
 
-// Real, well-known commercial songs. Title/artist metadata (real album,
-// real cover art, real duration, real release year) is resolved at seed
-// time from the iTunes Search API — a free, keyless, public catalog lookup.
-// No audio is fetched from iTunes; only metadata.
-const REAL_SONGS: { query: string; genre: string }[] = [
+// Real, well-known recording artists. For each, we pull their actual iTunes
+// catalog (real titles, real albums, real cover art, real durations/release
+// years) instead of hand-picking one or two singles — this is what lets the
+// library scale to hundreds of real songs instead of a curated handful.
+const ARTISTS: { name: string; genre: string }[] = [
   // Pop
-  { query: 'Blinding Lights The Weeknd', genre: 'pop' },
-  { query: 'Shape of You Ed Sheeran', genre: 'pop' },
-  { query: 'Levitating Dua Lipa', genre: 'pop' },
-  { query: 'Watermelon Sugar Harry Styles', genre: 'pop' },
-  { query: 'As It Was Harry Styles', genre: 'pop' },
-  { query: 'Anti-Hero Taylor Swift', genre: 'pop' },
+  { name: 'Taylor Swift', genre: 'pop' },
+  { name: 'Ed Sheeran', genre: 'pop' },
+  { name: 'Dua Lipa', genre: 'pop' },
+  { name: 'Ariana Grande', genre: 'pop' },
+  { name: 'The Weeknd', genre: 'pop' },
+  { name: 'Bruno Mars', genre: 'pop' },
+  { name: 'Billie Eilish', genre: 'pop' },
+  { name: 'Justin Bieber', genre: 'pop' },
+  { name: 'Harry Styles', genre: 'pop' },
+  { name: 'Miley Cyrus', genre: 'pop' },
+  { name: 'Adele', genre: 'pop' },
+  { name: 'Katy Perry', genre: 'pop' },
+  { name: 'Lady Gaga', genre: 'pop' },
+  { name: 'Shawn Mendes', genre: 'pop' },
+  { name: 'Olivia Rodrigo', genre: 'pop' },
   // Rock
-  { query: "Sweet Child O Mine Guns N Roses", genre: 'rock' },
-  { query: 'Smells Like Teen Spirit Nirvana', genre: 'rock' },
-  { query: 'Bohemian Rhapsody Queen', genre: 'rock' },
-  { query: 'Africa Toto', genre: 'rock' },
-  { query: 'Mr Brightside The Killers', genre: 'rock' },
-  { query: 'Somebody Told Me The Killers', genre: 'rock' },
+  { name: 'Queen', genre: 'rock' },
+  { name: 'Nirvana', genre: 'rock' },
+  { name: "Guns N' Roses", genre: 'rock' },
+  { name: 'Led Zeppelin', genre: 'rock' },
+  { name: 'AC/DC', genre: 'rock' },
+  { name: 'The Killers', genre: 'rock' },
+  { name: 'Foo Fighters', genre: 'rock' },
+  { name: 'Metallica', genre: 'rock' },
+  { name: 'Red Hot Chili Peppers', genre: 'rock' },
+  { name: 'Green Day', genre: 'rock' },
+  { name: 'Linkin Park', genre: 'rock' },
+  { name: 'Coldplay', genre: 'rock' },
+  { name: 'Muse', genre: 'rock' },
+  { name: 'Imagine Dragons', genre: 'rock' },
+  { name: 'Arctic Monkeys', genre: 'rock' },
   // Hip-Hop
-  { query: 'HUMBLE Kendrick Lamar', genre: 'hip-hop' },
-  { query: 'SICKO MODE Travis Scott', genre: 'hip-hop' },
-  { query: "Gods Plan Drake", genre: 'hip-hop' },
-  { query: 'Sunflower Post Malone', genre: 'hip-hop' },
-  { query: 'Lose Yourself Eminem', genre: 'hip-hop' },
-  { query: 'In Da Club 50 Cent', genre: 'hip-hop' },
+  { name: 'Kendrick Lamar', genre: 'hip-hop' },
+  { name: 'Drake', genre: 'hip-hop' },
+  { name: 'Travis Scott', genre: 'hip-hop' },
+  { name: 'Eminem', genre: 'hip-hop' },
+  { name: 'Post Malone', genre: 'hip-hop' },
+  { name: 'J. Cole', genre: 'hip-hop' },
+  { name: 'A$AP Rocky', genre: 'hip-hop' },
+  { name: 'Playboi Carti', genre: 'hip-hop' },
+  { name: 'Lil Uzi Vert', genre: 'hip-hop' },
+  { name: 'Future', genre: 'hip-hop' },
+  { name: 'Young Thug', genre: 'hip-hop' },
+  { name: '50 Cent', genre: 'hip-hop' },
+  { name: 'Kanye West', genre: 'hip-hop' },
+  { name: 'Lil Wayne', genre: 'hip-hop' },
+  { name: 'Nas', genre: 'hip-hop' },
   // Electronic
-  { query: 'Titanium David Guetta Sia', genre: 'electronic' },
-  { query: 'Wake Me Up Avicii', genre: 'electronic' },
-  { query: 'One More Time Daft Punk', genre: 'electronic' },
-  { query: 'Levels Avicii', genre: 'electronic' },
-  { query: 'Clarity Zedd', genre: 'electronic' },
-  { query: 'Animals Martin Garrix', genre: 'electronic' },
+  { name: 'Daft Punk', genre: 'electronic' },
+  { name: 'Avicii', genre: 'electronic' },
+  { name: 'Calvin Harris', genre: 'electronic' },
+  { name: 'Skrillex', genre: 'electronic' },
+  { name: 'Martin Garrix', genre: 'electronic' },
+  { name: 'Marshmello', genre: 'electronic' },
+  { name: 'Zedd', genre: 'electronic' },
+  { name: 'David Guetta', genre: 'electronic' },
+  { name: 'Deadmau5', genre: 'electronic' },
+  { name: 'The Chainsmokers', genre: 'electronic' },
+  { name: 'Swedish House Mafia', genre: 'electronic' },
+  { name: 'Alan Walker', genre: 'electronic' },
+  { name: 'DJ Snake', genre: 'electronic' },
+  { name: 'Tiësto', genre: 'electronic' },
+  { name: 'Kygo', genre: 'electronic' },
   // R&B / Soul
-  { query: 'Location Khalid', genre: 'r-and-b' },
-  { query: 'Best Part Daniel Caesar', genre: 'r-and-b' },
-  { query: 'Redbone Childish Gambino', genre: 'r-and-b' },
-  { query: 'Adorn Miguel', genre: 'r-and-b' },
-  { query: 'Pyramids Frank Ocean', genre: 'r-and-b' },
+  { name: 'Frank Ocean', genre: 'r-and-b' },
+  { name: 'Miguel', genre: 'r-and-b' },
+  { name: 'Khalid', genre: 'r-and-b' },
+  { name: 'Daniel Caesar', genre: 'r-and-b' },
+  { name: 'SZA', genre: 'r-and-b' },
+  { name: 'Chris Brown', genre: 'r-and-b' },
+  { name: 'Usher', genre: 'r-and-b' },
+  { name: 'Alicia Keys', genre: 'r-and-b' },
+  { name: 'John Legend', genre: 'r-and-b' },
+  { name: 'Beyoncé', genre: 'r-and-b' },
+  { name: 'H.E.R.', genre: 'r-and-b' },
+  { name: 'Jhené Aiko', genre: 'r-and-b' },
+  { name: 'Solange', genre: 'r-and-b' },
+  { name: 'Ne-Yo', genre: 'r-and-b' },
+  { name: 'Bryson Tiller', genre: 'r-and-b' },
   // Jazz & Blues
-  { query: 'Fly Me to the Moon Frank Sinatra', genre: 'jazz' },
-  { query: 'What a Wonderful World Louis Armstrong', genre: 'jazz' },
-  { query: 'Feeling Good Nina Simone', genre: 'jazz' },
-  { query: 'Take Five Dave Brubeck', genre: 'jazz' },
-  { query: 'My Way Frank Sinatra', genre: 'jazz' },
-  // Classical
-  { query: 'Clair de Lune Debussy', genre: 'classical' },
-  { query: 'Canon in D Pachelbel', genre: 'classical' },
-  { query: 'River Flows in You Yiruma', genre: 'classical' },
-  { query: 'Nuvole Bianche Ludovico Einaudi', genre: 'classical' },
-  { query: 'Gymnopedie No 1 Erik Satie', genre: 'classical' },
+  { name: 'Miles Davis', genre: 'jazz' },
+  { name: 'Frank Sinatra', genre: 'jazz' },
+  { name: 'Louis Armstrong', genre: 'jazz' },
+  { name: 'Nina Simone', genre: 'jazz' },
+  { name: 'Ella Fitzgerald', genre: 'jazz' },
+  { name: 'Dave Brubeck', genre: 'jazz' },
+  { name: 'Nat King Cole', genre: 'jazz' },
+  { name: 'Thelonious Monk', genre: 'jazz' },
+  { name: 'Dizzy Gillespie', genre: 'jazz' },
+  { name: 'Billie Holiday', genre: 'jazz' },
+  { name: 'John Coltrane', genre: 'jazz' },
+  { name: 'Ray Charles', genre: 'jazz' },
+  { name: 'B.B. King', genre: 'jazz' },
+  { name: 'Duke Ellington', genre: 'jazz' },
+  { name: 'Chet Baker', genre: 'jazz' },
   // Indie & Folk
-  { query: 'Ho Hey The Lumineers', genre: 'indie' },
-  { query: 'Skinny Love Bon Iver', genre: 'indie' },
-  { query: 'Riptide Vance Joy', genre: 'indie' },
-  { query: 'Budapest George Ezra', genre: 'indie' },
-  { query: 'Little Talks Of Monsters and Men', genre: 'indie' },
+  { name: 'The Lumineers', genre: 'indie' },
+  { name: 'Bon Iver', genre: 'indie' },
+  { name: 'Vance Joy', genre: 'indie' },
+  { name: 'George Ezra', genre: 'indie' },
+  { name: 'Of Monsters and Men', genre: 'indie' },
+  { name: 'Mumford & Sons', genre: 'indie' },
+  { name: 'Hozier', genre: 'indie' },
+  { name: 'Florence and the Machine', genre: 'indie' },
+  { name: 'Foster the People', genre: 'indie' },
+  { name: 'MGMT', genre: 'indie' },
+  { name: 'Fleet Foxes', genre: 'indie' },
+  { name: 'Vampire Weekend', genre: 'indie' },
+  { name: 'Arcade Fire', genre: 'indie' },
+  { name: 'The National', genre: 'indie' },
+  { name: 'Two Door Cinema Club', genre: 'indie' },
+];
+
+// Classical is modeled per-piece rather than per-artist: iTunes catalogs
+// classical recordings under the performing orchestra/soloist, not the
+// composer, so an artist-catalog pull doesn't work the way it does for
+// modern acts. A direct title search for well-known pieces works better.
+const CLASSICAL_PIECES: string[] = [
+  'Clair de Lune Debussy',
+  'Canon in D Pachelbel',
+  'River Flows in You Yiruma',
+  'Nuvole Bianche Ludovico Einaudi',
+  'Gymnopedie No 1 Erik Satie',
+  'Moonlight Sonata Beethoven',
+  'Symphony No 5 Beethoven',
+  'The Four Seasons Spring Vivaldi',
+  'Ave Maria Schubert',
+  'Requiem Mozart',
+  'Eine Kleine Nachtmusik Mozart',
+  'Swan Lake Tchaikovsky',
+  'Air on the G String Bach',
+  'Prelude in C Bach',
+  'Nocturne Chopin',
+  'Piano Sonata No 14 Beethoven',
+  'The Nutcracker Tchaikovsky',
+  'Rhapsody in Blue Gershwin',
+  'Adagio for Strings Barber',
+  'Fur Elise Beethoven',
+  'Toccata and Fugue in D Minor Bach',
+  'Hungarian Dance No 5 Brahms',
+  'Piano Concerto No 21 Mozart',
+  'Water Music Handel',
 ];
 
 const GENRE_AUDIO_DEFAULTS: Record<
@@ -104,12 +195,21 @@ interface ITunesTrack {
   releaseDate?: string;
   trackTimeMillis?: number;
   primaryGenreName?: string;
+  trackExplicitness?: string;
+  wrapperType?: string;
+  kind?: string;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// country=US + lang=en_us biases matches toward the English-language/US
+// catalog release of a track or artist, avoiding foreign-language covers
+// or region-specific versions that sometimes rank first for an ambiguous
+// title/name-only search.
+const ITUNES_LOCALE = 'country=US&lang=en_us';
+
 async function fetchItunesTrack(query: string): Promise<ITunesTrack | null> {
-  const url = `https://itunes.apple.com/search?media=music&entity=song&limit=1&term=${encodeURIComponent(query)}`;
+  const url = `https://itunes.apple.com/search?media=music&entity=song&${ITUNES_LOCALE}&limit=1&term=${encodeURIComponent(query)}`;
   try {
     const response = await fetch(url);
     if (!response.ok) return null;
@@ -120,10 +220,49 @@ async function fetchItunesTrack(query: string): Promise<ITunesTrack | null> {
   }
 }
 
+async function fetchArtistId(name: string): Promise<number | null> {
+  const url = `https://itunes.apple.com/search?entity=musicArtist&${ITUNES_LOCALE}&limit=1&term=${encodeURIComponent(name)}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const body = (await response.json()) as { results?: { artistId?: number }[] };
+    return body.results?.[0]?.artistId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchArtistTracks(artistId: number, limit = 25): Promise<ITunesTrack[]> {
+  const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=song&${ITUNES_LOCALE}&limit=${limit}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    const body = (await response.json()) as { results?: ITunesTrack[] };
+    const tracks = (body.results || []).filter((r) => r.wrapperType === 'track' && r.kind === 'song');
+
+    // The same track title often reappears across deluxe editions/reissues
+    // with identical metadata but a different album artwork URL — keep the
+    // first (usually original) occurrence only.
+    const seenTitles = new Set<string>();
+    const deduped: ITunesTrack[] = [];
+    for (const t of tracks) {
+      const key = t.trackName.toLowerCase().trim();
+      if (seenTitles.has(key)) continue;
+      seenTitles.add(key);
+      deduped.push(t);
+    }
+    return deduped;
+  } catch {
+    return [];
+  }
+}
+
 const upscaleArtwork = (url?: string): string => {
   if (!url) return '';
   return url.replace(/\d+x\d+bb\.(jpg|png)$/, '600x600bb.$1');
 };
+
+const MAX_TRACKS_PER_ARTIST = 14;
 
 const seedDatabase = async () => {
   try {
@@ -215,19 +354,54 @@ const seedDatabase = async () => {
     );
     const genreMap = new Map(genreData.map((g, i) => [g.key, genres[i]._id as string]));
 
-    // 2. Resolve real song metadata from the iTunes catalog
-    console.log('🔎 Resolving real song metadata from the iTunes catalog...');
+    // 2. Resolve real song metadata from the iTunes catalog: pull each
+    // artist's real catalog in bulk (not just one hand-picked single), plus
+    // a curated list of classical pieces (composers don't map to "artists").
+    console.log('🔎 Resolving real song metadata from the iTunes catalog (this pulls each artist\'s real catalog, expect a few minutes)...');
     const resolved: { track: ITunesTrack; genreSlug: string }[] = [];
-    for (const entry of REAL_SONGS) {
-      const track = await fetchItunesTrack(entry.query);
-      if (!track) {
-        console.warn(`  ⚠️  No iTunes match for "${entry.query}", skipping`);
+    const seenTracks = new Set<string>(); // guards against two sources resolving to the same real track
+
+    for (const artistDef of ARTISTS) {
+      const artistId = await fetchArtistId(artistDef.name);
+      await sleep(200);
+      if (!artistId) {
+        console.warn(`  ⚠️  No iTunes artist match for "${artistDef.name}", skipping`);
         continue;
       }
-      resolved.push({ track, genreSlug: entry.genre });
-      await sleep(150); // stay well under iTunes' unpublished per-minute rate limit
+
+      const tracks = await fetchArtistTracks(artistId, 25);
+      await sleep(200);
+      if (tracks.length === 0) {
+        console.warn(`  ⚠️  No tracks found for "${artistDef.name}", skipping`);
+        continue;
+      }
+
+      let added = 0;
+      for (const track of tracks) {
+        if (added >= MAX_TRACKS_PER_ARTIST) break;
+        const dedupeKey = `${track.artistName}::${track.trackName}`.toLowerCase();
+        if (seenTracks.has(dedupeKey)) continue;
+        seenTracks.add(dedupeKey);
+        resolved.push({ track, genreSlug: artistDef.genre });
+        added += 1;
+      }
+      console.log(`  ✓ ${artistDef.name}: added ${added} real tracks`);
     }
-    console.log(`✅ Resolved ${resolved.length}/${REAL_SONGS.length} real songs`);
+
+    for (const query of CLASSICAL_PIECES) {
+      const track = await fetchItunesTrack(query);
+      await sleep(200);
+      if (!track) {
+        console.warn(`  ⚠️  No iTunes match for "${query}", skipping`);
+        continue;
+      }
+      const dedupeKey = `${track.artistName}::${track.trackName}`.toLowerCase();
+      if (seenTracks.has(dedupeKey)) continue;
+      seenTracks.add(dedupeKey);
+      resolved.push({ track, genreSlug: 'classical' });
+    }
+
+    console.log(`✅ Resolved ${resolved.length} real songs total`);
 
     // 3. Seed real Artists (deduped by the artist name iTunes returns)
     console.log('🎤 Seeding real Artists...');
@@ -310,7 +484,7 @@ const seedDatabase = async () => {
         },
         tags: [genreSlug, 'harmonyai-seed'],
         language: 'English',
-        explicit: false,
+        explicit: track.trackExplicitness === 'explicit',
       });
       songs.push(song);
     }
