@@ -484,8 +484,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             className={`p-1.5 rounded-full hover:bg-surface-2 transition-colors cursor-pointer shrink-0 hidden sm:flex items-center justify-center ${
               isLiked ? 'text-accent' : 'text-text-tertiary hover:text-text-primary'
             }`}
-            aria-label={isLiked ? 'Unlike song' : 'Like song'}
-            title={isLiked ? 'Unlike song' : 'Like song'}
+            aria-label={isLiked ? 'Unlike song (Shift + =)' : 'Like song (Shift + =)'}
+            title={isLiked ? 'Unlike song (Shift + =)' : 'Like song (Shift + =)'}
           >
             <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} strokeWidth={1.75} />
           </button>
@@ -502,8 +502,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
               size="sm"
               variant={isShuffle ? 'active' : 'default'}
               onClick={toggleShuffle}
-              aria-label="Toggle Shuffle"
-              title={isShuffle ? 'Shuffle Enabled' : 'Enable Shuffle'}
+              aria-label="Toggle Shuffle (S)"
+              title={isShuffle ? 'Shuffle Enabled (S)' : 'Enable Shuffle (S)'}
             >
               <Shuffle strokeWidth={1.75} />
             </IconButton>
@@ -512,8 +512,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
               size="sm"
               onClick={previousSong}
               disabled={queue.length <= 1}
-              aria-label="Previous Song (Left Arrow)"
-              title="Previous Track (Left Arrow)"
+              aria-label="Previous Track (K or Shift+P)"
+              title="Previous Track (K or Shift+P)"
             >
               <SkipBack strokeWidth={1.75} fill="currentColor" />
             </IconButton>
@@ -522,8 +522,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
               size="lg"
               variant="accent"
               onClick={togglePlay}
-              aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+              aria-label={isPlaying ? 'Pause (Space or ;)' : 'Play (Space or ;)'}
+              title={isPlaying ? 'Pause (Space or ;)' : 'Play (Space or ;)'}
             >
               {isLoadingAudio ? (
                 <div className="w-4 h-4 border-2 border-text-on-accent border-t-transparent rounded-full animate-spin" />
@@ -538,8 +538,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
               size="sm"
               onClick={nextSong}
               disabled={queue.length <= 1 && !isAutoplayEnabled}
-              aria-label="Next Song (Right Arrow)"
-              title="Next Track (Right Arrow)"
+              aria-label="Next Track (J or Shift+N)"
+              title="Next Track (J or Shift+N)"
             >
               <SkipForward strokeWidth={1.75} fill="currentColor" />
             </IconButton>
@@ -548,8 +548,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
               size="sm"
               variant={repeatMode !== 'off' ? 'active' : 'default'}
               onClick={toggleRepeatMode}
-              aria-label="Toggle Repeat Mode"
-              title={repeatMode === 'one' ? 'Repeat One (Active)' : repeatMode === 'all' ? 'Repeat All (Active)' : 'Enable Repeat'}
+              aria-label="Toggle Repeat Mode (R)"
+              title={repeatMode === 'one' ? 'Repeat One (R)' : repeatMode === 'all' ? 'Repeat All (R)' : 'Enable Repeat (R)'}
             >
               {repeatMode === 'one' ? <Repeat1 strokeWidth={1.75} /> : <Repeat strokeWidth={1.75} />}
             </IconButton>
@@ -606,15 +606,20 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             className={`relative h-8 px-2.5 rounded-[var(--radius-sm)] border transition-colors flex items-center gap-1.5 cursor-pointer ${
               isQueueOpen ? 'bg-accent-wash text-accent border-accent-wash-strong' : 'text-text-tertiary border-border-subtle hover:text-text-secondary'
             }`}
-            title="Toggle Playback Queue"
-            aria-label="Toggle Playback Queue"
+            title="Toggle Playback Queue (Q)"
+            aria-label="Toggle Playback Queue (Q)"
           >
             <ListMusic size={15} strokeWidth={1.75} />
             <span className="text-2xs font-mono">{queue.length}</span>
           </button>
 
           <div className="flex items-center gap-2">
-            <button onClick={toggleMute} className="text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" aria-label="Mute / Unmute">
+            <button
+              onClick={toggleMute}
+              className="text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer"
+              aria-label="Mute / Unmute (M)"
+              title="Mute / Unmute (M)"
+            >
               {isMuted || volume === 0 ? <VolumeX size={16} className="text-danger" /> : <Volume2 size={16} />}
             </button>
             <div className="relative flex items-center w-20 sm:w-24 group">

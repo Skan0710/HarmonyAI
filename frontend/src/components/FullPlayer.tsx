@@ -335,17 +335,25 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                     size="md"
                     variant={isShuffle ? 'active' : 'default'}
                     onClick={toggleShuffle}
-                    aria-label="Toggle shuffle"
+                    aria-label="Toggle Shuffle (S)"
+                    title={isShuffle ? 'Shuffle Enabled (S)' : 'Enable Shuffle (S)'}
                   >
                     <Shuffle strokeWidth={1.75} />
                   </IconButton>
-                  <IconButton size="md" onClick={previousSong} disabled={queue.length <= 1} aria-label="Previous song">
+                  <IconButton
+                    size="md"
+                    onClick={previousSong}
+                    disabled={queue.length <= 1}
+                    aria-label="Previous Track (K or Shift+P)"
+                    title="Previous Track (K or Shift+P)"
+                  >
                     <SkipBack size={20} fill="currentColor" strokeWidth={2} />
                   </IconButton>
                   <motion.button
                     whileTap={{ scale: 0.94 }}
                     onClick={togglePlay}
-                    aria-label={isPlaying ? 'Pause' : 'Play'}
+                    aria-label={isPlaying ? 'Pause (Space or ;)' : 'Play (Space or ;)'}
+                    title={isPlaying ? 'Pause (Space or ;)' : 'Play (Space or ;)'}
                     className="w-16 h-16 rounded-full bg-accent hover:bg-accent-strong text-text-on-accent flex items-center justify-center transition-colors cursor-pointer"
                   >
                     {isPlaying ? (
@@ -354,14 +362,20 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                       <Play size={26} fill="currentColor" strokeWidth={0} className="ml-1" />
                     )}
                   </motion.button>
-                  <IconButton size="md" onClick={nextSong} aria-label="Next song">
+                  <IconButton
+                    size="md"
+                    onClick={nextSong}
+                    aria-label="Next Track (J or Shift+N)"
+                    title="Next Track (J or Shift+N)"
+                  >
                     <SkipForward size={20} fill="currentColor" strokeWidth={2} />
                   </IconButton>
                   <IconButton
                     size="md"
                     variant={repeatMode !== 'off' ? 'active' : 'default'}
                     onClick={toggleRepeatMode}
-                    aria-label="Toggle repeat"
+                    aria-label="Toggle Repeat Mode (R)"
+                    title={repeatMode === 'one' ? 'Repeat One (R)' : repeatMode === 'all' ? 'Repeat All (R)' : 'Enable Repeat (R)'}
                   >
                     {repeatMode === 'one' ? <Repeat1 strokeWidth={1.75} /> : <Repeat strokeWidth={1.75} />}
                   </IconButton>

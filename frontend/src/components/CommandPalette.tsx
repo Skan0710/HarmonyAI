@@ -11,6 +11,7 @@ import {
   SlidersHorizontal,
   Fingerprint,
   Play,
+  Keyboard,
 } from 'lucide-react';
 import { SearchModal } from './ui/search-modal';
 import type { SearchResult, QuickAction } from './ui/search-modal';
@@ -18,6 +19,7 @@ import { searchGlobal } from '../services/searchService';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useCommandPaletteStore } from '../store/useCommandPaletteStore';
 import { useRecentSearchesStore } from '../store/useRecentSearchesStore';
+import { useKeyboardShortcutsModalStore } from '../store/useKeyboardShortcutsModalStore';
 
 interface PaletteResult extends SearchResult {
   _navigate: string;
@@ -116,6 +118,7 @@ export const CommandPalette: React.FC = () => {
       { label: 'Music DNA', icon: <Fingerprint className="h-[15px] w-[15px]" />, onClick: () => { navigate('/music-dna'); close(); } },
       { label: 'AI Assistant', icon: <Sparkles className="h-[15px] w-[15px]" />, onClick: () => { navigate('/assistant'); close(); } },
       { label: 'Preferences', icon: <SlidersHorizontal className="h-[15px] w-[15px]" />, onClick: () => { navigate('/preferences'); close(); } },
+      { label: 'Keyboard shortcuts', icon: <Keyboard className="h-[15px] w-[15px]" />, onClick: () => { close(); useKeyboardShortcutsModalStore.getState().open(); } },
     ],
     [navigate, close]
   );

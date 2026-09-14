@@ -7,6 +7,7 @@ import { QueueDrawer } from './QueueDrawer';
 import { FullPlayer } from './FullPlayer';
 import { AmbientBackground } from './ui/AmbientBackground';
 import { CommandPalette } from './CommandPalette';
+import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 
 import { usePlayerStore } from '../store/usePlayerStore';
 
@@ -29,6 +30,7 @@ export const MainLayout: React.FC = () => {
       <QueueDrawer />
       <FullPlayer isOpen={isFullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
       <CommandPalette />
+      <KeyboardShortcutsModal />
     </div>
   );
 };
