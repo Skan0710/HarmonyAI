@@ -9,6 +9,7 @@ import { useRecentSearchesStore } from '../store/useRecentSearchesStore';
 import { Button } from './ui/Button';
 import { Wordmark } from './Wordmark';
 import { useCommandPaletteStore } from '../store/useCommandPaletteStore';
+import { ConfirmLogoutModal } from './ConfirmLogoutModal';
 
 interface NavbarProps {
   onMenuClick?: () => void;
@@ -26,6 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [suggestions, setSuggestions] = useState<GroupedSearchResults | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isConfirmLogoutOpen, setIsConfirmLogoutOpen] = useState(false);
 
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -58,6 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   }, []);
 
   const handleLogout = () => {
+    setIsConfirmLogoutOpen(false);
     logout();
     navigate('/login', { replace: true });
   };
@@ -175,12 +178,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
               <span className="text-text-secondary font-medium text-xs">{user.name}</span>
             </Link>
             <button
-              onClick={handleLogout}
-              className="p-2 text-text-tertiary hover:text-danger transition-colors cursor-pointer"
-              title="Sign Out"
-              aria-label="Sign Out"
+              type="button"
+              onClick={() => setIsConfirmLogoutOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-pill)] bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30 hover:border-danger/50 text-xs font-semibold transition-all duration-150 cursor-pointer shadow-sm active:scale-[0.98]"
+              title="Log Out"
+              aria-label="Log Out"
             >
-              <LogOut size={16} strokeWidth={1.75} />
+              <LogOut size={13} strokeWidth={2.2} />
+              <span>Log Out</span>
             </button>
           </div>
         ) : (
@@ -194,6 +199,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
           </div>
         )}
       </div>
+
+      <ConfirmLogoutModal
+        isOpen={isConfirmLogoutOpen}
+        onConfirm={handleLogout}
+        onClose={() => setIsConfirmLogoutOpen(false)}
+      />
     </header>
   );
 };

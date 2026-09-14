@@ -752,62 +752,41 @@ export const getContextAwareRecommendations = controllerWrapper(async (req: Requ
   const derivedPreferences = ContextPreferenceMappingService.mapContextToPreferences(sanitizedContext);
 
   try {
-    // 2. Fetch Hybrid Recommendations with Contextual Modulation
-    const result = await HybridRecommendationService.getHybridRecommendations({
+    // 2. Fetch Dynamic Context & Preference Aware Recommendations
+    const result = await ContextAwareRecommendationService.getContextAwareRecommendations({
       userId: user._id.toString(),
+      situation: sanitizedContext.situation,
+      mood: sanitizedContext.mood,
+      desiredEnergy: sanitizedContext.desiredEnergy,
+      desiredTempo: sanitizedContext.desiredTempo,
+      preferredGenres: sanitizedContext.preferredGenres,
+      discoveryLevel: sanitizedContext.discoveryLevel,
       limit: parsedLimit,
-      context: sanitizedContext,
-    });
-
-    // 3. Attach Explanations & Context Fit Metadata
-    const enrichedRecommendations = (result.recommendations || []).map((item) => {
-      const explanation = RecommendationExplanationService.explainSong({
-        song: item.song,
-        componentScores: item.componentScores,
-        sources: item.sources,
-        sessionPreferences: {
-          activeMood: derivedPreferences.targetMood,
-          targetEnergy: derivedPreferences.targetEnergy,
-          targetTempo: derivedPreferences.targetTempo,
-          sessionGenres: derivedPreferences.preferredGenres,
-        },
-      });
-
-      return {
-        song: item.song,
-        hybridScore: item.hybridScore,
-        recommendationScore: item.finalScore ?? item.hybridScore,
-        primaryExplanation: explanation.primaryExplanation,
-        topReasons: explanation.reasons || explanation.explanations,
-        componentScores: item.componentScores,
-        sources: item.sources,
-        metadata: item.metadata,
-      };
     });
 
     res.status(200).json({
       success: true,
       context: {
-        situation: derivedPreferences.situation,
-        mood: derivedPreferences.targetMood,
-        desiredEnergy: derivedPreferences.targetEnergy,
-        desiredTempo: derivedPreferences.targetTempo,
-        preferredGenres: derivedPreferences.preferredGenres,
-        discoveryLevel: derivedPreferences.noveltyPreference,
+        situation: result.context.situation,
+        mood: result.context.mood,
+        desiredEnergy: result.context.desiredEnergy,
+        desiredTempo: result.context.desiredTempo,
+        preferredGenres: result.context.preferredGenres,
+        discoveryLevel: result.context.discoveryLevel,
         derivedPreferences: {
-          targetEnergy: derivedPreferences.targetEnergy,
-          targetTempo: derivedPreferences.targetTempo,
-          targetMood: derivedPreferences.targetMood,
-          preferredGenres: derivedPreferences.preferredGenres,
-          noveltyPreference: derivedPreferences.noveltyPreference,
+          targetEnergy: result.context.desiredEnergy,
+          targetTempo: result.context.desiredTempo,
+          targetMood: result.context.mood,
+          preferredGenres: result.context.preferredGenres,
+          noveltyPreference: result.context.discoveryLevel,
           rankingWeights: derivedPreferences.rankingWeights,
         },
         appliedOverrides: derivedPreferences.appliedOverrides,
       },
       strategyUsed: result.strategyUsed,
       userClassification: result.userClassification,
-      count: enrichedRecommendations.length,
-      data: enrichedRecommendations,
+      count: result.count,
+      data: result.data,
     });
   } catch (error: any) {
     // Graceful fallback on empty or failed query

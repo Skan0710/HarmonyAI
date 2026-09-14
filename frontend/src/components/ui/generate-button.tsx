@@ -31,82 +31,59 @@ export function GenerateButton({
     <div className="relative inline-block group">
       <style>{`
         .gen-btn {
-          --border-radius: 24px;
-          --padding: 4px;
-          --transition: 0.4s;
-          --button-color: #101010;
+          --border-radius: 9999px;
+          --padding: 0px;
+          --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          --button-color: #1a1613;
           --highlight-color-hue: ${hue}deg;
 
           user-select: none;
-          display: flex;
+          display: inline-flex;
+          align-items: center;
           justify-content: center;
-          padding: 0.5em 0.5em 0.5em 1.1em;
+          padding: 0.55em 1.25em 0.55em 1.1em;
           font-family: "Poppins", "Inter", "Segoe UI", sans-serif;
-          font-size: 1em;
-          font-weight: 400;
+          font-size: 0.95em;
+          font-weight: 500;
+          color: #f5f5f5;
 
           background-color: var(--button-color);
 
           box-shadow:
-            inset 0px 1px 1px rgba(255, 255, 255, 0.2),
-            inset 0px 2px 2px rgba(255, 255, 255, 0.15),
-            inset 0px 4px 4px rgba(255, 255, 255, 0.1),
-            inset 0px 8px 8px rgba(255, 255, 255, 0.05),
-            inset 0px 16px 16px rgba(255, 255, 255, 0.05),
-            0px -1px 1px rgba(0, 0, 0, 0.02),
-            0px -2px 2px rgba(0, 0, 0, 0.03), 
-            0px -4px 4px rgba(0, 0, 0, 0.05),
-            0px -8px 8px rgba(0, 0, 0, 0.06), 
-            0px -16px 16px rgba(0, 0, 0, 0.08);
+            0 2px 8px rgba(0, 0, 0, 0.35),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12);
 
-          border: solid 1px rgba(255, 255, 255, 0.133);
+          border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: var(--border-radius);
           cursor: pointer;
 
-          transition: box-shadow var(--transition), border var(--transition), background-color var(--transition);
+          transition: box-shadow var(--transition), border-color var(--transition), background-color var(--transition);
         }
         
         .gen-btn::before {
           content: "";
           position: absolute;
-          top: calc(0px - var(--padding));
-          left: calc(0px - var(--padding));
-          width: calc(100% + var(--padding) * 2);
-          height: calc(100% + var(--padding) * 2);
-          border-radius: calc(var(--border-radius) + var(--padding));
+          inset: 0;
+          border-radius: inherit;
           pointer-events: none;
-          background-image: linear-gradient(0deg, rgba(0,0,0,0.267), rgba(0,0,0,0.667));
-
-          z-index: -1;
-          transition: box-shadow var(--transition), filter var(--transition);
-          box-shadow: 0 -8px 8px -6px rgba(0,0,0,0) inset, 
-            0 -16px 16px -8px rgba(0,0,0,0) inset,
-            1px 1px 1px rgba(255,255,255,0.133), 
-            2px 2px 2px rgba(255,255,255,0.067), 
-            -1px -1px 1px rgba(0,0,0,0.133),
-            -2px -2px 2px rgba(0,0,0,0.067);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 70%);
+          z-index: 0;
+          transition: opacity var(--transition);
         }
         
         .gen-btn::after {
           content: "";
           position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
+          inset: 0;
           border-radius: inherit;
           pointer-events: none;
           background-image: linear-gradient(
             0deg,
-            #fff,
-            hsl(var(--highlight-color-hue), 100%, 70%),
-            hsla(var(--highlight-color-hue), 100%, 70%, 50%),
-            8%,
-            transparent
+            hsla(var(--highlight-color-hue), 100%, 70%, 25%),
+            transparent 60%
           );
-          background-position: 0 0;
           opacity: 0;
-          transition: opacity var(--transition), filter var(--transition);
+          transition: opacity var(--transition);
         }
 
         .gen-btn-letter {
@@ -198,13 +175,12 @@ export function GenerateButton({
           animation-delay: 0.2s;
         }
 
-        .gen-btn[data-generating="true"]::before {
-          box-shadow: 0 -8px 12px -6px rgba(255,255,255,0.2) inset,
-            0 -16px 16px -8px hsla(var(--highlight-color-hue), 100%, 70%, 20%) inset,
-            1px 1px 1px rgba(255,255,255,0.2), 
-            2px 2px 2px rgba(255,255,255,0.067), 
-            -1px -1px 1px rgba(0,0,0,0.133),
-            -2px -2px 2px rgba(0,0,0,0.067);
+        .gen-btn[data-generating="true"] {
+          border-color: hsla(var(--highlight-color-hue), 100%, 70%, 0.6);
+          box-shadow:
+            0 4px 18px rgba(0, 0, 0, 0.4),
+            0 0 16px hsla(var(--highlight-color-hue), 100%, 70%, 0.25),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
         
         .gen-btn[data-generating="true"]::after {
@@ -230,21 +206,18 @@ export function GenerateButton({
 
         /* Hover & Active states */
         .gen-btn:active {
-          border: solid 1px hsla(var(--highlight-color-hue), 100%, 80%, 70%);
-          background-color: hsla(var(--highlight-color-hue), 50%, 20%, 0.5);
-        }
-        .gen-btn:active::before {
-          box-shadow: 0 -8px 12px -6px rgba(255,255,255,0.667) inset,
-            0 -16px 16px -8px hsla(var(--highlight-color-hue), 100%, 70%, 80%) inset,
-            1px 1px 1px rgba(255,255,255,0.267), 
-            2px 2px 2px rgba(255,255,255,0.133), 
-            -1px -1px 1px rgba(0,0,0,0.133),
-            -2px -2px 2px rgba(0,0,0,0.067);
+          border-color: hsla(var(--highlight-color-hue), 100%, 75%, 0.7);
+          background-color: #241f1b;
+          transform: translateY(1px);
+          box-shadow:
+            0 2px 10px rgba(0, 0, 0, 0.45),
+            0 0 14px hsla(var(--highlight-color-hue), 100%, 70%, 0.25),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
         .gen-btn:active::after {
-          opacity: 1;
+          opacity: 0.9;
           mask-image: linear-gradient(0deg, #fff, transparent);
-          filter: brightness(200%);
+          filter: brightness(150%);
         }
         .gen-btn:active .gen-btn-letter {
           text-shadow: 0 0 1px hsla(var(--highlight-color-hue), 100%, 90%, 90%);
@@ -252,23 +225,20 @@ export function GenerateButton({
         }
 
         .gen-btn:hover {
-          border: solid 1px hsla(var(--highlight-color-hue), 100%, 80%, 40%);
-        }
-        .gen-btn:hover::before {
-          box-shadow: 0 -8px 8px -6px rgba(255,255,255,0.667) inset,
-            0 -16px 16px -8px hsla(var(--highlight-color-hue), 100%, 70%, 30%) inset,
-            1px 1px 1px rgba(255,255,255,0.133), 
-            2px 2px 2px rgba(255,255,255,0.067), 
-            -1px -1px 1px rgba(0,0,0,0.133),
-            -2px -2px 2px rgba(0,0,0,0.067);
+          border-color: hsla(var(--highlight-color-hue), 90%, 65%, 0.45);
+          background-color: #221c18;
+          box-shadow:
+            0 4px 16px rgba(0, 0, 0, 0.4),
+            0 0 12px hsla(var(--highlight-color-hue), 100%, 70%, 0.15),
+            inset 0 1px 0 rgba(255, 255, 255, 0.16);
         }
         .gen-btn:hover::after {
-          opacity: 1;
+          opacity: 0.5;
           mask-image: linear-gradient(0deg, #fff, transparent);
         }
         .gen-btn:hover .gen-btn-svg {
           fill: #fff;
-          filter: drop-shadow(0 0 3px hsl(var(--highlight-color-hue), 100%, 70%)) drop-shadow(0 -4px 6px rgba(0,0,0,0.6));
+          filter: drop-shadow(0 0 3px hsl(var(--highlight-color-hue), 100%, 70%));
           animation: none;
         }
       `}</style>

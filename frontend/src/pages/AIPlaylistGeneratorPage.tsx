@@ -24,6 +24,7 @@ import type {
   GenerateAIPlaylistRequestParams,
 } from '../services/playlistService';
 import { usePlayer } from '../hooks/usePlayer';
+import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { Button } from '../components/ui/Button';
 import { GenerateButton } from '../components/ui/generate-button';

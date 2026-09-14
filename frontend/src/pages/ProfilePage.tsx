@@ -9,6 +9,7 @@ import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { fetchUserPlaylistsApi } from '../services/playlistService';
 import { fetchListeningHistoryApi } from '../services/historyService';
 import { EditProfilePictureModal } from '../components/EditProfilePictureModal';
+import { ConfirmLogoutModal } from '../components/ConfirmLogoutModal';
 
 export const ProfilePage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -18,6 +19,7 @@ export const ProfilePage: React.FC = () => {
   const [playlistCount, setPlaylistCount] = useState<number | null>(null);
   const [historyCount, setHistoryCount] = useState<number | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [isConfirmLogoutOpen, setIsConfirmLogoutOpen] = useState<boolean>(false);
   const [avatarError, setAvatarError] = useState<boolean>(false);
 
   useEffect(() => {
@@ -36,6 +38,7 @@ export const ProfilePage: React.FC = () => {
   }, []);
 
   const handleSignOut = () => {
+    setIsConfirmLogoutOpen(false);
     logout();
     navigate('/login', { replace: true });
   };
@@ -127,11 +130,12 @@ export const ProfilePage: React.FC = () => {
             </button>
 
             <button
-              onClick={handleSignOut}
-              className="px-4 py-2.5 bg-surface-2 hover:bg-danger-wash text-text-secondary hover:text-danger font-medium text-sm rounded-[var(--radius-pill)] transition-colors flex items-center gap-2 cursor-pointer"
+              type="button"
+              onClick={() => setIsConfirmLogoutOpen(true)}
+              className="px-4 py-2.5 bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30 hover:border-danger/50 font-medium text-sm rounded-[var(--radius-pill)] transition-colors flex items-center gap-2 cursor-pointer shadow-sm active:scale-[0.98]"
             >
-              <LogOut size={15} strokeWidth={1.75} />
-              Sign Out
+              <LogOut size={15} strokeWidth={2} />
+              Log Out
             </button>
           </div>
         </div>
@@ -188,6 +192,13 @@ export const ProfilePage: React.FC = () => {
         onClose={() => setIsEditModalOpen(false)}
         currentPicture={user.profilePicture}
         userName={user.name}
+      />
+
+      {/* Confirm Logout Modal */}
+      <ConfirmLogoutModal
+        isOpen={isConfirmLogoutOpen}
+        onConfirm={handleSignOut}
+        onClose={() => setIsConfirmLogoutOpen(false)}
       />
     </div>
   );
