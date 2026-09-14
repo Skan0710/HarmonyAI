@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useInView, useMotionValue, useSpring } from "motion/react";
+import { useMotionValue, useSpring } from "motion/react";
 import { cn } from "@/lib/utils";
 
 interface StatsCounterProps {
@@ -15,23 +15,21 @@ interface StatsCounterProps {
 
 export default function StatsCounter({
   value,
-  duration = 1.5,
+  duration = 1.0,
   prefix = "",
   suffix = "",
   decimals = 0,
   className,
 }: StatsCounterProps) {
   const ref = useRef<HTMLSpanElement>(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const targetVal = typeof value === "number" && !isNaN(value) ? value : 0;
   const motionValue = useMotionValue(0);
   const springValue = useSpring(motionValue, { duration: duration * 1000, bounce: 0 });
-  const [displayValue, setDisplayValue] = useState(0);
+  const [displayValue, setDisplayValue] = useState(targetVal);
 
   useEffect(() => {
-    if (isInView) {
-      motionValue.set(value);
-    }
-  }, [isInView, value, motionValue]);
+    motionValue.set(targetVal);
+  }, [targetVal, motionValue]);
 
   useEffect(() => {
     const unsubscribe = springValue.on("change", (latest) => {
@@ -43,7 +41,7 @@ export default function StatsCounter({
   return (
     <span ref={ref} className={cn("tabular-nums", className)}>
       {prefix}
-      {displayValue.toFixed(decimals)}
+      {Math.round(displayValue).toFixed(decimals)}
       {suffix}
     </span>
   );
