@@ -4,6 +4,7 @@ import { recordSongPlay } from '../services/songService';
 import { recordPlaybackApi } from '../services/historyService';
 import { trackRecommendationInteraction } from '../services/recommendationTrackingService';
 import { fetchSmartAutoplayApi } from '../services/recommendationService';
+import { prefetchVideoId } from '../lib/youtubeVideoIdCache';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -89,6 +90,7 @@ interface PlayerState {
   handleSongEnd: () => void;
   replenishAutoplayQueue: (force?: boolean) => Promise<boolean>;
   triggerSmartAutoplay: () => Promise<boolean>;
+  prefetchUpcoming: () => void;
   mediaMode: 'song' | 'video';
   setMediaMode: (mode: 'song' | 'video') => void;
   isFullPlayerOpen: boolean;
@@ -135,6 +137,32 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   videoSlotRect: null,
   setVideoSlotRect: (rect) => set({ videoSlotRect: rect }),
 
+  /**
+   * Warms the YouTube video-id cache for whatever song would play next, so
+   * the actual track swap (when the user skips or a track ends) hits an
+   * already-resolved id instead of waiting on a fresh lookup — mirrors the
+   * predictive pre-loading a real streaming client does between tracks.
+   * Doesn't predict through shuffle (next pick is random) or when there's
+   * nothing queued/buffered yet.
+   */
+  prefetchUpcoming: () => {
+    const { queue, queueIndex, isShuffle, repeatMode, autoplayQueue, isAutoplayEnabled } = get();
+    if (isShuffle) return;
+
+    let next: Song | undefined;
+    if (queueIndex + 1 < queue.length) {
+      next = queue[queueIndex + 1];
+    } else if (repeatMode === 'all' && queue.length > 0) {
+      next = queue[0];
+    } else if (isAutoplayEnabled && autoplayQueue.length > 0) {
+      next = autoplayQueue[0];
+    }
+
+    if (next?._id) {
+      prefetchVideoId(next._id, next.youtubeVideoId ?? undefined);
+    }
+  },
+
   playSong: (song, queue) => {
     const currentQueue = queue && queue.length > 0 ? queue : get().queue.length > 0 ? get().queue : [song];
     const index = currentQueue.findIndex((s) => s._id === song._id);
@@ -157,6 +185,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     });
 
     notifyTrackPlay(song._id);
+    get().prefetchUpcoming();
 
     // If autoplay is enabled, prefetch upcoming autoplay queue in background
     if (get().isAutoplayEnabled) {
@@ -409,6 +438,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     });
 
     notifyTrackPlay(targetSong._id);
+    get().prefetchUpcoming();
 
     if (remainingBuffer.length <= 2) {
       get().replenishAutoplayQueue().catch(() => {});
@@ -442,6 +472,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     });
 
     notifyTrackPlay(song?._id);
+    get().prefetchUpcoming();
 
     if (get().isAutoplayEnabled) {
       get().replenishAutoplayQueue().catch(() => {});
@@ -465,6 +496,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     });
 
     notifyTrackPlay(targetSong?._id);
+    get().prefetchUpcoming();
   },
 
   /**
@@ -534,6 +566,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
             isAutoplayLoading: false,
             autoplayError: null,
           });
+          get().prefetchUpcoming();
           return true;
         }
       }
@@ -600,6 +633,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       });
 
       notifyTrackPlay(nextSongItem._id);
+      get().prefetchUpcoming();
 
       // Replenish buffer in the background if it's now near exhaustion
       if (remainingBuffer.length <= 2) {
@@ -658,6 +692,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           recentPlayedSongIds: [nextSongItem._id, ...prevRecent].slice(0, 20),
         });
         notifyTrackPlay(nextSongItem._id);
+        get().prefetchUpcoming();
       }
       return;
     }
@@ -676,6 +711,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           recentPlayedSongIds: [nextSongItem._id, ...prevRecent].slice(0, 20),
         });
         notifyTrackPlay(nextSongItem._id);
+        get().prefetchUpcoming();
 
         // If approaching the end of the manual queue, prefetch autoplay tracks
         if (isAutoplayEnabled && queue.length - nextIdx <= 2) {
@@ -700,6 +736,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           recentPlayedSongIds: [nextSongItem._id, ...prevRecent].slice(0, 20),
         });
         notifyTrackPlay(nextSongItem._id);
+        get().prefetchUpcoming();
       }
     } else if (isAutoplayEnabled) {
       // 4. Reached end of queue: Automatically select next track from Smart Autoplay
@@ -745,6 +782,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       });
 
       notifyTrackPlay(prevSongItem._id);
+      get().prefetchUpcoming();
     }
   },
 

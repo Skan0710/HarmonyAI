@@ -9,6 +9,11 @@ export interface YoutubePlayer {
   getCurrentTime(): number;
   getDuration(): number;
   destroy(): void;
+  // Swap videos on an already-constructed player instead of tearing down and
+  // rebuilding the iframe embed — cueVideoById loads without playing,
+  // loadVideoById loads and autoplays.
+  cueVideoById(videoId: string): void;
+  loadVideoById(videoId: string): void;
 }
 
 interface YoutubePlayerOptions {

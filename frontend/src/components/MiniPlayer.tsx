@@ -23,8 +23,8 @@ import { usePlayerKeyboardShortcuts } from '../hooks/usePlayerKeyboardShortcuts'
 import { formatTime } from '../utils/formatters';
 import { IconButton } from './ui/IconButton';
 import { YoutubePlayerEngine, type PlaybackEngineHandle } from './YoutubePlayerEngine';
-import { fetchYoutubeVideoIdApi } from '../services/songService';
 import { recordPlaybackApi } from '../services/historyService';
+import { getCachedVideoId, resolveVideoId } from '../lib/youtubeVideoIdCache';
 
 interface MiniPlayerProps {
   onExpand?: () => void;
@@ -130,11 +130,25 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
       return;
     }
 
+    if (!currentSong?._id) {
+      setYoutubeVideoId(undefined);
+      return;
+    }
+
+    // Already resolved (or predictively pre-fetched) — apply instantly so
+    // the player portal never unmounts across the transition, which is what
+    // lets YoutubePlayerEngine reuse its existing player and just swap
+    // videos instead of rebuilding the iframe from scratch.
+    const cached = getCachedVideoId(currentSong._id);
+    if (cached !== undefined) {
+      setYoutubeVideoId(cached);
+      return;
+    }
+
     setYoutubeVideoId(undefined);
-    if (!currentSong?._id) return;
 
     let cancelled = false;
-    fetchYoutubeVideoIdApi(currentSong._id)
+    resolveVideoId(currentSong._id)
       .then((videoId) => {
         if (!cancelled) {
           setYoutubeVideoId(videoId);
