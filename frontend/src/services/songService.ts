@@ -145,9 +145,12 @@ export const fetchSimilarArtists = async (artistId: string): Promise<{ artists: 
   return { artists: result.data || [], error: result.error || undefined };
 };
 
-export const fetchAlbums = async (params: { artistId?: string } = {}): Promise<{ albums: Album[]; error?: string }> => {
+export const fetchAlbums = async (
+  params: { artistId?: string; limit?: number } = {}
+): Promise<{ albums: Album[]; error?: string }> => {
   const queryParams = new URLSearchParams();
   if (params.artistId) queryParams.append('artistId', params.artistId);
+  if (params.limit) queryParams.append('limit', String(params.limit));
 
   const queryString = queryParams.toString();
   const endpoint = `/albums${queryString ? `?${queryString}` : ''}`;

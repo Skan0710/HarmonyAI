@@ -40,7 +40,7 @@ export const ArtistDetailPage: React.FC = () => {
 
         const [songsRes, albumsRes, similarRes] = await Promise.all([
           fetchSongs({ artistId: id, limit: 20 }),
-          fetchAlbums({ artistId: id }),
+          fetchAlbums({ artistId: id, limit: 100 }),
           fetchSimilarArtists(id),
         ]);
 
@@ -68,6 +68,13 @@ export const ArtistDetailPage: React.FC = () => {
     'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 24 24" fill="none" stroke="%23d9a15b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231b1815;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
 
   const imageUrl = imgError || (!artist?.profileImage && !artist?.avatar) ? fallbackAvatar : (artist?.profileImage || artist?.avatar);
+
+  // "Singles and EPs" reads as its own shelf, separate from real albums —
+  // matches how Apple Music/Spotify split a discography, instead of one
+  // mixed carousel where a handful of albums get buried under dozens of
+  // one-off single releases.
+  const fullAlbums = artistAlbums.filter((a) => a.albumType !== 'ep' && a.albumType !== 'single');
+  const singlesAndEps = artistAlbums.filter((a) => a.albumType === 'ep' || a.albumType === 'single');
 
   if (loading) {
     return (
@@ -158,12 +165,21 @@ export const ArtistDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {artistAlbums.length > 0 && (
+      {fullAlbums.length > 0 && (
         <MediaCarousel
-          title="Albums & Discography"
-          subtitle={`Explore albums released by ${artist.name}`}
+          title="Albums"
+          subtitle={`Studio albums released by ${artist.name}`}
           type="album"
-          items={artistAlbums}
+          items={fullAlbums}
+        />
+      )}
+
+      {singlesAndEps.length > 0 && (
+        <MediaCarousel
+          title="Singles and EPs"
+          subtitle={`Singles and EPs released by ${artist.name}`}
+          type="album"
+          items={singlesAndEps}
         />
       )}
 

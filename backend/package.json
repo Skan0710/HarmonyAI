@@ -7,7 +7,9 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "seed": "tsx src/seed.ts"
+    "seed": "tsx src/seed.ts",
+    "seed:more-hiphop": "tsx src/seedMoreHipHop.ts",
+    "backfill:album-types": "tsx src/backfillAlbumTypes.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

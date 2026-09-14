@@ -7,7 +7,7 @@ dotenv.config();
 // Fallback audio, used only if YouTube resolution ever fails for a song.
 // Real playback comes from the YouTube IFrame Player API, resolved lazily
 // per song (title + artist search) on first play and cached on the row.
-const AUDIO_SAMPLE_URLS = [
+export const AUDIO_SAMPLE_URLS = [
   'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
   'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
   'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
@@ -24,7 +24,7 @@ const AUDIO_SAMPLE_URLS = [
 // catalog (real titles, real albums, real cover art, real durations/release
 // years) instead of hand-picking one or two singles — this is what lets the
 // library scale to hundreds of real songs instead of a curated handful.
-const ARTISTS: { name: string; genre: string }[] = [
+export const ARTISTS: { name: string; genre: string }[] = [
   // Pop
   { name: 'Taylor Swift', genre: 'pop' },
   { name: 'Ed Sheeran', genre: 'pop' },
@@ -170,7 +170,7 @@ const CLASSICAL_PIECES: string[] = [
   'Water Music Handel',
 ];
 
-const GENRE_AUDIO_DEFAULTS: Record<
+export const GENRE_AUDIO_DEFAULTS: Record<
   string,
   { bpm: number; energy: number; valence: number; acousticness: number; instrumentalness: number }
 > = {
@@ -184,7 +184,7 @@ const GENRE_AUDIO_DEFAULTS: Record<
   indie: { bpm: 96, energy: 0.5, valence: 0.6, acousticness: 0.6, instrumentalness: 0.1 },
 };
 
-interface ITunesTrack {
+export interface ITunesTrack {
   trackName: string;
   artistName: string;
   collectionId?: number;
@@ -199,7 +199,7 @@ interface ITunesTrack {
   kind?: string;
 }
 
-interface ITunesAlbum {
+export interface ITunesAlbum {
   collectionId: number;
   collectionName: string;
   artistName: string;
@@ -229,7 +229,7 @@ async function fetchItunesTrack(query: string): Promise<ITunesTrack | null> {
   }
 }
 
-async function fetchArtistId(name: string): Promise<number | null> {
+export async function fetchArtistId(name: string): Promise<number | null> {
   const url = `https://itunes.apple.com/search?entity=musicArtist&${ITUNES_LOCALE}&limit=1&term=${encodeURIComponent(name)}`;
   try {
     const response = await fetch(url);
@@ -250,36 +250,71 @@ const normalizeAlbumTitle = (title: string): string =>
     .replace(/\s*[([][^)\]]*(deluxe|remaster|anniversary|expanded|edition|version|bonus|explicit)[^)\]]*[)\]]/gi, '')
     .trim();
 
-async function fetchArtistAlbums(artistId: number, limit = 200): Promise<ITunesAlbum[]> {
+export async function fetchArtistAlbums(
+  artistId: number,
+  artistName: string,
+  limit = 200,
+  dedupeByTitle = true
+): Promise<ITunesAlbum[]> {
   const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=album&${ITUNES_LOCALE}&limit=${limit}`;
   try {
     const response = await fetch(url);
     if (!response.ok) return [];
     const body = (await response.json()) as { results?: ITunesAlbum[] };
-    // Accept Album/EP/Single collection types — a strict "Album" filter drops
-    // EPs and singles-as-releases, which is why some artists' catalogs came
-    // back thin. Compilations (best-ofs, deluxe repackagings of other albums
-    // we already have) are excluded to avoid bulk duplicate tracks.
-    const albums = (body.results || []).filter(
-      (r: any) =>
-        r.wrapperType === 'collection' &&
-        (r.collectionType === 'Album' || r.collectionType === 'EP' || r.collectionType === 'Single') &&
-        r.collectionType !== 'Compilation'
-    );
 
-    const seenTitles = new Set<string>();
-    const deduped: ITunesAlbum[] = [];
-    for (const a of albums) {
-      const key = normalizeAlbumTitle(a.collectionName || '');
-      if (!key || seenTitles.has(key)) continue;
-      seenTitles.add(key);
-      deduped.push(a);
+    // iTunes' `entity=album` lookup for an artist ID returns every release
+    // that artist appears on anywhere — including tracks where they're just
+    // a guest feature credited to someone else's primary artist name (e.g.
+    // "Fat Joe" for a Fat Joe single A$AP Rocky guests on). Requiring the
+    // target name as a substring of the credited artistName keeps genuine
+    // solo/co-primary releases and drops pure guest-feature noise.
+    // Also: iTunes' `collectionType` field is unreliable here — almost
+    // everything comes back "Album" even for an obvious single — so real
+    // classification comes from the " - Single"/" - EP" suffix iTunes
+    // appends to the title itself, stripped off for the clean display title.
+    const albums = (body.results || [])
+      .filter(
+        (r: any) =>
+          r.wrapperType === 'collection' &&
+          r.collectionType !== 'Compilation' &&
+          typeof r.artistName === 'string' &&
+          r.artistName.includes(artistName)
+      )
+      .map((r: any) => {
+        const rawTitle: string = r.collectionName || '';
+        let collectionType = 'Album';
+        let title = rawTitle;
+        if (/ - Single$/.test(rawTitle)) {
+          collectionType = 'Single';
+          title = rawTitle.replace(/ - Single$/, '');
+        } else if (/ - EP$/.test(rawTitle)) {
+          collectionType = 'EP';
+          title = rawTitle.replace(/ - EP$/, '');
+        }
+        return { ...r, collectionName: title, collectionType };
+      });
+
+    // dedupeByTitle=false keeps every edition (deluxe/anniversary/remix) —
+    // used when topping up an artist already in the DB, since a deluxe
+    // edition's bonus tracks would otherwise never be seen. Track-level
+    // dedupe against already-seeded songs is what prevents duplicates then.
+    let result = albums;
+    if (dedupeByTitle) {
+      const seenTitles = new Set<string>();
+      const deduped: ITunesAlbum[] = [];
+      for (const a of albums) {
+        const key = normalizeAlbumTitle(a.collectionName || '');
+        if (!key || seenTitles.has(key)) continue;
+        seenTitles.add(key);
+        deduped.push(a);
+      }
+      result = deduped;
     }
 
     // Most-recent-first, so the artist's better-known/latest work is what
     // gets included when we cap albums per artist below.
-    deduped.sort((a, b) => new Date(b.releaseDate || 0).getTime() - new Date(a.releaseDate || 0).getTime());
-    return deduped;
+    result.sort((a, b) => new Date(b.releaseDate || 0).getTime() - new Date(a.releaseDate || 0).getTime());
+    return result;
   } catch {
     return [];
   }
@@ -288,7 +323,7 @@ async function fetchArtistAlbums(artistId: number, limit = 200): Promise<ITunesA
 // Fetches every real track on a specific album release (not a capped top-N
 // search hit) so an album we seed is always seeded whole, never a partial
 // handful of its songs.
-async function fetchAlbumTracks(collectionId: number): Promise<ITunesTrack[]> {
+export async function fetchAlbumTracks(collectionId: number): Promise<ITunesTrack[]> {
   const url = `https://itunes.apple.com/lookup?id=${collectionId}&entity=song&${ITUNES_LOCALE}&limit=200`;
   try {
     const response = await fetch(url);
@@ -302,7 +337,7 @@ async function fetchAlbumTracks(collectionId: number): Promise<ITunesTrack[]> {
   }
 }
 
-const upscaleArtwork = (url?: string): string => {
+export const upscaleArtwork = (url?: string): string => {
   if (!url) return '';
   return url.replace(/\d+x\d+bb\.(jpg|png)$/, '600x600bb.$1');
 };
@@ -433,6 +468,7 @@ const seedDatabase = async () => {
     const resolved: { track: ITunesTrack; genreSlug: string }[] = [];
     const seenTracks = new Set<string>(); // guards against two sources resolving to the same real track
     const albumTrackCounts = new Map<string, number>(); // keyed the same way as albumMap below
+    const albumTypeByKey = new Map<string, string>(); // real Album/EP/Single classification from iTunes
 
     for (const artistDef of ARTISTS) {
       const artistId = await fetchArtistId(artistDef.name);
@@ -442,7 +478,7 @@ const seedDatabase = async () => {
         continue;
       }
 
-      const albums = await fetchArtistAlbums(artistId, 200);
+      const albums = await fetchArtistAlbums(artistId, artistDef.name, 200);
       await sleep(150);
       if (albums.length === 0) {
         console.warn(`  ⚠️  No albums found for "${artistDef.name}", skipping`);
@@ -468,6 +504,7 @@ const seedDatabase = async () => {
         }
         if (addedFromAlbum > 0) {
           albumTrackCounts.set(albumKey, addedFromAlbum);
+          albumTypeByKey.set(albumKey, (album.collectionType || 'Album').toLowerCase());
           albumsAdded += 1;
           tracksAdded += addedFromAlbum;
         }
@@ -577,7 +614,7 @@ const seedDatabase = async () => {
         genre_id: genreMap.get(genreSlug) || null,
         cover_image: upscaleArtwork(track.artworkUrl100),
         release_year: releaseYear,
-        album_type: 'album',
+        album_type: albumTypeByKey.get(key) || 'album',
         total_tracks: albumTrackCounts.get(key) || 1,
         tags: [genreSlug],
       });
@@ -646,4 +683,8 @@ const seedDatabase = async () => {
   }
 };
 
-seedDatabase();
+// Guarded so other scripts (e.g. seedMoreHipHop.ts) can import the helpers
+// below without triggering a full destructive reseed as a side effect.
+if (require.main === module) {
+  seedDatabase();
+}
