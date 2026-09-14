@@ -54,41 +54,60 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
     <div
       onClick={() => song._id && navigate(`/songs/${song._id}`)}
       onContextMenu={(e) => openContextMenu(e, song)}
-      className="group flex items-center gap-3.5 py-2.5 px-2 -mx-2 rounded-[var(--radius-sm)] hover:bg-surface-2 transition-colors cursor-pointer"
+      className="group flex items-center gap-3.5 sm:gap-4 py-3 px-2.5 sm:px-3 -mx-2 sm:-mx-3 rounded-[var(--radius-md)] hover:bg-surface-2 transition-colors cursor-pointer"
     >
-      <span className="w-5 text-center text-2xs font-mono text-text-tertiary shrink-0 tabular-nums">
+      {/* Play button / Track number */}
+      <button
+        type="button"
+        onClick={handlePlay}
+        aria-label={isCurrentlyPlaying ? `Pause ${song.title}` : `Play ${song.title}`}
+        title={isCurrentlyPlaying ? 'Pause' : 'Play'}
+        className="relative w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-3 text-text-tertiary hover:text-text-primary transition-all cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-accent"
+      >
         {isCurrentlyPlaying ? (
-          <div className="flex items-end justify-center gap-0.5 h-3 mx-auto w-fit">
-            <span className="w-0.5 bg-accent h-full animate-pulse" />
-            <span className="w-0.5 bg-accent h-2/3 animate-pulse [animation-delay:75ms]" />
-            <span className="w-0.5 bg-accent h-4/5 animate-pulse [animation-delay:150ms]" />
-          </div>
+          <>
+            <div className="flex items-end justify-center gap-0.5 h-3.5 mx-auto w-fit transition-opacity duration-150 group-hover:opacity-0">
+              <span className="w-0.5 bg-accent h-full animate-pulse" />
+              <span className="w-0.5 bg-accent h-2/3 animate-pulse [animation-delay:75ms]" />
+              <span className="w-0.5 bg-accent h-4/5 animate-pulse [animation-delay:150ms]" />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-accent">
+              <Pause size={16} fill="currentColor" strokeWidth={0} />
+            </div>
+          </>
         ) : (
-          String(index + 1).padStart(2, '0')
+          <>
+            <span className="text-xs sm:text-sm font-mono text-text-tertiary font-semibold tabular-nums transition-opacity duration-150 group-hover:opacity-0">
+              {String(index + 1).padStart(2, '0')}
+            </span>
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-text-primary hover:text-accent">
+              <Play size={16} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+            </div>
+          </>
         )}
-      </span>
+      </button>
 
-      <div className="relative w-10 h-10 rounded-[var(--radius-artwork)] overflow-hidden bg-surface-2 shrink-0">
+      {/* Album Artwork without obstructing overlay */}
+      <div className="relative w-12 h-12 rounded-[var(--radius-artwork)] overflow-hidden bg-surface-2 shrink-0 border border-border-subtle/60 shadow-xs">
         <img
           src={imgError || !song.coverImage ? fallbackCover : song.coverImage}
           alt={song.title}
           onError={() => setImgError(true)}
           className="w-full h-full object-cover"
         />
-        <button
-          onClick={handlePlay}
-          aria-label={isCurrentlyPlaying ? `Pause ${song.title}` : `Play ${song.title}`}
-          className="absolute inset-0 bg-surface-0/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-text-primary transition-opacity cursor-pointer"
-        >
-          {isCurrentlyPlaying ? <Pause size={14} fill="currentColor" strokeWidth={0} /> : <Play size={14} fill="currentColor" strokeWidth={0} />}
-        </button>
       </div>
 
-      <div className="min-w-0 flex-1">
-        <h4 className={`text-sm font-medium truncate ${isCurrent ? 'text-accent' : 'text-text-primary'}`}>{song.title}</h4>
-        <p className="text-xs text-text-tertiary truncate mt-0.5">{getArtistName()}</p>
+      {/* Title & Artist - Increased text sizes */}
+      <div className="min-w-0 flex-1 pr-2">
+        <h4 className={`text-sm sm:text-base font-semibold truncate leading-snug ${isCurrent ? 'text-accent' : 'text-text-primary'}`}>
+          {song.title}
+        </h4>
+        <p className="text-xs sm:text-sm text-text-secondary truncate mt-0.5 font-normal">
+          {getArtistName()}
+        </p>
       </div>
 
+      {/* Actions */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -98,13 +117,13 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
         }}
         aria-label="Play next"
         title={playedNext ? 'Playing next' : 'Play next'}
-        className={`p-1.5 rounded-[var(--radius-sm)] transition-all cursor-pointer shrink-0 ${
+        className={`p-2 rounded-[var(--radius-sm)] transition-all cursor-pointer shrink-0 ${
           playedNext
             ? 'opacity-100 text-success'
-            : 'text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+            : 'text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-3'
         }`}
       >
-        {playedNext ? <Check size={14} /> : <ListPlus size={14} strokeWidth={1.75} />}
+        {playedNext ? <Check size={17} /> : <ListPlus size={17} strokeWidth={1.75} />}
       </button>
 
       <button
@@ -113,12 +132,19 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
           toggleLikeSong(song);
         }}
         aria-label={isLiked ? 'Unlike song' : 'Like song'}
-        className="p-1.5 text-text-tertiary hover:text-accent opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity cursor-pointer shrink-0"
+        title={isLiked ? 'Unlike song' : 'Like song'}
+        className="p-2 text-text-tertiary hover:text-accent opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity cursor-pointer shrink-0 hover:bg-surface-3 rounded-[var(--radius-sm)]"
       >
-        <Heart size={14} fill={isLiked ? 'currentColor' : 'none'} className={isLiked ? 'text-accent opacity-100' : ''} strokeWidth={1.75} />
+        <Heart
+          size={17}
+          fill={isLiked ? 'currentColor' : 'none'}
+          className={isLiked ? 'text-accent opacity-100' : ''}
+          strokeWidth={1.75}
+        />
       </button>
 
-      <span className="text-2xs font-mono text-text-tertiary tabular-nums w-9 text-right shrink-0">
+      {/* Duration - Increased text size */}
+      <span className="text-xs sm:text-sm font-mono text-text-secondary tabular-nums w-11 text-right shrink-0 font-medium">
         {formatTime(song.duration)}
       </span>
     </div>
