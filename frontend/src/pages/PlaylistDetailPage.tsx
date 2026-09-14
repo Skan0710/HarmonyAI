@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Play, Shuffle } from 'lucide-react';
 import type { Playlist, Song } from '../types/music';
 import { fetchPlaylistByIdApi, removeSongFromPlaylistApi, deletePlaylistApi } from '../services/playlistService';
 import { usePlayerStore } from '../store/usePlayerStore';
@@ -43,9 +44,16 @@ export const PlaylistDetailPage: React.FC = () => {
     loadPlaylist();
   }, [id]);
 
-  const handlePlayAll = () => {
+  const handlePlayAll = (shuffle = false) => {
     if (playlist && playlist.songs && playlist.songs.length > 0) {
-      playSong(playlist.songs[0], playlist.songs);
+      if (shuffle) {
+        const shuffled = [...playlist.songs].sort(() => Math.random() - 0.5);
+        usePlayerStore.setState({ isShuffle: true });
+        playSong(shuffled[0], shuffled);
+      } else {
+        usePlayerStore.setState({ isShuffle: false });
+        playSong(playlist.songs[0], playlist.songs);
+      }
     }
   };
 
@@ -196,15 +204,22 @@ export const PlaylistDetailPage: React.FC = () => {
               {/* Header Action Buttons */}
               <div className="flex items-center gap-3 shrink-0">
                 {playlist.songs && playlist.songs.length > 0 && (
-                  <button
-                    onClick={handlePlayAll}
-                    className="px-6 py-3.5 bg-accent hover:bg-accent-strong text-text-on-accent font-bold text-sm rounded-[var(--radius-pill)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                    <span>Play All</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={() => handlePlayAll(false)}
+                      className="px-6 py-3.5 bg-accent hover:bg-accent-strong text-text-on-accent font-bold text-sm rounded-[var(--radius-pill)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <Play size={16} fill="currentColor" />
+                      <span>Play All</span>
+                    </button>
+                    <button
+                      onClick={() => handlePlayAll(true)}
+                      className="px-5 py-3.5 bg-surface-2 hover:bg-surface-3 text-text-primary font-semibold text-sm rounded-[var(--radius-pill)] border border-border-subtle hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <Shuffle size={15} />
+                      <span>Shuffle</span>
+                    </button>
+                  </>
                 )}
 
                 {/* Edit Playlist Button */}

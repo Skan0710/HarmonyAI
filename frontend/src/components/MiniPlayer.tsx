@@ -36,6 +36,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
 
   const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
 
   const navigate = useNavigate();
   const mediaMode = usePlayerStore((state) => state.mediaMode);
@@ -289,12 +291,13 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   };
   const handleError = () => {
     setIsLoadingAudio(false);
+    if (usingYoutubeEngine && currentSong?.audioUrl) {
+      setYoutubeVideoId(null);
+      return;
+    }
     setAudioError('Stream unavailable');
     pause();
   };
-
-  const [isScrubbing, setIsScrubbing] = useState(false);
-  const [scrubTime, setScrubTime] = useState<number | null>(null);
 
   const displayTime = isScrubbing && scrubTime !== null ? scrubTime : currentTime;
   const progressPercentage = duration > 0 ? (displayTime / duration) * 100 : 0;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { History, Play } from 'lucide-react';
+import { History, Play, Shuffle } from 'lucide-react';
 import { fetchListeningHistoryApi } from '../services/historyService';
 import type { HistoryItem } from '../services/historyService';
 import { usePlayerStore } from '../store/usePlayerStore';
@@ -63,10 +63,17 @@ export const HistoryPage: React.FC = () => {
     playSong(item.song, songsQueue);
   };
 
-  const handlePlayAll = () => {
+  const handlePlayAll = (shuffle = false) => {
     const songsQueue = history.map((h) => h.song).filter(Boolean);
     if (songsQueue.length > 0) {
-      playSong(songsQueue[0], songsQueue);
+      if (shuffle) {
+        const shuffled = [...songsQueue].sort(() => Math.random() - 0.5);
+        usePlayerStore.setState({ isShuffle: true });
+        playSong(shuffled[0], shuffled);
+      } else {
+        usePlayerStore.setState({ isShuffle: false });
+        playSong(songsQueue[0], songsQueue);
+      }
     }
   };
 
@@ -99,10 +106,16 @@ export const HistoryPage: React.FC = () => {
         </div>
 
         {history.length > 0 && (
-          <Button onClick={handlePlayAll}>
-            <Play size={14} fill="currentColor" />
-            Replay all
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => handlePlayAll(false)}>
+              <Play size={14} fill="currentColor" />
+              Replay all
+            </Button>
+            <Button variant="secondary" onClick={() => handlePlayAll(true)}>
+              <Shuffle size={14} />
+              Shuffle
+            </Button>
+          </div>
         )}
       </section>
 

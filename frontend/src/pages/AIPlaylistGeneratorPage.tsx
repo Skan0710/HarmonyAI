@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Play,
   Pause,
+  Shuffle,
   Plus,
   Check,
   RefreshCw,
@@ -133,10 +134,17 @@ export const AIPlaylistGeneratorPage: React.FC = () => {
     setActiveTracks((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  const handlePlayAll = () => {
+  const handlePlayAll = (shuffle = false) => {
     if (activeTracks.length > 0) {
       const songList = activeTracks.map((t) => t.song);
-      playSong(songList[0], songList);
+      if (shuffle) {
+        const shuffled = [...songList].sort(() => Math.random() - 0.5);
+        usePlayerStore.setState({ isShuffle: true });
+        playSong(shuffled[0], shuffled);
+      } else {
+        usePlayerStore.setState({ isShuffle: false });
+        playSong(songList[0], songList);
+      }
     }
   };
 
@@ -380,9 +388,13 @@ export const AIPlaylistGeneratorPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 pt-1">
-              <Button size="sm" onClick={handlePlayAll} disabled={activeTracks.length === 0}>
+              <Button size="sm" onClick={() => handlePlayAll(false)} disabled={activeTracks.length === 0}>
                 <Play size={13} fill="currentColor" />
                 Play all
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => handlePlayAll(true)} disabled={activeTracks.length === 0}>
+                <Shuffle size={13} />
+                Shuffle
               </Button>
               <Button
                 size="sm"

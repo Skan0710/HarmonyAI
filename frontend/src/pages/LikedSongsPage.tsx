@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Heart, Play } from 'lucide-react';
+import { Heart, Play, Shuffle } from 'lucide-react';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { SongRow } from '../components/SongRow';
@@ -13,8 +13,14 @@ export const LikedSongsPage: React.FC = () => {
     fetchLikedSongs();
   }, [fetchLikedSongs]);
 
-  const handlePlayAll = () => {
-    if (likedSongs.length > 0) {
+  const handlePlayAll = (shuffle = false) => {
+    if (likedSongs.length === 0) return;
+    if (shuffle) {
+      const shuffled = [...likedSongs].sort(() => Math.random() - 0.5);
+      usePlayerStore.setState({ isShuffle: true });
+      playSong(shuffled[0], shuffled);
+    } else {
+      usePlayerStore.setState({ isShuffle: false });
       playSong(likedSongs[0], likedSongs);
     }
   };
@@ -36,10 +42,16 @@ export const LikedSongsPage: React.FC = () => {
         </div>
 
         {likedSongs.length > 0 && (
-          <Button onClick={handlePlayAll}>
-            <Play size={14} fill="currentColor" />
-            Play all
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => handlePlayAll(false)}>
+              <Play size={14} fill="currentColor" />
+              Play all
+            </Button>
+            <Button variant="secondary" onClick={() => handlePlayAll(true)}>
+              <Shuffle size={14} />
+              Shuffle
+            </Button>
+          </div>
         )}
       </section>
 

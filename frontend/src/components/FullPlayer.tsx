@@ -35,6 +35,8 @@ const fallbackCover =
 export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
   const [whyOpen, setWhyOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
   const navigate = useNavigate();
 
   const {
@@ -163,9 +165,6 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
     Boolean((currentSong as any).sources);
 
   const cover = imgError || !currentSong.coverImage ? fallbackCover : currentSong.coverImage;
-
-  const [isScrubbing, setIsScrubbing] = useState(false);
-  const [scrubTime, setScrubTime] = useState<number | null>(null);
 
   const displayTime = isScrubbing && scrubTime !== null ? scrubTime : currentTime;
   const progressPercentage = duration > 0 ? (displayTime / duration) * 100 : 0;
