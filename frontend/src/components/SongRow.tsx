@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Play, Pause, Heart, ListPlus, Check } from 'lucide-react';
 import type { Song } from '../types/music';
 import { usePlayerStore } from '../store/usePlayerStore';
@@ -17,7 +16,6 @@ const fallbackCover =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23d9a15b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231b1815;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
 
 export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
-  const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
   const [playedNext, setPlayedNext] = useState(false);
 
@@ -39,8 +37,11 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
     return String(song.artist);
   };
 
-  const handlePlay = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Clicking anywhere on the row plays the song — matches YouTube Music,
+  // where the row itself is the play target and "more info" lives behind
+  // the right-click/overflow menu (SongContextMenu's "View Track Details"),
+  // not behind the row's primary click.
+  const activatePlay = () => {
     if (onPlay) {
       onPlay(song);
     } else if (isCurrent) {
@@ -50,6 +51,11 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
     }
   };
 
+  const handlePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    activatePlay();
+  };
+
   // Only act on Enter/Space when the row itself is focused — a nested
   // control (the play button, like button, etc.) already handles its own
   // keyboard activation, and bubbling would otherwise double-fire both.
@@ -57,18 +63,18 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
     if (e.target !== e.currentTarget) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      if (song._id) navigate(`/songs/${song._id}`);
+      activatePlay();
     }
   };
 
   return (
     <div
-      onClick={() => song._id && navigate(`/songs/${song._id}`)}
+      onClick={activatePlay}
       onContextMenu={(e) => openContextMenu(e, song)}
       role="button"
       tabIndex={0}
       onKeyDown={handleRowKeyDown}
-      aria-label={`Open ${song.title} by ${getArtistName()}`}
+      aria-label={isCurrentlyPlaying ? `Pause ${song.title}` : `Play ${song.title} by ${getArtistName()}`}
       className="group flex items-center gap-3.5 sm:gap-4 py-3 px-2.5 sm:px-3 -mx-2 sm:-mx-3 rounded-[var(--radius-md)] hover:bg-surface-2 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       {/* Play button / Track number */}

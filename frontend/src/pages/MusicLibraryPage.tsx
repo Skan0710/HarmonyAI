@@ -28,13 +28,17 @@ export const MusicLibraryPage: React.FC = () => {
   const sortBy = searchParams.get('sort') || 'playCount';
   const sortOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc';
   const page = parseInt(searchParams.get('page') || '1', 10);
-  const limit = parseInt(searchParams.get('limit') || '60', 10);
+  // 25 matches Pagination's own "per page" dropdown options (10/15/25/50) —
+  // the previous default of 60 didn't match any of them, so the select
+  // rendered with no option chosen. 25 also keeps the initial grid to a
+  // digestible chunk rather than dumping 60 unsectioned tiles at once.
+  const limit = parseInt(searchParams.get('limit') || '25', 10);
 
   const updateUrlParams = (newParams: Record<string, string | number | undefined | null>) => {
     const nextParams = new URLSearchParams(searchParams);
 
     Object.entries(newParams).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '' && value !== 1 && value !== 60 && value !== '60' && value !== 'playCount' && value !== 'desc') {
+      if (value !== undefined && value !== null && value !== '' && value !== 1 && value !== 25 && value !== '25' && value !== 'playCount' && value !== 'desc') {
         nextParams.set(key, String(value));
       } else {
         nextParams.delete(key);

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Play, Pause, Plus, Heart, Sparkles, AudioLines, ListPlus, Check } from 'lucide-react';
 import type { Song } from '../types/music';
 import { usePlayerStore } from '../store/usePlayerStore';
@@ -18,7 +17,6 @@ interface SongCardProps {
 }
 
 export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) => {
-  const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
   const [isExplanationModalOpen, setIsExplanationModalOpen] = useState(false);
@@ -82,13 +80,25 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
 
   const coverUrl = imgError || !song.coverImage ? fallbackCover : song.coverImage;
 
+  // Clicking anywhere on the card plays the song — matches YouTube Music,
+  // where the tile itself is the play target and "more info" lives behind
+  // the right-click/overflow menu (SongContextMenu's "View Track Details"),
+  // not behind the card's primary click.
+  const activatePlay = () => {
+    if (onPlay) {
+      onPlay(song);
+    } else if (activeSong?._id === song._id) {
+      togglePlay();
+    } else {
+      playSong(song);
+    }
+  };
+
   const handleCardClick = () => {
     if (hasRecommendationInfo && song._id) {
       trackRecommendationInteraction(song._id, 'click', recommendationSource);
     }
-    if (song._id) {
-      navigate(`/songs/${song._id}`);
-    }
+    activatePlay();
   };
 
   const handlePlayClick = (e: React.MouseEvent) => {
@@ -96,15 +106,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
     if (hasRecommendationInfo && song._id) {
       trackRecommendationInteraction(song._id, 'play', recommendationSource);
     }
-    if (onPlay) {
-      onPlay(song);
-    } else {
-      if (activeSong?._id === song._id) {
-        togglePlay();
-      } else {
-        playSong(song);
-      }
-    }
+    activatePlay();
   };
 
   const handleLikeClick = (e: React.MouseEvent) => {
@@ -151,7 +153,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
         role="button"
         tabIndex={0}
         onKeyDown={handleCardKeyDown}
-        aria-label={`Open ${song.title} by ${getArtistName()}`}
+        aria-label={isCurrentTrackPlaying ? `Pause ${song.title}` : `Play ${song.title} by ${getArtistName()}`}
         className={`group relative cursor-pointer bg-surface-1 hover:bg-surface-2 rounded-[var(--radius-md)] p-3 transition-colors duration-[var(--duration-base)] flex flex-col justify-between overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
           isCurrentTrackPlaying ? 'ring-1 ring-accent/50 bg-surface-2' : ''
         }`}

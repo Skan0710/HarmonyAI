@@ -14,10 +14,12 @@ import {
   VolumeX,
   X,
   Heart,
+  MoreHorizontal,
 } from 'lucide-react';
 import { usePlayer } from '../hooks/usePlayer';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
+import { useContextMenuStore } from '../store/useContextMenuStore';
 import { useNavigate } from 'react-router-dom';
 import { usePlayerKeyboardShortcuts } from '../hooks/usePlayerKeyboardShortcuts';
 import { formatTime } from '../utils/formatters';
@@ -117,6 +119,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
 
   const isLiked = useLikedSongsStore((state) => (currentSong ? state.isLiked(currentSong._id) : false));
   const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
+  const openContextMenu = useContextMenuStore((state) => state.openContextMenu);
 
   const seekRequest = usePlayerStore((state) => state.seekRequest);
   const clearSeekRequest = usePlayerStore((state) => state.clearSeekRequest);
@@ -505,7 +508,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
 
           <button
             onClick={() => toggleLikeSong(currentSong)}
-            className={`p-1.5 rounded-full hover:bg-surface-2 transition-colors cursor-pointer shrink-0 hidden sm:flex items-center justify-center ${
+            className={`w-7 h-7 rounded-full hover:bg-surface-2 transition-colors cursor-pointer shrink-0 flex items-center justify-center ${
               isLiked ? 'text-accent' : 'text-text-tertiary hover:text-text-primary'
             }`}
             aria-label={isLiked ? 'Unlike song (Shift + =)' : 'Like song (Shift + =)'}
@@ -514,7 +517,16 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} strokeWidth={1.75} />
           </button>
 
-          <button onClick={stop} className="sm:hidden text-text-tertiary hover:text-text-primary p-1" aria-label="Close Player">
+          <button
+            onClick={(e) => openContextMenu(e, currentSong)}
+            className="w-7 h-7 rounded-full hover:bg-surface-2 transition-colors cursor-pointer shrink-0 flex items-center justify-center text-text-tertiary hover:text-text-primary"
+            aria-label="More actions"
+            title="More actions"
+          >
+            <MoreHorizontal size={16} strokeWidth={1.75} />
+          </button>
+
+          <button onClick={stop} className="sm:hidden w-7 h-7 shrink-0 flex items-center justify-center text-text-tertiary hover:text-text-primary" aria-label="Close Player">
             <X size={16} />
           </button>
         </div>
@@ -533,7 +545,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             </IconButton>
 
             <IconButton
-              size="sm"
+              size="md"
               onClick={previousSong}
               disabled={queue.length <= 1}
               aria-label="Previous Track (K or Shift+P)"
@@ -559,7 +571,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             </IconButton>
 
             <IconButton
-              size="sm"
+              size="md"
               onClick={nextSong}
               disabled={queue.length <= 1 && !isAutoplayEnabled}
               aria-label="Next Track (J or Shift+N)"
@@ -663,7 +675,16 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             </div>
           </div>
 
-          <button onClick={stop} className="text-text-tertiary hover:text-text-primary p-1.5 transition-colors cursor-pointer" aria-label="Close Player" title="Close Player">
+          {/* Separated from the volume cluster with a divider + extra
+              spacing — this stops playback entirely, unlike its neighbors,
+              and shouldn't share their visual grouping (a misreach while
+              adjusting volume shouldn't land on it). */}
+          <button
+            onClick={stop}
+            className="ml-1 pl-2.5 border-l border-border-subtle text-text-tertiary hover:text-danger p-1.5 transition-colors cursor-pointer"
+            aria-label="Close Player"
+            title="Close Player"
+          >
             <X size={15} />
           </button>
         </div>

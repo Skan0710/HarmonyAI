@@ -59,25 +59,32 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
 
   const handleTogglePlaylist = async (playlist: Playlist) => {
     const inPlaylist = isSongInPlaylist(playlist);
+    const previousPlaylists = playlists;
 
-    if (inPlaylist) {
-      const { playlist: updated, error: err } = await removeSongFromPlaylistApi(playlist._id, song._id);
-      if (err) {
-        setError(err);
-      } else if (updated) {
-        setPlaylists((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
-        setActionMessage(`Removed from "${playlist.name}"`);
-        setTimeout(() => setActionMessage(null), 2500);
-      }
+    // Optimistic update — flip membership locally immediately (mirrors
+    // useLikedSongsStore's pattern) instead of leaving the checkmark
+    // static until the network round-trip resolves, then roll back on
+    // failure. Doherty threshold: a click should read as "done" within
+    // ~400ms, not after a request completes.
+    const optimisticSongs = inPlaylist
+      ? (playlist.songs || []).filter((s: any) => (typeof s === 'object' ? s._id : s) !== song._id)
+      : [...(playlist.songs || []), song as any];
+    setPlaylists((prev) =>
+      prev.map((p) => (p._id === playlist._id ? { ...p, songs: optimisticSongs } : p))
+    );
+    setActionMessage(inPlaylist ? `Removed from "${playlist.name}"` : `Added to "${playlist.name}"`);
+    setTimeout(() => setActionMessage(null), 2500);
+
+    const { playlist: updated, error: err } = inPlaylist
+      ? await removeSongFromPlaylistApi(playlist._id, song._id)
+      : await addSongToPlaylistApi(playlist._id, song._id);
+
+    if (err || !updated) {
+      setPlaylists(previousPlaylists);
+      setActionMessage(null);
+      setError(err || 'Failed to update playlist');
     } else {
-      const { playlist: updated, error: err } = await addSongToPlaylistApi(playlist._id, song._id);
-      if (err) {
-        setError(err);
-      } else if (updated) {
-        setPlaylists((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
-        setActionMessage(`Added to "${playlist.name}"`);
-        setTimeout(() => setActionMessage(null), 2500);
-      }
+      setPlaylists((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
     }
   };
 

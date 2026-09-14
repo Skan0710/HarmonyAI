@@ -16,10 +16,12 @@ import {
   Heart,
   Music,
   Film,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePlayer } from '../hooks/usePlayer';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
+import { useContextMenuStore } from '../store/useContextMenuStore';
 import { formatTime } from '../utils/formatters';
 import { IconButton } from './ui/IconButton';
 import { WhyThisSongModal } from './RecommendationExplanationModal';
@@ -70,6 +72,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
 
   const isLiked = useLikedSongsStore((state) => (currentSong ? state.isLiked(currentSong._id) : false));
   const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
+  const openContextMenu = useContextMenuStore((state) => state.openContextMenu);
 
   const handleClose = () => {
     setQueueOpen(false);
@@ -281,21 +284,31 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                       {getArtistName()}
                     </p>
                   </div>
-                  <button
-                    onClick={() => toggleLikeSong(currentSong)}
-                    className={`p-3 rounded-full hover:bg-surface-2 transition-all cursor-pointer shrink-0 flex items-center justify-center ${
-                      isLiked ? 'text-accent' : 'text-text-tertiary hover:text-text-primary'
-                    }`}
-                    aria-label={isLiked ? 'Unlike song' : 'Like song'}
-                    title={isLiked ? 'Unlike song' : 'Like song'}
-                  >
-                    <Heart
-                      size={26}
-                      fill={isLiked ? 'currentColor' : 'none'}
-                      strokeWidth={2}
-                      className={`transition-transform duration-200 active:scale-125 ${isLiked ? 'scale-110' : ''}`}
-                    />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleLikeSong(currentSong)}
+                      className={`p-3 rounded-full hover:bg-surface-2 transition-all cursor-pointer flex items-center justify-center ${
+                        isLiked ? 'text-accent' : 'text-text-tertiary hover:text-text-primary'
+                      }`}
+                      aria-label={isLiked ? 'Unlike song' : 'Like song'}
+                      title={isLiked ? 'Unlike song' : 'Like song'}
+                    >
+                      <Heart
+                        size={26}
+                        fill={isLiked ? 'currentColor' : 'none'}
+                        strokeWidth={2}
+                        className={`transition-transform duration-200 active:scale-125 ${isLiked ? 'scale-110' : ''}`}
+                      />
+                    </button>
+                    <button
+                      onClick={(e) => openContextMenu(e, currentSong)}
+                      className="p-3 rounded-full hover:bg-surface-2 transition-colors cursor-pointer flex items-center justify-center text-text-tertiary hover:text-text-primary"
+                      aria-label="More actions"
+                      title="More actions"
+                    >
+                      <MoreHorizontal size={22} strokeWidth={1.75} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="w-full space-y-2">

@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { LineHoverText } from './ui/line-hover-link';
 import {
@@ -15,8 +15,7 @@ import {
   Sparkles,
   SlidersHorizontal,
   Fingerprint,
-  Sparkle,
-  History as HistoryIcon,
+  ChevronDown,
   X,
 } from 'lucide-react';
 
@@ -25,18 +24,29 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
   end?: boolean;
-  tag?: string;
+}
+
+// A group collapses several related destinations behind one top-level row —
+// keeps the sidebar's decision surface closer to what a YouTube-Music-shaped
+// mental model expects (a handful of top-level choices, not 14) without
+// touching any of the underlying routes/pages/links elsewhere in the app.
+interface NavGroup {
+  label: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  items: NavItem[];
 }
 
 interface NavSection {
   title: string;
-  items: NavItem[];
+  entries: (NavItem | NavGroup)[];
 }
+
+const isGroup = (entry: NavItem | NavGroup): entry is NavGroup => 'items' in entry;
 
 const sections: NavSection[] = [
   {
     title: 'Listen',
-    items: [
+    entries: [
       { to: '/', label: 'Home', icon: Home, end: true },
       { to: '/discover', label: 'Discover', icon: Compass },
       { to: '/search', label: 'Search', icon: Search },
@@ -45,15 +55,21 @@ const sections: NavSection[] = [
   },
   {
     title: 'Your Sound',
-    items: [
-      { to: '/music-dna', label: 'Music DNA', icon: Fingerprint },
-      { to: '/music-twin', label: 'Music Twin', icon: Sparkle },
-      { to: '/taste-evolution', label: 'Taste Evolution', icon: HistoryIcon },
+    entries: [
+      {
+        label: 'Music DNA',
+        icon: Fingerprint,
+        items: [
+          { to: '/music-dna', label: 'Music DNA', icon: Fingerprint },
+          { to: '/music-twin', label: 'Music Twin', icon: Fingerprint },
+          { to: '/taste-evolution', label: 'Taste Evolution', icon: Fingerprint },
+        ],
+      },
     ],
   },
   {
     title: 'Your Library',
-    items: [
+    entries: [
       { to: '/library', label: 'Music Library', icon: Library },
       { to: '/playlists', label: 'Playlists', icon: ListMusic },
       { to: '/liked-songs', label: 'Liked Songs', icon: Heart },
@@ -62,12 +78,92 @@ const sections: NavSection[] = [
   },
   {
     title: 'Create',
-    items: [
-      { to: '/ai-playlist', label: 'AI Playlist Generator', icon: Wand2 },
-      { to: '/assistant', label: 'AI Assistant', icon: Sparkles },
+    entries: [
+      {
+        label: 'Create',
+        icon: Wand2,
+        items: [
+          { to: '/ai-playlist', label: 'AI Playlist Generator', icon: Wand2 },
+          { to: '/assistant', label: 'AI Assistant', icon: Sparkles },
+        ],
+      },
     ],
   },
 ];
+
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `group relative flex items-center gap-3.5 pl-3.5 pr-3 py-2.5 rounded-[var(--radius-sm)] text-[15px] transition-colors duration-[var(--duration-fast)] ${
+    isActive
+      ? 'bg-accent-wash text-text-primary'
+      : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'
+  }`;
+
+const NavItemLink: React.FC<{ item: NavItem; indent?: boolean }> = ({ item, indent }) => (
+  <NavLink to={item.to} end={item.end} className={navLinkClass}>
+    {({ isActive }) => (
+      <>
+        <span
+          className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full transition-colors duration-[var(--duration-fast)] ${
+            isActive ? 'bg-accent' : 'bg-transparent'
+          }`}
+        />
+        {!indent && <item.icon size={18} strokeWidth={1.75} />}
+        <span className="flex-1 min-w-0">
+          <LineHoverText variant="slide" className="font-medium">
+            {item.label}
+          </LineHoverText>
+        </span>
+      </>
+    )}
+  </NavLink>
+);
+
+const NavGroupDisclosure: React.FC<{ group: NavGroup }> = ({ group }) => {
+  const location = useLocation();
+  const hasActiveChild = group.items.some((item) => location.pathname === item.to);
+  const [open, setOpen] = useState(hasActiveChild);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        className={`w-full flex items-center gap-3.5 pl-3.5 pr-3 py-2.5 rounded-[var(--radius-sm)] text-[15px] font-medium transition-colors duration-[var(--duration-fast)] cursor-pointer ${
+          hasActiveChild && !open
+            ? 'text-text-primary bg-accent-wash'
+            : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'
+        }`}
+      >
+        <group.icon size={18} strokeWidth={1.75} />
+        <span className="flex-1 min-w-0 text-left">{group.label}</span>
+        <ChevronDown
+          size={15}
+          strokeWidth={1.75}
+          className={`shrink-0 transition-transform duration-[var(--duration-fast)] ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-0.5 pl-7 pt-0.5">
+              {group.items.map((item) => (
+                <NavItemLink key={item.to} item={item} indent />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -76,43 +172,25 @@ interface SidebarProps {
 
 const SidebarContent: React.FC<{ onNavigate?: () => void }> = ({ onNavigate }) => (
   <>
-    <nav className="flex-1 overflow-y-auto px-3 pb-4" onClick={onNavigate}>
+    <nav className="flex-1 overflow-y-auto px-3 pb-4">
         {sections.map((section) => (
           <div key={section.title} className="mb-6">
             <p className="px-3 mb-2 text-2xs font-semibold uppercase tracking-[0.12em] text-text-tertiary">
               {section.title}
             </p>
-            <div className="flex flex-col gap-0.5">
-              {section.items.map(({ to, label, icon: Icon, end }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  className={({ isActive }) =>
-                    `group relative flex items-center gap-3.5 pl-3.5 pr-3 py-2.5 rounded-[var(--radius-sm)] text-[15px] transition-colors duration-[var(--duration-fast)] ${
-                      isActive
-                        ? 'bg-accent-wash text-text-primary'
-                        : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <span
-                        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full transition-colors duration-[var(--duration-fast)] ${
-                          isActive ? 'bg-accent' : 'bg-transparent'
-                        }`}
-                      />
-                      <Icon size={18} strokeWidth={1.75} />
-                      <span className="flex-1 min-w-0">
-                        <LineHoverText variant="slide" className="font-medium">
-                          {label}
-                        </LineHoverText>
-                      </span>
-                    </>
-                  )}
-                </NavLink>
-              ))}
+            <div className="flex flex-col gap-0.5" onClick={(e) => {
+              // Only auto-close the mobile drawer for an actual navigation
+              // (a leaf link), not for toggling a group open/closed.
+              const target = e.target as HTMLElement;
+              if (target.closest('a')) onNavigate?.();
+            }}>
+              {section.entries.map((entry) =>
+                isGroup(entry) ? (
+                  <NavGroupDisclosure key={entry.label} group={entry} />
+                ) : (
+                  <NavItemLink key={entry.to} item={entry} />
+                )
+              )}
             </div>
           </div>
         ))}
@@ -121,6 +199,7 @@ const SidebarContent: React.FC<{ onNavigate?: () => void }> = ({ onNavigate }) =
     <div className="px-3 pb-5 pt-2 border-t border-border-subtle">
       <NavLink
         to="/preferences"
+        onClick={onNavigate}
         className={({ isActive }) =>
           `flex items-center gap-3.5 pl-3.5 pr-3 py-2.5 text-[15px] font-medium rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-fast)] ${
             isActive ? 'text-text-primary bg-accent-wash' : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Fingerprint, TrendingUp, Compass, Sparkles } from 'lucide-react';
 import { AnimatedLink } from '../components/ui/AnimatedLink';
-import StatsCounter from '../components/ui/stats-counter';
+import { Meter } from '../components/ui/Meter';
 import { useAuth } from '../hooks/useAuth';
 import type { Song } from '../types/music';
 import { fetchTrendingSongsApi } from '../services/songService';
@@ -292,25 +292,10 @@ export const HomePage: React.FC = () => {
               ))}
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mt-6 max-w-md">
-              <div>
-                <p className="text-2xl font-display text-text-primary">
-                  <StatsCounter value={Math.round(twin.confidence * 100)} suffix="%" />
-                </p>
-                <p className="text-2xs text-text-tertiary mt-0.5">Confidence</p>
-              </div>
-              <div>
-                <p className="text-2xl font-display text-text-primary">
-                  <StatsCounter value={Math.round(twin.explorationTendency * 100)} suffix="%" />
-                </p>
-                <p className="text-2xs text-text-tertiary mt-0.5">Exploration</p>
-              </div>
-              <div>
-                <p className="text-2xl font-display text-text-primary">
-                  <StatsCounter value={Math.round(twin.tasteStability.stabilityScore * 100)} suffix="%" />
-                </p>
-                <p className="text-2xs text-text-tertiary mt-0.5">Stability</p>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-3 mt-6 max-w-md">
+              <Meter label="Confidence" value={twin.confidence} size="sm" />
+              <Meter label="Exploration" value={twin.explorationTendency} size="sm" color="var(--gold)" />
+              <Meter label="Stability" value={twin.tasteStability.stabilityScore} size="sm" color="var(--success)" />
             </div>
           </section>
         )}

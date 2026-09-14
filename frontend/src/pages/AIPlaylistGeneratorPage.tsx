@@ -242,7 +242,7 @@ export const AIPlaylistGeneratorPage: React.FC = () => {
                   key={opt.value}
                   type="button"
                   onClick={() => setSelectedDuration(opt.value)}
-                  className={`py-1.5 text-2xs font-medium rounded-[4px] transition-colors text-center cursor-pointer ${
+                  className={`py-1.5 text-2xs font-medium rounded-[var(--radius-sharp)] transition-colors text-center cursor-pointer ${
                     selectedDuration === opt.value ? 'bg-accent text-text-on-accent font-semibold' : 'text-text-tertiary hover:text-text-secondary'
                   }`}
                 >

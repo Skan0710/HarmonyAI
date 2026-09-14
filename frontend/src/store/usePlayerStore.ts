@@ -5,6 +5,7 @@ import { recordPlaybackApi } from '../services/historyService';
 import { trackRecommendationInteraction } from '../services/recommendationTrackingService';
 import { fetchSmartAutoplayApi } from '../services/recommendationService';
 import { prefetchVideoId } from '../lib/youtubeVideoIdCache';
+import { toast } from './useToastStore';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -745,10 +746,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       const autoplayStarted = await get().triggerSmartAutoplay();
       if (!autoplayStarted) {
         set({ isPlaying: false, currentTime: 0 });
+        toast.info("That's the end of your queue — no more autoplay picks available right now.");
       }
     } else {
       // 5. Autoplay off: Stop playback cleanly
       set({ isPlaying: false, currentTime: 0 });
+      toast.info("That's the end of your queue — turn on Smart Autoplay to keep the music going.");
     }
   },
 
@@ -817,9 +820,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       const autoplayStarted = await get().triggerSmartAutoplay();
       if (!autoplayStarted) {
         set({ isPlaying: false, currentTime: 0 });
+        toast.info("That's the end of your queue — no more autoplay picks available right now.");
       }
     } else {
       set({ isPlaying: false, currentTime: 0 });
+      toast.info("That's the end of your queue — turn on Smart Autoplay to keep the music going.");
     }
   },
 

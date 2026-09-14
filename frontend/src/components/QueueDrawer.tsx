@@ -101,15 +101,10 @@ export const QueueDrawer: React.FC = () => {
     <AnimatePresence>
       {isQueueOpen && (
         <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={() => setQueueOpen(false)}
-            className="fixed inset-0 z-[var(--z-drawer)] bg-black/60"
-          />
-
+          {/* No full-screen backdrop here on purpose — unlike a modal, the
+              queue is meant to stay open alongside the rest of the app
+              (matches YouTube Music's non-blocking side panel), closed only
+              via the explicit X button, the Q shortcut, or navigating away. */}
           <motion.aside
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
