@@ -1,12 +1,19 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { Sparkles as SparklesIcon, TrendingUp } from 'lucide-react';
-import { fetchPersonalMusicTwinApi, type PersonalMusicTwin } from '../services/musicIntelligenceService';
+import { Sparkles as SparklesIcon, TrendingUp, Radio } from 'lucide-react';
+import {
+  fetchPersonalMusicTwinApi,
+  fetchModeRecommendationsApi,
+  type PersonalMusicTwin,
+} from '../services/musicIntelligenceService';
+import type { Song } from '../types/music';
 import { ThreeErrorBoundary } from '../components/ThreeErrorBoundary';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { hasWebGL } from '../utils/webgl';
 import { Meter } from '../components/ui/Meter';
 import { AnimatedLink } from '../components/ui/AnimatedLink';
 import { PageHero } from '../components/PageHero';
+import { MediaCarousel } from '../components/MediaCarousel';
+import { usePlayerStore } from '../store/usePlayerStore';
 
 const MusicTwinOrganism = lazy(() =>
   import('../components/MusicTwinOrganism').then((m) => ({ default: m.MusicTwinOrganism }))
@@ -17,8 +24,18 @@ const formatName = (name: string): string => name.replace(/[_-]+/g, ' ').replace
 export const MusicTwinPage: React.FC = () => {
   const [twin, setTwin] = useState<PersonalMusicTwin | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [twinPicks, setTwinPicks] = useState<Song[]>([]);
+  const [loadingTwinPicks, setLoadingTwinPicks] = useState(true);
+  const [explorePicks, setExplorePicks] = useState<Song[]>([]);
+  const [exploreNote, setExploreNote] = useState<string>('');
+  const [loadingExplorePicks, setLoadingExplorePicks] = useState(true);
+
   const reducedMotion = usePrefersReducedMotion();
   const [webglAvailable] = useState(() => hasWebGL());
+
+  const currentSong = usePlayerStore((state) => state.currentSong);
+  const playSong = usePlayerStore((state) => state.playSong);
 
   useEffect(() => {
     (async () => {
@@ -26,6 +43,21 @@ export const MusicTwinPage: React.FC = () => {
       const { twin } = await fetchPersonalMusicTwinApi(8);
       setTwin(twin);
       setLoading(false);
+    })();
+
+    (async () => {
+      setLoadingTwinPicks(true);
+      const res = await fetchModeRecommendationsApi('FOR_YOU', 12);
+      setTwinPicks(res.songs);
+      setLoadingTwinPicks(false);
+    })();
+
+    (async () => {
+      setLoadingExplorePicks(true);
+      const res = await fetchModeRecommendationsApi('DISCOVER', 12);
+      setExplorePicks(res.songs);
+      setExploreNote(res.description || '');
+      setLoadingExplorePicks(false);
     })();
   }, []);
 
@@ -45,7 +77,8 @@ export const MusicTwinPage: React.FC = () => {
         <h1 className="font-display text-2xl text-text-primary">Your Music Twin hasn't formed yet</h1>
         <p className="text-sm text-text-secondary mt-3 leading-relaxed">
           Your Twin is a living reflection of your listening identity — an abstract entity that grows more defined
-          the more you listen. Keep playing music and check back soon.
+          the more you listen, and starts suggesting songs of its own once it knows you well enough. Keep playing
+          music and check back soon.
         </p>
       </div>
     );
@@ -54,6 +87,13 @@ export const MusicTwinPage: React.FC = () => {
   const distortIntensity = 0.2 + twin.explorationTendency * 0.5;
   const speed = 1 + twin.explorationTendency * 2;
   const sparkleCount = Math.round(twin.currentMusicalIdentity.rarityScore * 80) + 20;
+
+  const topGenreName = twin.dominantGenres[0]?.name;
+  const topArtistName = twin.importantArtists[0];
+  const twinPicksSubtitle =
+    topGenreName && topArtistName
+      ? `Curated from your ${formatName(topGenreName)} and ${formatName(topArtistName)} affinity`
+      : 'Ranked from what your Twin already knows you love';
 
   return (
     <div className="pb-16">
@@ -86,12 +126,37 @@ export const MusicTwinPage: React.FC = () => {
         <div className="bg-surface-1 rounded-[var(--radius-lg)] p-5">
           <p className="text-2xs font-semibold uppercase tracking-[0.1em] text-text-tertiary">{twin.listenerArchetype}</p>
           <p className="text-sm text-text-secondary mt-2 leading-relaxed">{twin.archetypeDescription}</p>
+
+          {twin.currentMusicalIdentity.signatureSound && (
+            <div className="mt-4 pt-4 border-t border-border-subtle">
+              <p className="text-2xs font-semibold uppercase tracking-[0.1em] text-text-tertiary mb-1.5">Signature sound</p>
+              <p className="text-sm text-text-primary leading-relaxed">{twin.currentMusicalIdentity.signatureSound}</p>
+            </div>
+          )}
+
           <div className="mt-4 pt-4 border-t border-border-subtle space-y-3">
             <Meter label="Confidence" value={twin.confidence} />
             <Meter label="Exploration" value={twin.explorationTendency} color="var(--gold)" />
             <Meter label="Familiarity" value={twin.familiarityPreference} color="var(--success)" />
             <Meter label="Taste stability" value={twin.tasteStability.stabilityScore} color="var(--danger)" />
           </div>
+
+          {twin.personalityTraits.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-border-subtle">
+              <p className="text-2xs font-semibold uppercase tracking-[0.1em] text-text-tertiary mb-2">Traits</p>
+              <div className="flex flex-wrap gap-1.5">
+                {twin.personalityTraits.slice(0, 6).map((t) => (
+                  <span
+                    key={t.id}
+                    title={`${Math.round(t.confidence * 100)}% confidence`}
+                    className="text-2xs font-medium px-2 py-1 rounded-[var(--radius-pill)] bg-surface-2 text-text-secondary"
+                  >
+                    {formatName(t.trait)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -101,7 +166,22 @@ export const MusicTwinPage: React.FC = () => {
         </div>
       )}
 
-      <div className="px-5 sm:px-8 lg:px-12 pt-8">
+      {(loadingTwinPicks || twinPicks.length > 0) && (
+        <div className="px-5 sm:px-8 lg:px-12 pt-10">
+          <MediaCarousel
+            title="Your Twin's Picks"
+            subtitle={twinPicksSubtitle}
+            type="song"
+            items={twinPicks}
+            loading={loadingTwinPicks}
+            onPlaySong={(song) => playSong(song, twinPicks)}
+            currentPlayingSongId={currentSong?._id}
+            emptyMessage="Your Twin is still listening — picks will appear here soon."
+          />
+        </div>
+      )}
+
+      <div className="px-5 sm:px-8 lg:px-12 pt-10">
         <p className="text-2xs font-semibold uppercase tracking-[0.1em] text-text-tertiary mb-3">Vibe keywords</p>
         <div className="flex flex-wrap gap-2">
           {twin.currentMusicalIdentity.vibeKeywords.map((kw) => (
@@ -145,20 +225,44 @@ export const MusicTwinPage: React.FC = () => {
         </div>
       </div>
 
-      {twin.emergingPreferences.narrative && (
+      {(twin.emergingPreferences.narrative || loadingExplorePicks || explorePicks.length > 0) && (
         <div className="px-5 sm:px-8 lg:px-12 pt-10">
-          <div className="border-l-2 border-gold pl-5 sm:pl-7 py-1 max-w-2xl">
-            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <TrendingUp size={15} className="text-gold" strokeWidth={1.75} />
-              Where your twin is headed
-            </h3>
-            <p className="text-sm text-text-secondary mt-2 leading-relaxed">{twin.emergingPreferences.narrative}</p>
-            <AnimatedLink to="/taste-evolution" className="mt-4 text-sm font-medium text-gold hover:text-gold-strong">
-              See your full taste evolution
-            </AnimatedLink>
-          </div>
+          {twin.emergingPreferences.narrative && (
+            <div className="border-l-2 border-gold pl-5 sm:pl-7 py-1 max-w-2xl mb-6">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <TrendingUp size={15} className="text-gold" strokeWidth={1.75} />
+                Where your twin is headed
+              </h3>
+              <p className="text-sm text-text-secondary mt-2 leading-relaxed">{twin.emergingPreferences.narrative}</p>
+              <AnimatedLink to="/taste-evolution" className="mt-4 text-sm font-medium text-gold hover:text-gold-strong">
+                See your full taste evolution
+              </AnimatedLink>
+            </div>
+          )}
+
+          {(loadingExplorePicks || explorePicks.length > 0) && (
+            <MediaCarousel
+              title="Songs To Try Next"
+              subtitle={exploreNote || 'Just outside your comfort zone, picked to stretch your taste'}
+              type="song"
+              items={explorePicks}
+              loading={loadingExplorePicks}
+              onPlaySong={(song) => playSong(song, explorePicks)}
+              currentPlayingSongId={currentSong?._id}
+              emptyMessage="Nothing to stretch your taste with yet — keep listening."
+            />
+          )}
         </div>
       )}
+
+      <div className="px-5 sm:px-8 lg:px-12 pt-10">
+        <div className="flex items-start gap-3 bg-surface-1 rounded-[var(--radius-lg)] p-4 max-w-2xl">
+          <Radio size={16} className="text-text-tertiary mt-0.5 shrink-0" strokeWidth={1.75} />
+          <p className="text-xs text-text-tertiary leading-relaxed">
+            Your Twin updates as you listen — every play, skip, and like reshapes what it picks for you next.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
