@@ -240,7 +240,12 @@ export const SearchPage: React.FC = () => {
 
   return (
     <div className="pb-16">
-      <PageHero eyebrow="Search" title="What are you in the mood for?">
+      <PageHero
+        eyebrow="Search"
+        title="What are you in the mood for?"
+        maxWidth="max-w-3xl"
+        titleClassName="!text-2xl sm:!text-3xl lg:!text-3.5xl font-medium tracking-tight !leading-tight"
+      >
         <div ref={containerRef} className="relative mt-6">
           <div className="relative flex items-center">
             <SearchIcon size={17} className="absolute left-4 text-text-tertiary pointer-events-none z-10" strokeWidth={1.75} />
@@ -313,8 +318,8 @@ export const SearchPage: React.FC = () => {
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 mt-4 -mx-1 px-1">
-            <span className="text-2xs text-text-tertiary font-medium shrink-0">Quick vibes</span>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 mt-4 -mx-1 px-1">
+            <span className="text-xs text-text-tertiary font-semibold uppercase tracking-wider shrink-0">Quick vibes</span>
             {VIBE_QUICK_SEARCHES.map((vibe) => (
               <button
                 key={vibe}

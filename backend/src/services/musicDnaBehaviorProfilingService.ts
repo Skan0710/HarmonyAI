@@ -212,7 +212,7 @@ export class MusicDNABehaviorProfilingService {
   } {
     const totalPlays = history.length;
     if (totalPlays <= 1) {
-      return { repeatListeningTendency: 0.1, replayRatio: 0.0, uniqueTracksCount: totalPlays };
+      return { repeatListeningTendency: 0.0, replayRatio: 0.0, uniqueTracksCount: totalPlays };
     }
 
     const songCountMap = new Map<string, number>();
@@ -321,9 +321,9 @@ export class MusicDNABehaviorProfilingService {
     const skipRatio = Number((skips / totalPlays).toFixed(4));
     const completionRatio = Number((completed / totalPlays).toFixed(4));
 
-    // Bayesian smoothing to handle small counts gracefully
-    const smoothedSkip = (skips + 0.5) / (totalPlays + 2.5);
-    const skipTendency = clampNumber(smoothedSkip, 0.0, 1.0, 0.2)!;
+    // Bayesian smoothing to handle small counts gracefully, zero when no skips occurred
+    const smoothedSkip = skips === 0 ? 0.0 : (skips + 0.5) / (totalPlays + 2.5);
+    const skipTendency = clampNumber(smoothedSkip, 0.0, 1.0, 0.0)!;
 
     return {
       skipTendency,

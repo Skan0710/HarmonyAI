@@ -14,7 +14,15 @@ const MusicDnaConstellation = lazy(() =>
 
 const formatName = (name: string): string => name.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-const TasteList: React.FC<{ title: string; items: TasteItem[]; color: string; onHover: (id: string | null) => void; onSelect: (id: string) => void; selectedId: string | null; category: DnaNodeCategory }> = ({
+const TasteList: React.FC<{
+  title: string;
+  items: TasteItem[];
+  color: string;
+  onHover: (id: string | null) => void;
+  onSelect: (id: string) => void;
+  selectedId: string | null;
+  category: DnaNodeCategory;
+}> = ({
   title,
   items,
   color,
@@ -22,32 +30,43 @@ const TasteList: React.FC<{ title: string; items: TasteItem[]; color: string; on
   onSelect,
   selectedId,
   category,
-}) => (
-  <div>
-    <h3 className="text-2xs font-semibold uppercase tracking-[0.1em] text-text-tertiary mb-3">{title}</h3>
-    <div className="space-y-2">
-      {items.slice(0, 6).map((item) => {
-        const id = `${category}-${item.name}`;
-        const isSelected = selectedId === id;
-        return (
-          <button
-            key={id}
-            onMouseEnter={() => onHover(id)}
-            onMouseLeave={() => onHover(null)}
-            onClick={() => onSelect(id)}
-            className={`w-full flex items-center gap-2.5 text-left py-1.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
-              isSelected ? 'bg-surface-2' : 'hover:bg-surface-2'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
-            <span className="text-sm text-text-primary flex-1 truncate">{formatName(item.name)}</span>
-            <span className="text-2xs font-mono text-text-tertiary tabular-nums">{Math.round(item.score * 100)}%</span>
-          </button>
-        );
-      })}
+}) => {
+  const totalScore = useMemo(() => {
+    const sum = (items || []).reduce((acc, it) => acc + (typeof it.score === 'number' ? it.score : 0), 0);
+    return sum > 0 ? sum : 1;
+  }, [items]);
+
+  return (
+    <div>
+      <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-text-secondary mb-3.5">{title}</h3>
+      <div className="space-y-2">
+        {(items || []).slice(0, 6).map((item) => {
+          const id = `${category}-${item.name}`;
+          const isSelected = selectedId === id;
+          const pct = (items || []).length === 1 && (item.score ?? 0) > 0
+            ? 100
+            : Math.round(((item.score || 0) / totalScore) * 100);
+
+          return (
+            <button
+              key={id}
+              onMouseEnter={() => onHover(id)}
+              onMouseLeave={() => onHover(null)}
+              onClick={() => onSelect(id)}
+              className={`w-full flex items-center gap-3 text-left py-2 px-2.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
+                isSelected ? 'bg-surface-2 ring-1 ring-border-default' : 'hover:bg-surface-2/80'
+              }`}
+            >
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+              <span className="text-base font-semibold text-text-primary flex-1 truncate">{formatName(item.name)}</span>
+              <span className="text-sm font-bold font-mono text-text-secondary tabular-nums">{pct}%</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const MusicDnaPage: React.FC = () => {
   const [profile, setProfile] = useState<MusicDnaProfile | null>(null);
@@ -181,8 +200,8 @@ export const MusicDnaPage: React.FC = () => {
       </div>
 
       <div className="px-5 sm:px-8 lg:px-12 pt-10">
-        <h3 className="text-2xs font-semibold uppercase tracking-[0.1em] text-text-tertiary mb-4">Listening behavior</h3>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-5 max-w-3xl">
+        <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-text-secondary mb-4">Listening behavior</h3>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6 max-w-4xl">
           <Meter label="Repeat listening" value={profile.listeningBehavior.repeatListeningTendency} />
           <Meter label="Skip tendency" value={profile.listeningBehavior.skipTendency} color="var(--danger)" />
           <Meter label="Session intensity" value={profile.listeningBehavior.sessionListeningIntensity} color="var(--gold)" />

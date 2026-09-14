@@ -252,8 +252,8 @@ export class MusicDNAProfilingService {
       shortMap.set(key, curr);
     }
 
-    const maxShort = Math.max(1, ...Array.from(shortMap.values()).map((v) => v.rawScore));
-    const maxLong = Math.max(1, ...Array.from(longMap.values()).map((v) => v.rawScore));
+    const totalShort = Math.max(1, Array.from(shortMap.values()).reduce((sum, v) => sum + v.rawScore, 0));
+    const totalLong = Math.max(1, Array.from(longMap.values()).reduce((sum, v) => sum + v.rawScore, 0));
 
     const detailedItems: DetailedTasteItem[] = [];
     const emergingList: DetailedTasteItem[] = [];
@@ -262,8 +262,8 @@ export class MusicDNAProfilingService {
       const shortItem = shortMap.get(key);
       const longItem = longMap.get(key);
 
-      const shortTermScore = shortItem ? Number(Math.min(1.0, shortItem.rawScore / maxShort).toFixed(4)) : 0;
-      const longTermScore = longItem ? Number(Math.min(1.0, longItem.rawScore / maxLong).toFixed(4)) : 0;
+      const shortTermScore = shortItem ? Number((shortItem.rawScore / totalShort).toFixed(4)) : 0;
+      const longTermScore = longItem ? Number((longItem.rawScore / totalLong).toFixed(4)) : 0;
       const totalPlayCount = (longItem?.playCount || 0) + (shortItem?.playCount || 0);
 
       // Blended score preserves foundational long-term taste (0.60) while incorporating short-term momentum (0.40)
@@ -271,7 +271,7 @@ export class MusicDNAProfilingService {
       if (longTermScore > 0 && shortTermScore > 0) {
         score = Number((0.4 * shortTermScore + 0.6 * longTermScore).toFixed(4));
       } else if (longTermScore > 0) {
-        score = Number((0.85 * longTermScore).toFixed(4));
+        score = longTermScore;
       } else {
         score = shortTermScore;
       }
@@ -317,6 +317,14 @@ export class MusicDNAProfilingService {
       if (preferenceType === 'emerging') {
         emergingList.push(detailedItem);
       }
+    }
+
+    // Normalize final scores so that category items represent true proportional affinity (summing to 1.0)
+    const sumScores = detailedItems.reduce((acc, it) => acc + it.score, 0);
+    if (sumScores > 0) {
+      detailedItems.forEach((it) => {
+        it.score = Number((it.score / sumScores).toFixed(4));
+      });
     }
 
     // Sort by final score descending
