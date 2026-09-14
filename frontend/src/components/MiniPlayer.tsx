@@ -174,6 +174,16 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   const usingYoutubeEngine = Boolean(youtubeVideoId);
   const usingNativeAudio = youtubeVideoId === null && Boolean(currentSong?.audioUrl);
 
+  // A confirmed "no YouTube match" with no fallback audio_url means neither
+  // engine will ever mount for this track, so neither one's onReady/onError
+  // fires to clear the spinner — without this it spins forever.
+  useEffect(() => {
+    if (youtubeVideoId === null && !currentSong?.audioUrl) {
+      setIsLoadingAudio(false);
+      setAudioError('Playback unavailable for this track');
+    }
+  }, [youtubeVideoId, currentSong?.audioUrl]);
+
   const onSongEnd = () => {
     const currentRepeatMode = usePlayerStore.getState().repeatMode;
     const currentQueue = usePlayerStore.getState().queue;

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { SongService } from '../services/songService.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
-import { extractQueryParams, sanitizeString } from '../utils/validators.js';
+import { extractQueryParams, sanitizeString, clampLimit } from '../utils/validators.js';
 
 export const createSong = controllerWrapper(async (req: Request, res: Response) => {
   const {
@@ -89,7 +89,7 @@ export const getSongs = controllerWrapper(async (req: Request, res: Response) =>
   const sortBy = (q.sortBy as any) || 'createdAt';
   const sortOrder = q.sortOrder === 'asc' ? 'asc' : 'desc';
   const page = q.page || 1;
-  const limit = q.limit || 20;
+  const limit = clampLimit(q.limit, 20);
 
   const result = await SongService.getAllSongs({
     search,
@@ -206,7 +206,7 @@ export const getRecommendations = controllerWrapper(async (req: Request, res: Re
     targetEnergy: q.targetEnergy,
     targetValence: q.targetValence,
     tags,
-    limit: q.limit || 10,
+    limit: clampLimit(q.limit, 10),
   });
 
   res.status(200).json({

@@ -5,7 +5,7 @@ export class UserService {
   static async getUserById(userId: string): Promise<any | null> {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, clerk_id, name, email, profile_picture, created_at, updated_at')
+      .select('id, clerk_id, name, email, profile_picture, role, created_at, updated_at')
       .eq('id', userId)
       .maybeSingle();
 
@@ -29,6 +29,7 @@ export class UserService {
       name: user.name,
       email: user.email,
       profilePicture: user.profile_picture,
+      role: user.role || 'user',
       favoriteArtists: (favArtists || []).map((a: any) => ({
         _id: a.artists?.id,
         id: a.artists?.id,

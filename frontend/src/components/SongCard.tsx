@@ -132,12 +132,27 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
     setIsExplanationModalOpen(true);
   };
 
+  // Only act on Enter/Space when the card itself is focused — nested
+  // controls (play, like, add-to-playlist, etc.) already handle their own
+  // keyboard activation, and bubbling would otherwise double-fire both.
+  const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleCardClick();
+    }
+  };
+
   return (
     <>
       <div
         onClick={handleCardClick}
         onContextMenu={(e) => openContextMenu(e, song)}
-        className={`group relative cursor-pointer bg-surface-1 hover:bg-surface-2 rounded-[var(--radius-md)] p-3 transition-colors duration-[var(--duration-base)] flex flex-col justify-between overflow-hidden ${
+        role="button"
+        tabIndex={0}
+        onKeyDown={handleCardKeyDown}
+        aria-label={`Open ${song.title} by ${getArtistName()}`}
+        className={`group relative cursor-pointer bg-surface-1 hover:bg-surface-2 rounded-[var(--radius-md)] p-3 transition-colors duration-[var(--duration-base)] flex flex-col justify-between overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
           isCurrentTrackPlaying ? 'ring-1 ring-accent/50 bg-surface-2' : ''
         }`}
       >

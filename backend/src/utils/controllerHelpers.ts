@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { IUser } from '../types/domainModels.js';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 /**
  * Wraps an async controller handler with automatic try/catch and standardized error responses.
  * Eliminates the repetitive try { ... } catch (error) { res.status(5xx).json(...) } pattern.
@@ -40,10 +42,14 @@ export const controllerWrapper = (
       return;
     }
 
-    // Default 500
+    // Default 500 — never leak raw internals (DB/PostgREST error text, stack
+    // details, etc.) to the client in production; log server-side instead.
+    if (!isProduction) {
+      console.error(error);
+    }
     res.status(500).json({
       success: false,
-      message: error.message || 'Internal server error',
+      message: isProduction ? 'Internal server error' : error.message || 'Internal server error',
     });
   }
 };

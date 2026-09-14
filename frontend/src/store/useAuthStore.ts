@@ -6,6 +6,7 @@ export interface User {
   name: string;
   email: string;
   profilePicture?: string;
+  role?: string;
   createdAt: string;
 }
 
@@ -23,6 +24,7 @@ interface UserProfileResponseData {
     name: string;
     email: string;
     profilePicture?: string;
+    role?: string;
     createdAt: string;
   };
 }

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { HistoryService } from '../services/historyService.js';
 import { controllerWrapper, ensureAuth } from '../utils/controllerHelpers.js';
-import { extractQueryParams } from '../utils/validators.js';
+import { extractQueryParams, clampLimit } from '../utils/validators.js';
 
 export const recordPlayback = controllerWrapper(async (req: Request, res: Response) => {
   const user = ensureAuth(req, res);
@@ -27,7 +27,7 @@ export const getListeningHistory = controllerWrapper(async (req: Request, res: R
   if (!user) return;
 
   const q = extractQueryParams(req, { limit: 'int' });
-  const history = await HistoryService.getListeningHistory(user._id.toString(), q.limit || 50);
+  const history = await HistoryService.getListeningHistory(user._id.toString(), clampLimit(q.limit, 50));
 
   res.status(200).json({
     success: true,
@@ -40,7 +40,7 @@ export const getRecentlyPlayed = controllerWrapper(async (req: Request, res: Res
   if (!user) return;
 
   const q = extractQueryParams(req, { limit: 'int' });
-  const songs = await HistoryService.getRecentlyPlayed(user._id.toString(), q.limit || 20);
+  const songs = await HistoryService.getRecentlyPlayed(user._id.toString(), clampLimit(q.limit, 20));
 
   res.status(200).json({
     success: true,

@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase.js';
 import { isValidObjectId } from '../utils/validators.js';
+import { escapePostgrestFilterValue } from '../utils/postgrestFilter.js';
 import { mapSongRow } from './songService.js';
 import { ContentRecommendationService } from './recommendationService.js';
 import { CollaborativeFilteringService } from './collaborativeFilteringService.js';
@@ -170,7 +171,7 @@ export class CandidateGenerationService {
         if (topGenres.length > 0) {
           const orFilter = topGenres
             .slice(0, 3)
-            .map((n: string) => `name.ilike.${n}`)
+            .map((n: string) => `name.ilike.${escapePostgrestFilterValue(n)}`)
             .join(',');
           const { data: matchedGenreDocs } = await supabase.from('genres').select('id').or(orFilter);
           genreIds.push(...(matchedGenreDocs || []).map((g) => g.id));
@@ -179,7 +180,7 @@ export class CandidateGenerationService {
         if (topArtists.length > 0) {
           const orFilter = topArtists
             .slice(0, 3)
-            .map((n: string) => `name.ilike.${n}`)
+            .map((n: string) => `name.ilike.${escapePostgrestFilterValue(n)}`)
             .join(',');
           const { data: matchedArtistDocs } = await supabase.from('artists').select('id').or(orFilter);
           artistIds.push(...(matchedArtistDocs || []).map((a) => a.id));

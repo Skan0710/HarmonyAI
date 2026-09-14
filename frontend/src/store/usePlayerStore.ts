@@ -175,6 +175,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       youtubeVideoId: song.youtubeVideoId ?? undefined,
       isPlaying: true,
       currentTime: 0,
+      duration: 0,
       targetSeekTime: null,
       seekLockUntil: 0,
       queue: currentQueue,
@@ -603,6 +604,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const currentBuffer = [...get().autoplayQueue];
     const excludedIds = new Set([
       currentSong._id,
+      ...queue.map((s) => s._id),
       ...recentPlayedSongIds.slice(0, 8),
     ]);
 

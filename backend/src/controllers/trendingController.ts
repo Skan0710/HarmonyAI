@@ -1,13 +1,13 @@
 import { Request, Response } from 'express';
 import { TrendingService } from '../services/trendingService.js';
 import { controllerWrapper } from '../utils/controllerHelpers.js';
-import { extractQueryParams } from '../utils/validators.js';
+import { extractQueryParams, clampLimit } from '../utils/validators.js';
 
 export const getTrendingSongs = controllerWrapper(async (req: Request, res: Response) => {
   const q = extractQueryParams(req, { limit: 'int', window: 'int' });
 
-  const limit = isNaN(q.limit) ? 10 : q.limit;
-  const windowHours = isNaN(q.window) ? 168 : q.window;
+  const limit = clampLimit(q.limit, 10);
+  const windowHours = clampLimit(q.window, 168, 2160); // cap at 90 days
 
   const songs = await TrendingService.getTrendingSongs(limit, windowHours);
 

@@ -72,6 +72,16 @@ export function sanitizeNumber(
 }
 
 /**
+ * Clamp a `limit` query param (already parsed as an int by extractQueryParams)
+ * to a safe range — falls back to `defaultValue` when absent/invalid/non-positive,
+ * and caps at `max` so a caller can't force an unbounded/oversized DB query.
+ */
+export function clampLimit(value: number | undefined, defaultValue: number, max = 100): number {
+  if (typeof value !== 'number' || isNaN(value) || value < 1) return defaultValue;
+  return Math.min(value, max);
+}
+
+/**
  * Extract and coerce query parameters from an Express request based on a schema.
  *
  * Example:

@@ -50,11 +50,26 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
     }
   };
 
+  // Only act on Enter/Space when the row itself is focused — a nested
+  // control (the play button, like button, etc.) already handles its own
+  // keyboard activation, and bubbling would otherwise double-fire both.
+  const handleRowKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (song._id) navigate(`/songs/${song._id}`);
+    }
+  };
+
   return (
     <div
       onClick={() => song._id && navigate(`/songs/${song._id}`)}
       onContextMenu={(e) => openContextMenu(e, song)}
-      className="group flex items-center gap-3.5 sm:gap-4 py-3 px-2.5 sm:px-3 -mx-2 sm:-mx-3 rounded-[var(--radius-md)] hover:bg-surface-2 transition-colors cursor-pointer"
+      role="button"
+      tabIndex={0}
+      onKeyDown={handleRowKeyDown}
+      aria-label={`Open ${song.title} by ${getArtistName()}`}
+      className="group flex items-center gap-3.5 sm:gap-4 py-3 px-2.5 sm:px-3 -mx-2 sm:-mx-3 rounded-[var(--radius-md)] hover:bg-surface-2 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       {/* Play button / Track number */}
       <button

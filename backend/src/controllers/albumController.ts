@@ -3,7 +3,7 @@ import { supabase } from '../config/supabase.js';
 import { AlbumService } from '../services/albumService.js';
 import { AlbumType } from '../types/domainModels.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
-import { extractQueryParams, sanitizeString, isValidObjectId } from '../utils/validators.js';
+import { extractQueryParams, sanitizeString, isValidObjectId, clampLimit } from '../utils/validators.js';
 import { cached, invalidateCache } from '../utils/simpleCache.js';
 
 const CACHE_TTL_MS = 60_000;
@@ -88,7 +88,7 @@ export const getAlbums = controllerWrapper(async (req: Request, res: Response) =
   const albumType = q.albumType as AlbumType | undefined;
   const releaseYear = q.releaseYear || undefined;
   const page = q.page || 1;
-  const limit = q.limit || 20;
+  const limit = clampLimit(q.limit, 20);
 
   const cacheKey = `albums:list:${search ?? ''}:${artistId ?? ''}:${genreId ?? ''}:${albumType ?? ''}:${releaseYear ?? ''}:${page}:${limit}`;
   const result = await cached(cacheKey, CACHE_TTL_MS, () =>

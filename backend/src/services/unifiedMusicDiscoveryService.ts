@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase.js';
 import { isValidObjectId } from '../utils/validators.js';
+import { escapePostgrestFilterValue } from '../utils/postgrestFilter.js';
 import { searchCatalog, GroupedSearchResults } from './searchService.js';
 import { SemanticSearchService, SemanticSearchResult } from './semanticSearchService.js';
 import { HybridRecommendationService } from './hybridRecommendationService.js';
@@ -1064,7 +1065,9 @@ export class UnifiedMusicDiscoveryService {
         if (genresToFind.length > 0) {
           // Artists don't carry a genres column directly in Postgres; derive matches
           // via songs in those genres, excluding artists already matched.
-          const genreOrFilter = genresToFind.map((g: string) => `name.ilike.%${g}%`).join(',');
+          const genreOrFilter = genresToFind
+            .map((g: string) => `name.ilike.${escapePostgrestFilterValue(`%${g}%`)}`)
+            .join(',');
           const { data: matchedGenreDocs } = await supabase.from('genres').select('id').or(genreOrFilter);
           const genreIds = (matchedGenreDocs || []).map((g) => g.id);
 

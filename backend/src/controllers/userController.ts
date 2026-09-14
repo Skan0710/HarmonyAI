@@ -21,6 +21,7 @@ export const getCurrentUser = controllerWrapper(async (req: Request, res: Respon
       name: profile.name,
       email: profile.email,
       profilePicture: profile.profilePicture,
+      role: profile.role || 'user',
       likedSongs: profile.likedSongs?.map((id: any) => id.toString()) || [],
       favoriteArtists: profile.favoriteArtists || [],
       favoriteGenres: profile.favoriteGenres || [],

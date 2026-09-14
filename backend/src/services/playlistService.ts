@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase.js';
+import { ControllerError } from '../utils/controllerHelpers.js';
 
 export interface CreatePlaylistInput {
   name: string;
@@ -152,7 +153,7 @@ export class PlaylistService {
       const isCollaborator = collaborators.some((c: any) => c.id === currentUserIdStr);
 
       if (!isOwner && !isCollaborator) {
-        throw new Error('Access denied to private playlist');
+        throw new ControllerError(403, 'Access denied to private playlist');
       }
     }
 
@@ -171,7 +172,7 @@ export class PlaylistService {
     const isCollaborator = existing.collaborators?.some((c: any) => c.id === userId);
 
     if (!isOwner && (!existing.isCollaborative || !isCollaborator)) {
-      throw new Error('Unauthorized to update this playlist');
+      throw new ControllerError(403, 'Unauthorized to update this playlist');
     }
 
     const updatePayload: Record<string, any> = { updated_at: new Date().toISOString() };
@@ -197,7 +198,7 @@ export class PlaylistService {
 
     const isOwner = existing.owner?._id === userId || existing.owner === userId;
     if (!isOwner) {
-      throw new Error('Only the playlist owner can delete it');
+      throw new ControllerError(403, 'Only the playlist owner can delete it');
     }
 
     await supabase.from('playlist_songs').delete().eq('playlist_id', playlistId);
@@ -212,13 +213,13 @@ export class PlaylistService {
     songId: string
   ): Promise<any> {
     const existing = await this.getPlaylistById(playlistId);
-    if (!existing) throw new Error('Playlist not found');
+    if (!existing) throw new ControllerError(404, 'Playlist not found');
 
     const isOwner = existing.owner?._id === userId || existing.owner === userId;
     const isCollaborator = existing.collaborators?.some((c: any) => c.id === userId);
 
     if (!isOwner && (!existing.isCollaborative || !isCollaborator)) {
-      throw new Error('Unauthorized to modify this playlist');
+      throw new ControllerError(403, 'Unauthorized to modify this playlist');
     }
 
     const { data: currentSongs } = await supabase
@@ -243,13 +244,13 @@ export class PlaylistService {
     songId: string
   ): Promise<any> {
     const existing = await this.getPlaylistById(playlistId);
-    if (!existing) throw new Error('Playlist not found');
+    if (!existing) throw new ControllerError(404, 'Playlist not found');
 
     const isOwner = existing.owner?._id === userId || existing.owner === userId;
     const isCollaborator = existing.collaborators?.some((c: any) => c.id === userId);
 
     if (!isOwner && (!existing.isCollaborative || !isCollaborator)) {
-      throw new Error('Unauthorized to modify this playlist');
+      throw new ControllerError(403, 'Unauthorized to modify this playlist');
     }
 
     await supabase

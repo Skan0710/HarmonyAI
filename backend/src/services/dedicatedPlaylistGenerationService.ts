@@ -1,6 +1,7 @@
 import { ISong } from '../types/domainModels.js';
 import { supabase } from '../config/supabase.js';
 import { isValidObjectId } from '../utils/validators.js';
+import { escapePostgrestFilterValue } from '../utils/postgrestFilter.js';
 import { mapSongRow } from './songService.js';
 import { CandidateGenerationService } from './candidateGenerationService.js';
 import { SemanticSearchService } from './semanticSearchService.js';
@@ -238,7 +239,9 @@ export class DedicatedPlaylistGenerationService {
       const orParts: string[] = [];
 
       if (preferredGenres.length > 0) {
-        const genreOrFilter = preferredGenres.map((g) => `name.ilike.%${g}%`).join(',');
+        const genreOrFilter = preferredGenres
+          .map((g) => `name.ilike.${escapePostgrestFilterValue(`%${g}%`)}`)
+          .join(',');
         const { data: matchedGenreDocs } = await supabase.from('genres').select('id').or(genreOrFilter);
         const genreIds = (matchedGenreDocs || []).map((g) => g.id);
         if (genreIds.length > 0) {
@@ -246,7 +249,7 @@ export class DedicatedPlaylistGenerationService {
         }
       }
       if (mood) {
-        orParts.push(`mood.ilike.%${mood}%`);
+        orParts.push(`mood.ilike.${escapePostgrestFilterValue(`%${mood}%`)}`);
       }
 
       let catalogQuery = supabase

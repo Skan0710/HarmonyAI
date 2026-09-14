@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { ArtistService } from '../services/artistService.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
-import { extractQueryParams, sanitizeString } from '../utils/validators.js';
+import { extractQueryParams, sanitizeString, clampLimit } from '../utils/validators.js';
 import { cached, invalidateCache } from '../utils/simpleCache.js';
 
 const CACHE_TTL_MS = 60_000;
@@ -72,7 +72,7 @@ export const getArtists = controllerWrapper(async (req: Request, res: Response) 
   const sortBy = (q.sortBy as any) || 'monthlyListeners';
   const sortOrder = q.sortOrder === 'asc' ? 'asc' : 'desc';
   const page = q.page || 1;
-  const limit = q.limit || 20;
+  const limit = clampLimit(q.limit, 20);
 
   const cacheKey = `artists:list:${search ?? ''}:${genreId ?? ''}:${verified ?? ''}:${sortBy}:${sortOrder}:${page}:${limit}`;
   const result = await cached(cacheKey, CACHE_TTL_MS, () =>
@@ -156,7 +156,7 @@ export const deleteArtist = controllerWrapper(async (req: Request, res: Response
 
 export const getSimilarArtists = controllerWrapper(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 5;
+  const limit = clampLimit(req.query.limit ? parseInt(String(req.query.limit), 10) : undefined, 5);
 
   const similar = await ArtistService.getRecommendedArtists(id, limit);
 

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MainLayout } from './components/MainLayout';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AdminRoute } from './components/AdminRoute';
 import { HomePage } from './pages/HomePage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { MusicDnaPage } from './pages/MusicDnaPage';
@@ -89,7 +90,9 @@ function App() {
             <Route path="/albums" element={<AlbumsPage />} />
             <Route path="/albums/:id" element={<AlbumDetailPage />} />
             {/* Developer Diagnostic Dashboard */}
-            <Route path="/admin/recommendations" element={<RecommendationEvaluationDashboardPage />} />
+            <Route element={<AdminRoute />}>
+              <Route path="/admin/recommendations" element={<RecommendationEvaluationDashboardPage />} />
+            </Route>
           </Route>
         </Route>
 

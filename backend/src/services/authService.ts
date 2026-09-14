@@ -49,6 +49,22 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 // process is the sole auth authority (no distributed session store).
 const failedAttemptsByEmail = new Map<string, FailedAttemptRecord>();
 
+// Every entry here is otherwise permanent for the process's lifetime (a
+// record is only ever deleted on a successful login), so a steady stream of
+// failed/nonexistent-email login attempts grows this map without bound.
+// Periodically evict anything whose tracking window and lockout have both
+// expired, since it no longer affects the rate-limit decision anyway.
+setInterval(() => {
+  const now = Date.now();
+  for (const [email, record] of failedAttemptsByEmail) {
+    const windowExpired = now - record.windowStart > FAILED_ATTEMPT_WINDOW_MS;
+    const lockExpired = !record.lockedUntil || record.lockedUntil <= now;
+    if (windowExpired && lockExpired) {
+      failedAttemptsByEmail.delete(email);
+    }
+  }
+}, FAILED_ATTEMPT_WINDOW_MS).unref();
+
 export class AuthService {
   static async register(input: RegisterInput): Promise<AuthResult> {
     const { name, email, password, profilePicture } = input;
