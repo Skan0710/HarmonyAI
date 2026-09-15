@@ -11,7 +11,8 @@
     "seed:more-hiphop": "tsx src/seedMoreHipHop.ts",
     "backfill:album-types": "tsx src/backfillAlbumTypes.ts",
     "catalog:test": "tsx src/scripts/ingestCatalog.ts --test",
-    "catalog:ingest": "tsx src/scripts/ingestCatalog.ts"
+    "catalog:ingest": "tsx src/scripts/ingestCatalog.ts",
+    "catalog:stats": "tsx src/scripts/checkStats.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
