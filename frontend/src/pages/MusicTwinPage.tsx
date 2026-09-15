@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { Sparkles as SparklesIcon, TrendingUp, Radio } from 'lucide-react';
+import { Sparkles as SparklesIcon, TrendingUp, Radio, Info, X, Orbit, Waves, Activity } from 'lucide-react';
 import {
   fetchPersonalMusicTwinApi,
   fetchModeRecommendationsApi,
@@ -24,6 +24,7 @@ const formatName = (name: string): string => name.replace(/[_-]+/g, ' ').replace
 export const MusicTwinPage: React.FC = () => {
   const [twin, setTwin] = useState<PersonalMusicTwin | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAnatomy, setShowAnatomy] = useState(false);
 
   const [twinPicks, setTwinPicks] = useState<Song[]>([]);
   const [loadingTwinPicks, setLoadingTwinPicks] = useState(true);
@@ -84,9 +85,23 @@ export const MusicTwinPage: React.FC = () => {
     );
   }
 
-  const distortIntensity = 0.2 + twin.explorationTendency * 0.5;
-  const speed = 1 + twin.explorationTendency * 2;
-  const sparkleCount = Math.round(twin.currentMusicalIdentity.rarityScore * 80) + 20;
+  const distortIntensity = 0.2 + twin.explorationTendency * 0.55;
+  const speed = 0.8 + twin.explorationTendency * 1.6;
+  const sparkleCount = Math.round(twin.currentMusicalIdentity.rarityScore * 80) + 25;
+
+  // Derive dynamic acoustic colors based on dominant vibe
+  const primaryMood = twin.dominantMoods[0]?.mood?.toLowerCase() || '';
+  const isEnergetic = primaryMood.includes('energy') || primaryMood.includes('hype') || primaryMood.includes('intense');
+  const isChill = primaryMood.includes('chill') || primaryMood.includes('calm') || primaryMood.includes('ambient');
+  const isDark = primaryMood.includes('dark') || primaryMood.includes('night') || primaryMood.includes('nocturnal');
+
+  const organismColors = isChill
+    ? { primary: '#3a86ff', secondary: '#00f5d4', core: '#7209b7' }
+    : isDark
+    ? { primary: '#9d4edd', secondary: '#ff007f', core: '#3a0ca3' }
+    : isEnergetic
+    ? { primary: '#ff3366', secondary: '#ffbe0b', core: '#fb5607' }
+    : { primary: '#ff6a43', secondary: '#ffd166', core: '#ff2a5f' };
 
   const topGenreName = twin.dominantGenres[0]?.name;
   const topArtistName = twin.importantArtists[0];
@@ -105,22 +120,143 @@ export const MusicTwinPage: React.FC = () => {
       />
 
       <div className="px-5 sm:px-8 lg:px-12 pt-8 grid lg:grid-cols-[1fr_320px] gap-8">
-        <div className="relative aspect-[4/3] sm:aspect-[16/10] rounded-[var(--radius-lg)] bg-surface-1 overflow-hidden">
-          {webglAvailable ? (
-            <ThreeErrorBoundary fallback={<OrganismFallback />}>
-              <Suspense fallback={<div className="w-full h-full animate-pulse bg-surface-2" />}>
-                <MusicTwinOrganism
-                  color="#ff6a43"
-                  distortIntensity={distortIntensity}
-                  speed={speed}
-                  sparkleCount={sparkleCount}
-                  reducedMotion={reducedMotion}
-                />
-              </Suspense>
-            </ThreeErrorBoundary>
-          ) : (
-            <OrganismFallback />
+        {/* 3D Living Organism Container with Interactive HUD */}
+        <div className="relative aspect-[4/3] sm:aspect-[16/10] rounded-[var(--radius-lg)] bg-surface-1 border border-border-subtle overflow-hidden flex flex-col justify-between shadow-2xl">
+          {/* Top HUD: Status, Persona, & Anatomy Toggle */}
+          <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
+            <div className="flex items-center gap-2 pointer-events-auto bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-2xs font-semibold uppercase tracking-wider text-text-secondary">
+                Acoustic Organism
+              </span>
+              <span className="text-white/20">|</span>
+              <span className="text-2xs font-medium text-text-primary">
+                {twin.listenerArchetype}
+              </span>
+            </div>
+
+            <button
+              onClick={() => setShowAnatomy((prev) => !prev)}
+              className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/15 text-xs text-text-primary hover:text-white transition-all shadow-md active:scale-95 cursor-pointer"
+              title="Click to understand what each visual part means"
+            >
+              {showAnatomy ? <X size={14} /> : <Info size={14} className="text-accent" />}
+              <span className="font-medium text-2xs uppercase tracking-wide">
+                {showAnatomy ? 'Close Guide' : 'What is this?'}
+              </span>
+            </button>
+          </div>
+
+          {/* Interactive Anatomy Guide Modal Overlay */}
+          {showAnatomy && (
+            <div className="absolute inset-x-3 top-14 bottom-14 z-20 bg-black/85 backdrop-blur-xl rounded-[var(--radius-md)] border border-white/15 p-5 overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <Orbit size={18} className="text-accent" />
+                  <h4 className="font-semibold text-sm text-text-primary">Anatomy of Your Music Twin</h4>
+                </div>
+                <button
+                  onClick={() => setShowAnatomy(false)}
+                  className="p-1 text-text-tertiary hover:text-white rounded-md transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="mt-4 grid sm:grid-cols-2 gap-3.5 text-xs">
+                <div className="bg-surface-2/60 border border-white/5 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-rose-400 font-semibold mb-1">
+                    <Activity size={14} />
+                    <span>Pulsing Nucleus (Core)</span>
+                  </div>
+                  <p className="text-text-secondary leading-relaxed">
+                    The inner radiant heart represents your baseline acoustic center of gravity. Its pulse speed matches your natural rhythm preference ({Math.round(speed * 30 + 60)} BPM).
+                  </p>
+                </div>
+
+                <div className="bg-surface-2/60 border border-white/5 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-accent font-semibold mb-1">
+                    <Waves size={14} />
+                    <span>Fluid Biomembrane (Distortion)</span>
+                  </div>
+                  <p className="text-text-secondary leading-relaxed">
+                    The fluid organic outer layer constantly morphs based on your <strong>Exploration Tendency ({Math.round(twin.explorationTendency * 100)}%)</strong>. High exploration creates elastic, ever-shifting sonic forms.
+                  </p>
+                </div>
+
+                <div className="bg-surface-2/60 border border-white/5 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-amber-400 font-semibold mb-1">
+                    <Orbit size={14} />
+                    <span>Harmonic Resonance Rings</span>
+                  </div>
+                  <p className="text-text-secondary leading-relaxed">
+                    Dual orbital rings reflect your <strong>Taste Diversity ({Math.round((twin.diversityPreference || 0.6) * 100)}%)</strong> and structural taste stability ({twin.tasteStability.stabilityRating}).
+                  </p>
+                </div>
+
+                <div className="bg-surface-2/60 border border-white/5 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-1">
+                    <SparklesIcon size={14} />
+                    <span>Satellites & Rarity Stardust</span>
+                  </div>
+                  <p className="text-text-secondary leading-relaxed">
+                    Orbiting crystalline nodes represent your top genres gravitationally locked in orbit. Particle density scales with your <strong>Rarity Score ({Math.round(twin.currentMusicalIdentity.rarityScore * 100)}%)</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-2xs text-text-tertiary mt-4 text-center italic">
+                Tip: Click and drag on the organism anytime to rotate and inspect it in 3D.
+              </p>
+            </div>
           )}
+
+          {/* 3D WebGL Canvas */}
+          <div className="w-full h-full">
+            {webglAvailable ? (
+              <ThreeErrorBoundary fallback={<OrganismFallback />}>
+                <Suspense fallback={<div className="w-full h-full animate-pulse bg-surface-2" />}>
+                  <MusicTwinOrganism
+                    color={organismColors.primary}
+                    secondaryColor={organismColors.secondary}
+                    coreColor={organismColors.core}
+                    distortIntensity={distortIntensity}
+                    speed={speed}
+                    sparkleCount={sparkleCount}
+                    diversityFactor={twin.diversityPreference || 0.6}
+                    reducedMotion={reducedMotion}
+                  />
+                </Suspense>
+              </ThreeErrorBoundary>
+            ) : (
+              <OrganismFallback />
+            )}
+          </div>
+
+          {/* Bottom Telemetry HUD Bar */}
+          <div className="absolute bottom-3 inset-x-3 z-10 pointer-events-none flex items-center justify-between text-2xs text-text-tertiary">
+            <div className="flex items-center gap-2 pointer-events-auto bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+              <span className="flex items-center gap-1 font-mono text-text-secondary">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                Fluidity: <strong className="text-text-primary">{Math.round(twin.explorationTendency * 100)}%</strong>
+              </span>
+              <span className="text-white/20">•</span>
+              <span className="flex items-center gap-1 font-mono text-text-secondary">
+                Diversity: <strong className="text-text-primary">{Math.round((twin.diversityPreference || 0.6) * 100)}%</strong>
+              </span>
+              <span className="text-white/20">•</span>
+              <span className="flex items-center gap-1 font-mono text-text-secondary">
+                Rarity: <strong className="text-text-primary">{Math.round(twin.currentMusicalIdentity.rarityScore * 100)}%</strong>
+              </span>
+            </div>
+
+            <span className="hidden sm:inline-block bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/5 text-2xs text-text-tertiary">
+              Drag to rotate in 3D
+            </span>
+          </div>
         </div>
 
         <div className="bg-surface-1 rounded-[var(--radius-lg)] p-5">
