@@ -6,13 +6,27 @@ export interface CuratedArtist {
 
 export const CURATED_ENGLISH_ARTISTS: CuratedArtist[] = [
   // ==========================================
+  // TOP PRIORITY FULL DISCOGRAPHY ACTS
+  // ==========================================
+  { name: 'Frank Ocean', genre: 'r-and-b', priority: true },
+  { name: 'Kanye West', genre: 'hip-hop', priority: true },
+  { name: 'A$AP Rocky', genre: 'hip-hop', priority: true },
+  { name: 'Travis Scott', genre: 'hip-hop', priority: true },
+  { name: 'Playboi Carti', genre: 'hip-hop', priority: true },
+  { name: 'Kendrick Lamar', genre: 'hip-hop', priority: true },
+  { name: 'Drake', genre: 'hip-hop', priority: true },
+  { name: 'Tyler, The Creator', genre: 'hip-hop', priority: true },
+  { name: 'The Weeknd', genre: 'pop', priority: true },
+  { name: 'Taylor Swift', genre: 'pop', priority: true },
+  { name: 'Mac Miller', genre: 'hip-hop', priority: true },
+  { name: 'Juice WRLD', genre: 'hip-hop', priority: true },
+
+  // ==========================================
   // 1. POP
   // ==========================================
-  { name: 'Taylor Swift', genre: 'pop', priority: true },
   { name: 'Ed Sheeran', genre: 'pop', priority: true },
   { name: 'Dua Lipa', genre: 'pop', priority: true },
   { name: 'Ariana Grande', genre: 'pop', priority: true },
-  { name: 'The Weeknd', genre: 'pop', priority: true },
   { name: 'Bruno Mars', genre: 'pop', priority: true },
   { name: 'Billie Eilish', genre: 'pop', priority: true },
   { name: 'Justin Bieber', genre: 'pop' },

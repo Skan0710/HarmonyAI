@@ -283,12 +283,41 @@ export class CatalogIngestionService {
       recommendation_metadata: r.recommendation_metadata,
     }));
 
-    // 4. Fetch artist's albums from iTunes
-    const itunesAlbums = await this.itunes.fetchArtistAlbums(itunesArtist.artistId, artistName, 25);
+    const isFullDiscography = [
+      'frank ocean',
+      'franck ocean',
+      'kanye west',
+      'a$ap rocky',
+      'asap rocky',
+      'travis scott',
+      'playboi carti',
+      'kendrick lamar',
+      'drake',
+      'the weeknd',
+      'tyler, the creator',
+      'taylor swift',
+      'mac miller',
+      'juice wrld',
+      'j. cole',
+      'future',
+      'eminem',
+      'radiohead',
+    ].some((name) => artistName.toLowerCase().includes(name));
+
+    // 4. Fetch artist's albums from iTunes:
+    // For full discography acts, pull up to 200 releases keeping all editions/deluxe/singles.
+    // Track-level deduplication against the DB ensures zero duplicate tracks are created.
+    const albumLimit = isFullDiscography ? 200 : 60;
+    const itunesAlbums = await this.itunes.fetchArtistAlbums(
+      itunesArtist.artistId,
+      artistName,
+      albumLimit,
+      !isFullDiscography
+    );
     if (itunesAlbums.length === 0) return { songsAdded: 0, albumsAdded: 0, duplicatesSkipped: 0, filteredCount: 0 };
 
-    // Select studio albums / EPs first
-    const selectedAlbums = itunesAlbums.slice(0, 15);
+    // Select albums: full discography for prioritized artists, top 40 for others
+    const selectedAlbums = isFullDiscography ? itunesAlbums : itunesAlbums.slice(0, 40);
 
     let audioIdx = 0;
     const pendingSongs: any[] = [];
