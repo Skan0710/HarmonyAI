@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Play,
@@ -75,10 +75,16 @@ const fallbackCover =
 
 export const AIPlaylistGeneratorPage: React.FC = () => {
   const navigate = useNavigate();
-  const [prompt, setPrompt] = useState<string>('');
+  const [searchParams] = useSearchParams();
+  const [prompt, setPrompt] = useState<string>(() => searchParams.get('prompt') || '');
   const [selectedDuration, setSelectedDuration] = useState<number>(30);
   const [selectedMood, setSelectedMood] = useState<string>('Any');
-  const [selectedGenre, setSelectedGenre] = useState<string>('All');
+  const [selectedGenre, setSelectedGenre] = useState<string>(() => {
+    const fromQuery = searchParams.get('genre');
+    if (!fromQuery) return 'All';
+    const matched = GENRE_OPTIONS.find((g) => g.toLowerCase() === fromQuery.toLowerCase());
+    return matched || 'All';
+  });
   const [discoveryLevel, setDiscoveryLevel] = useState<number>(50);
   const [sequencingStrategy, setSequencingStrategy] = useState<'balanced' | 'energetic' | 'gradual' | 'discovery'>('balanced');
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
@@ -123,6 +129,14 @@ export const AIPlaylistGeneratorPage: React.FC = () => {
       setActiveTracks(apiResult.tracks || []);
     }
   };
+
+  useEffect(() => {
+    if (searchParams.get('auto') === '1') {
+      handleGenerate();
+    }
+    // Only run once on mount — deep-link auto-generate, not on every prompt edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePresetClick = (preset: (typeof PRESET_PROMPTS)[0]) => {
     setPrompt(preset.text);

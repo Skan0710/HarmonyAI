@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { MultiStepAssistantService } from '../services/multiStepAssistantService.js';
 import { AssistantIntentService } from '../services/assistantIntentService.js';
+import { AssistantResponseComposerService } from '../services/assistantResponseComposerService.js';
 import { AssistantToolContext } from '../tools/toolTypes.js';
 import { controllerWrapper, ControllerError } from '../utils/controllerHelpers.js';
 
@@ -39,10 +40,19 @@ export const handleAssistantChat = controllerWrapper(async (req: Request, res: R
       actionConfirmation = lastStep?.message || `Executed ${multiResult.stepsExecuted.length} actions successfully`;
     }
 
+    const lastStep = multiResult.stepsExecuted[multiResult.stepsExecuted.length - 1];
+    const composedResponseMessage = await AssistantResponseComposerService.composeAnswer({
+      prompt: trimmedPrompt,
+      intentType: multiResult.stepsExecuted.length > 0 ? 'tool_call' : 'unfulfillable',
+      toolName: lastStep?.toolName,
+      toolResult: lastStep?.result,
+      explanation: multiResult.responseMessage,
+    });
+
     res.json({
       success: multiResult.status === 'completed',
       userPrompt: trimmedPrompt,
-      responseMessage: multiResult.responseMessage,
+      responseMessage: composedResponseMessage,
       isMultiStep: true,
       status: multiResult.status,
       actionConfirmation,
@@ -64,10 +74,18 @@ export const handleAssistantChat = controllerWrapper(async (req: Request, res: R
     actionConfirmation = singleResult.toolExecutionResult?.message;
   }
 
+  const composedResponseMessage = await AssistantResponseComposerService.composeAnswer({
+    prompt: trimmedPrompt,
+    intentType: singleResult.intent.type,
+    toolName: singleResult.intent.toolName,
+    toolResult: singleResult.toolExecutionResult,
+    explanation: singleResult.intent.explanation,
+  });
+
   res.json({
     success: isToolSuccess,
     userPrompt: trimmedPrompt,
-    responseMessage: singleResult.responseMessage,
+    responseMessage: composedResponseMessage,
     isMultiStep: false,
     status: isToolSuccess ? 'completed' : 'failed',
     intent: singleResult.intent,

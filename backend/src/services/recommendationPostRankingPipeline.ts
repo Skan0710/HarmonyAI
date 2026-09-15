@@ -81,6 +81,10 @@ export interface PostRankingPipelineOptions<T = any> {
   isDebugMode?: boolean;
 }
 
+// Weight given to the listener's real genre-affinity (from their taste profile) when blending
+// it into each candidate's base relevance score, prior to novelty adjustment.
+const USER_PREFERENCE_BLEND_WEIGHT = 0.25;
+
 export class RecommendationPostRankingPipeline {
   /**
    * Default score extractor resolving recommendation score from any upstream engine.
@@ -192,6 +196,16 @@ export class RecommendationPostRankingPipeline {
       const genreName = GenreDiversityFilteringService.extractGenre({ song });
       const userPreferenceScore = Number((tasteAffinityMap.get(genreName) || 0.5).toFixed(4));
 
+      // Blend the user's actual genre-affinity into the base relevance score before novelty
+      // is applied. Without this, userPreferenceScore was computed but only ever surfaced as
+      // diagnostics — the ranking itself never rewarded songs that matched the listener's taste.
+      const preferenceAdjustedScore = Number(
+        (
+          (1 - USER_PREFERENCE_BLEND_WEIGHT) * originalScore +
+          USER_PREFERENCE_BLEND_WEIGHT * userPreferenceScore
+        ).toFixed(4)
+      );
+
       // Novelty Calculation (Catalog + User Exposure)
       const catalogPlayCount = song?.playCount || 0;
       const userPlayCount = recentlyRecommendedMap.get(songId)?.count || 0;
@@ -204,7 +218,7 @@ export class RecommendationPostRankingPipeline {
 
       const { finalScore: noveltyEnhancedScore, gatedNoveltyScore } =
         NoveltyScoringService.combineNoveltyWithBaseScore(
-          originalScore,
+          preferenceAdjustedScore,
           rawNovelty,
           noveltyConfig
         );
