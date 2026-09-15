@@ -16,6 +16,12 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.12.7",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -23,15 +29,7 @@
     "express": "^4.19.2",
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
-    "jsonwebtoken": "^9.0.3"
-  },
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cookie-parser": "^1.4.10",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^20.12.7",
+    "jsonwebtoken": "^9.0.3",
     "tsx": "^4.7.2",
     "typescript": "^5.4.5"
   }
