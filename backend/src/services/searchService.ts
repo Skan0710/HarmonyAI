@@ -50,10 +50,65 @@ export const searchCatalog = async (
       .limit(safeLimit),
   ]);
 
-  const songs = (songsRes.data || []).map(mapSongRow);
-  const artists = (artistsRes.data || []).map((a) => mapArtistRow(a));
-  const albums = (albumsRes.data || []).map(mapAlbumRow);
-  const total = songs.length + artists.length + albums.length;
+  let songs = (songsRes.data || []).map(mapSongRow);
+  let artists = (artistsRes.data || []).map((a) => mapArtistRow(a));
+  let albums = (albumsRes.data || []).map(mapAlbumRow);
+  let total = songs.length + artists.length + albums.length;
+
+  // On-demand search expansion:
+  // If local results are sparse and the query is specific (>= 3 chars),
+  // attempt on-demand English artist/track discovery through iTunes to grow the catalog organically.
+  // We strictly do NOT call external APIs when sufficient local results already exist.
+  if (songs.length < 2 && artists.length === 0 && trimmedQuery.length >= 3) {
+    try {
+      const { ITunesProvider } = await import('../ingestion/providers/itunesProvider.js');
+      const { CatalogIngestionService } = await import('../ingestion/services/catalogIngestionService.js');
+      const { isEnglishArtist } = await import('../ingestion/filters/englishFilter.js');
+
+      const itunes = new ITunesProvider(100);
+      const artistMatch = await itunes.searchArtist(trimmedQuery);
+
+      if (artistMatch && isEnglishArtist(artistMatch.name)) {
+        const ingestionService = new CatalogIngestionService(100);
+        await ingestionService.initializeGenres();
+        const genreKey = (artistMatch.primaryGenre || 'pop').toLowerCase();
+
+        // Ingest artist's catalog into Supabase (non-destructive append/upsert)
+        const ingestRes = await ingestionService.ingestArtistCatalog(artistMatch.name, genreKey);
+
+        if (ingestRes.songsAdded > 0) {
+          // Re-query newly populated records
+          const [newSongsRes, newArtistsRes, newAlbumsRes] = await Promise.all([
+            supabase
+              .from('songs')
+              .select('*, artists!songs_artist_id_fkey(*), albums!songs_album_id_fkey(*), genres!songs_genre_id_fkey(*)')
+              .eq('is_published', true)
+              .or(`title.ilike.${pattern},language.ilike.${pattern}`)
+              .limit(safeLimit),
+
+            supabase
+              .from('artists')
+              .select('*')
+              .or(`name.ilike.${pattern},bio.ilike.${pattern}`)
+              .limit(safeLimit),
+
+            supabase
+              .from('albums')
+              .select('*, artists!albums_artist_id_fkey(*), genres!albums_genre_id_fkey(*)')
+              .or(`title.ilike.${pattern}`)
+              .limit(safeLimit),
+          ]);
+
+          songs = (newSongsRes.data || []).map(mapSongRow);
+          artists = (newArtistsRes.data || []).map((a) => mapArtistRow(a));
+          albums = (newAlbumsRes.data || []).map(mapAlbumRow);
+          total = songs.length + artists.length + albums.length;
+        }
+      }
+    } catch (e) {
+      // Safe fallback: on-demand discovery failure never breaks the user's search
+    }
+  }
 
   return {
     songs,
