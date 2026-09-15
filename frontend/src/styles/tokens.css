@@ -49,16 +49,16 @@
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
 
-  --text-2xs: 0.6875rem;   /* 11px — metadata, timestamps */
-  --text-xs: 0.75rem;      /* 12px */
-  --text-sm: 0.8125rem;    /* 13px */
-  --text-base: 0.9375rem;  /* 15px */
-  --text-md: 1.0625rem;    /* 17px */
-  --text-lg: 1.375rem;     /* 22px */
-  --text-xl: 1.875rem;     /* 30px */
-  --text-2xl: 2.5rem;      /* 40px */
-  --text-3xl: 3.5rem;      /* 56px */
-  --text-4xl: 4.75rem;     /* 76px */
+  --text-2xs: 0.75rem;     /* 12px — metadata, timestamps */
+  --text-xs: 0.875rem;     /* 14px */
+  --text-sm: 0.9375rem;    /* 15px */
+  --text-base: 1.0625rem;  /* 17px */
+  --text-md: 1.1875rem;    /* 19px */
+  --text-lg: 1.5rem;       /* 24px */
+  --text-xl: 2rem;         /* 32px */
+  --text-2xl: 2.75rem;     /* 44px */
+  --text-3xl: 3.75rem;     /* 60px */
+  --text-4xl: 5rem;        /* 80px */
 
   /* ---------- Spacing (4px base, editorial gutters at the top end) ---------- */
   --space-1: 0.25rem;
