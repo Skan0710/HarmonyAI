@@ -9,6 +9,7 @@ import {
 } from '../services/playlistService';
 import { CreatePlaylistModal } from './CreatePlaylistModal';
 import { ScrollArea } from './ui/scroll-area';
+import { setRecentPlaylist, broadcastPlaylistUpdated } from '../hooks/useRecentPlaylist';
 
 interface AddToPlaylistModalProps {
   song: Song | null;
@@ -52,8 +53,8 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
   const isSongInPlaylist = (playlist: Playlist): boolean => {
     if (!playlist.songs) return false;
     return playlist.songs.some((s: any) => {
-      const songId = typeof s === 'object' ? s._id : s;
-      return songId === song._id;
+      const songId = typeof s === 'object' ? (s._id || s.id) : s;
+      return songId === song._id || songId === (song as any).id;
     });
   };
 
@@ -61,17 +62,27 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
     const inPlaylist = isSongInPlaylist(playlist);
     const previousPlaylists = playlists;
 
-    // Optimistic update — flip membership locally immediately (mirrors
-    // useLikedSongsStore's pattern) instead of leaving the checkmark
-    // static until the network round-trip resolves, then roll back on
-    // failure. Doherty threshold: a click should read as "done" within
-    // ~400ms, not after a request completes.
+    const currentCount = playlist.songCount ?? playlist.songs?.length ?? 0;
+    const optimisticCount = inPlaylist ? Math.max(0, currentCount - 1) : currentCount + 1;
+
+    // Optimistic update — flip membership locally immediately
     const optimisticSongs = inPlaylist
-      ? (playlist.songs || []).filter((s: any) => (typeof s === 'object' ? s._id : s) !== song._id)
+      ? (playlist.songs || []).filter((s: any) => {
+          const sId = typeof s === 'object' ? (s._id || s.id) : s;
+          return sId !== song._id && sId !== (song as any).id;
+        })
       : [...(playlist.songs || []), song as any];
+
     setPlaylists((prev) =>
-      prev.map((p) => (p._id === playlist._id ? { ...p, songs: optimisticSongs } : p))
+      prev.map((p) =>
+        p._id === playlist._id ? { ...p, songs: optimisticSongs, songCount: optimisticCount } : p
+      )
     );
+
+    if (!inPlaylist) {
+      setRecentPlaylist({ id: playlist._id, name: playlist.name });
+    }
+
     setActionMessage(inPlaylist ? `Removed from "${playlist.name}"` : `Added to "${playlist.name}"`);
     setTimeout(() => setActionMessage(null), 2500);
 
@@ -84,12 +95,21 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
       setActionMessage(null);
       setError(err || 'Failed to update playlist');
     } else {
-      setPlaylists((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
+      broadcastPlaylistUpdated(playlist._id);
+      setPlaylists((prev) =>
+        prev.map((p) =>
+          p._id === updated._id
+            ? { ...updated, songCount: updated.songCount ?? updated.songs?.length ?? 0 }
+            : p
+        )
+      );
     }
   };
 
   const handlePlaylistCreated = (newPlaylist: Playlist) => {
     setPlaylists((prev) => [newPlaylist, ...prev]);
+    setRecentPlaylist({ id: newPlaylist._id, name: newPlaylist.name });
+    broadcastPlaylistUpdated(newPlaylist._id);
     // Automatically add song to the newly created playlist
     handleTogglePlaylist(newPlaylist);
   };
@@ -185,7 +205,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                               {playlist.name}
                             </p>
                             <p className="text-2xs text-text-tertiary font-mono">
-                              {playlist.songs ? playlist.songs.length : 0} tracks
+                              {playlist.songCount ?? playlist.songs?.length ?? 0} tracks
                             </p>
                           </div>
                         </div>

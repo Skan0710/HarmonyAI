@@ -9,6 +9,7 @@ export interface Playlist {
   songs: Song[];
   visibility?: 'public' | 'private';
   isCollaborative?: boolean;
+  songCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }

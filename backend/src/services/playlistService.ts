@@ -19,6 +19,16 @@ export interface UpdatePlaylistInput {
 
 function mapPlaylistRow(row: any, songs: any[] = [], collaborators: any[] = []) {
   if (!row) return null;
+  const finalSongs = songs && songs.length > 0
+    ? songs
+    : (Array.isArray(row.playlist_songs)
+      ? row.playlist_songs.map((ps: any) => ({ _id: ps.song_id, id: ps.song_id }))
+      : []);
+
+  const songCount = Array.isArray(row.playlist_songs)
+    ? row.playlist_songs.length
+    : (finalSongs ? finalSongs.length : 0);
+
   return {
     _id: row.id,
     id: row.id,
@@ -34,7 +44,8 @@ function mapPlaylistRow(row: any, songs: any[] = [], collaborators: any[] = []) 
     } : row.owner_id,
     visibility: row.visibility || 'public',
     isCollaborative: Boolean(row.is_collaborative),
-    songs,
+    songs: finalSongs,
+    songCount,
     collaborators,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -63,13 +74,13 @@ export class PlaylistService {
   static async getUserPlaylists(userId: string): Promise<any[]> {
     const { data: ownedPlaylists } = await supabase
       .from('playlists')
-      .select('*, users!owner_id(*)')
+      .select('*, users!owner_id(*), playlist_songs(song_id)')
       .eq('owner_id', userId)
       .order('updated_at', { ascending: false });
 
     const { data: collabPlaylists } = await supabase
       .from('playlist_collaborators')
-      .select('playlists(*, users!owner_id(*))')
+      .select('playlists(*, users!owner_id(*), playlist_songs(song_id))')
       .eq('user_id', userId);
 
     const all = [...(ownedPlaylists || [])];
@@ -235,6 +246,10 @@ export class PlaylistService {
       .from('playlist_songs')
       .upsert({ playlist_id: playlistId, song_id: songId, position: nextPos });
 
+    await (supabase.from('playlists') as any)
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', playlistId);
+
     return this.getPlaylistById(playlistId);
   }
 
@@ -257,6 +272,10 @@ export class PlaylistService {
       .from('playlist_songs')
       .delete()
       .match({ playlist_id: playlistId, song_id: songId });
+
+    await (supabase.from('playlists') as any)
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', playlistId);
 
     return this.getPlaylistById(playlistId);
   }

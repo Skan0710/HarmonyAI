@@ -33,9 +33,22 @@ export const ToastContainer: React.FC = () => {
 
             <span className="flex-1 leading-snug">{item.message}</span>
 
+            {item.action && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  item.action?.onClick();
+                  removeToast(item.id);
+                }}
+                className="px-2.5 py-1 text-xs font-semibold rounded-[var(--radius-pill)] bg-accent hover:bg-accent-strong text-text-on-accent transition-all cursor-pointer shrink-0 shadow-sm whitespace-nowrap active:scale-95"
+              >
+                {item.action.label}
+              </button>
+            )}
+
             <button
               onClick={() => removeToast(item.id)}
-              className="p-1 -mr-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-3 transition-colors cursor-pointer"
+              className="p-1 -mr-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-3 transition-colors cursor-pointer shrink-0"
               aria-label="Dismiss notification"
             >
               <X size={13} />

@@ -9,6 +9,7 @@ import { WhyThisSongModal } from './RecommendationExplanationModal';
 import { trackRecommendationInteraction } from '../services/recommendationTrackingService';
 import { formatTime, formatCount } from '../utils/formatters';
 import { LineHoverText } from './ui/line-hover-link';
+import { useRecentPlaylist } from '../hooks/useRecentPlaylist';
 
 interface SongCardProps {
   song: Song;
@@ -31,6 +32,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
   const isLiked = useLikedSongsStore((state) => state.isLiked(song._id));
   const toggleLikeSong = useLikedSongsStore((state) => state.toggleLikeSong);
   const openContextMenu = useContextMenuStore((state) => state.openContextMenu);
+  const { addSongWithRecentPlaylist } = useRecentPlaylist();
 
   const hasRecommendationInfo =
     Boolean((song as any).componentScores) ||
@@ -119,7 +121,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isPlaying }) =
 
   const handlePlaylistClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsPlaylistModalOpen(true);
+    addSongWithRecentPlaylist(song, () => setIsPlaylistModalOpen(true));
   };
 
   const handlePlayNextClick = (e: React.MouseEvent) => {

@@ -8,10 +8,12 @@ import { Breadcrumbs } from '../components/Breadcrumbs';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { LineHoverText } from '../components/ui/line-hover-link';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { useRecentPlaylist } from '../hooks/useRecentPlaylist';
 
 export const SongDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { addSongWithRecentPlaylist } = useRecentPlaylist();
 
   const currentSong = usePlayerStore((state) => state.currentSong);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
@@ -232,7 +234,11 @@ export const SongDetailPage: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setIsPlaylistModalOpen(true)}
+                onClick={() => {
+                  if (song) {
+                    addSongWithRecentPlaylist(song, () => setIsPlaylistModalOpen(true));
+                  }
+                }}
                 className="px-5 py-3 bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary font-medium text-sm rounded-[var(--radius-pill)] transition-colors flex items-center gap-2 cursor-pointer"
               >
                 <Plus size={15} strokeWidth={2} className="text-accent" />

@@ -3,17 +3,30 @@ import React from 'react';
 
 export type ToastType = 'success' | 'error' | 'info';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface ToastItem {
   id: string;
   message: string;
   type: ToastType;
   icon?: React.ReactNode;
   duration: number;
+  action?: ToastAction;
+}
+
+export interface ToastOptions {
+  type?: ToastType;
+  icon?: React.ReactNode;
+  duration?: number;
+  action?: ToastAction;
 }
 
 interface ToastState {
   toasts: ToastItem[];
-  addToast: (message: string, options?: { type?: ToastType; icon?: React.ReactNode; duration?: number }) => string;
+  addToast: (message: string, options?: ToastOptions) => string;
   removeToast: (id: string) => void;
 }
 
@@ -26,7 +39,8 @@ export const useToastStore = create<ToastState>((set) => ({
       message,
       type: options?.type || 'info',
       icon: options?.icon,
-      duration: options?.duration ?? 3200,
+      duration: options?.duration ?? (options?.action ? 4500 : 3200),
+      action: options?.action,
     };
 
     set((state) => ({
@@ -50,10 +64,10 @@ export const useToastStore = create<ToastState>((set) => ({
 }));
 
 export const toast = {
-  success: (message: string, options?: { icon?: React.ReactNode; duration?: number }) =>
+  success: (message: string, options?: Omit<ToastOptions, 'type'>) =>
     useToastStore.getState().addToast(message, { ...options, type: 'success' }),
-  error: (message: string, options?: { icon?: React.ReactNode; duration?: number }) =>
+  error: (message: string, options?: Omit<ToastOptions, 'type'>) =>
     useToastStore.getState().addToast(message, { ...options, type: 'error' }),
-  info: (message: string, options?: { icon?: React.ReactNode; duration?: number }) =>
+  info: (message: string, options?: Omit<ToastOptions, 'type'>) =>
     useToastStore.getState().addToast(message, { ...options, type: 'info' }),
 };

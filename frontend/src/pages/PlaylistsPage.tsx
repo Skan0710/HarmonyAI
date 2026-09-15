@@ -34,6 +34,17 @@ export const PlaylistsPage: React.FC = () => {
 
   useEffect(() => {
     loadPlaylists();
+
+    const handlePlaylistUpdate = () => {
+      fetchUserPlaylistsApi().then(({ playlists: data }) => {
+        if (data) setPlaylists(data);
+      });
+    };
+
+    window.addEventListener('harmony:playlist-updated', handlePlaylistUpdate);
+    return () => {
+      window.removeEventListener('harmony:playlist-updated', handlePlaylistUpdate);
+    };
   }, []);
 
   const handlePlaylistCreated = (newPlaylist: Playlist) => {

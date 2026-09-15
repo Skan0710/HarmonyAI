@@ -14,7 +14,7 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, onDelete }
   const [imgError, setImgError] = useState(false);
   const playSong = usePlayerStore((state) => state.playSong);
 
-  const songCount = playlist.songs ? playlist.songs.length : 0;
+  const songCount = playlist.songCount ?? (playlist.songs ? playlist.songs.length : 0);
 
   const fallbackCover =
     'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 24 24" fill="none" stroke="%23d9a15b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:%231b1815;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
@@ -29,6 +29,8 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, onDelete }
     e.stopPropagation();
     if (playlist.songs && playlist.songs.length > 0) {
       playSong(playlist.songs[0], playlist.songs);
+    } else if (playlist._id) {
+      navigate(`/playlists/${playlist._id}`);
     }
   };
 
