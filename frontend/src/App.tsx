@@ -33,6 +33,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { ThankYouPage } from './pages/ThankYouPage';
 import { FaqPage } from './pages/FaqPage';
+import { LandingPage } from './pages/LandingPage';
 import { useAuthStore } from './store/useAuthStore';
 import { useLikedSongsStore } from './store/useLikedSongsStore';
 import { usePreferenceStore } from './store/usePreferenceStore';
@@ -59,7 +60,22 @@ function App() {
     <BrowserRouter>
       <GoogleAnalytics />
       <Routes>
+        {/* Root Route: LandingPage for unauthenticated visitors (Demo User mode), HomePage for logged-in users */}
+        <Route
+          path="/"
+          element={
+            isAuthenticated ? (
+              <MainLayout />
+            ) : (
+              <LandingPage />
+            )
+          }
+        >
+          {isAuthenticated && <Route index element={<HomePage />} />}
+        </Route>
+
         {/* Public Routes */}
+        <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/thank-you" element={<ThankYouPage />} />
@@ -69,7 +85,7 @@ function App() {
         {/* Protected Routes with Nested Layout */}
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/home" element={<HomePage />} />
             <Route path="/discover" element={<DiscoverPage />} />
             <Route path="/music-dna" element={<MusicDnaPage />} />
             <Route path="/music-twin" element={<MusicTwinPage />} />
