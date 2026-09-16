@@ -17,7 +17,7 @@ export const setAuthCookie = (res: Response, token: string): void => {
   res.cookie(AUTH_COOKIE_NAME, token, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: 'lax',
+    sameSite: isProduction ? 'none' : 'lax',
     maxAge: AUTH_COOKIE_MAX_AGE_MS,
     path: '/',
   });
@@ -28,7 +28,7 @@ export const clearAuthCookie = (res: Response): void => {
   res.clearCookie(AUTH_COOKIE_NAME, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: 'lax',
+    sameSite: isProduction ? 'none' : 'lax',
     path: '/',
   });
 };

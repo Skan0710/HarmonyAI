@@ -74,70 +74,70 @@ const WaveformMark: React.FC = () => (
 
 const FALLBACK_DEMO_TRACKS: Song[] = [
   {
-    _id: 'demo-1',
-    title: 'Midnight Reverie',
-    artist: { _id: 'art-1', name: 'Kiasmos & Olafur' } as any,
-    album: 'Solaris Ethers' as any,
-    genre: { _id: 'gen-1', name: 'Ambient' } as any,
-    duration: 248,
+    _id: 'a7d61fbb-1e4c-45f6-9748-a7710e8c340c',
+    title: 'Rockstar Made',
+    artist: { _id: 'artist-playboi-carti', id: 'artist-playboi-carti', name: 'Playboi Carti' } as any,
+    album: { _id: 'album-whole-lotta-red', id: 'album-whole-lotta-red', title: 'Whole Lotta Red' } as any,
+    genre: { _id: 'genre-hip-hop', id: 'genre-hip-hop', name: 'Hip-Hop' } as any,
+    duration: 194,
     playCount: 14230,
-    coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80',
-    audioUrl: '',
+    coverImage: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/ba/1e/05/ba1e058e-5637-e53c-563c-f5b9a1a6c344/20UM1IM18331.rgb.jpg/600x600bb.jpg',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
   },
   {
-    _id: 'demo-2',
-    title: 'Neon Drift',
-    artist: { _id: 'art-2', name: 'Tycho & Tycho Sound' } as any,
-    album: 'Epoch Horizons' as any,
-    genre: { _id: 'gen-2', name: 'Electronic' } as any,
-    duration: 215,
+    _id: '3ee1daa4-9a71-4174-aaa6-b18fc74638c0',
+    title: 'I Knew It, I Knew You',
+    artist: { _id: 'artist-taylor-swift', id: 'artist-taylor-swift', name: 'Taylor Swift' } as any,
+    album: { _id: 'album-toy-story-5', id: 'album-toy-story-5', title: 'I Knew It, I Knew You - Single' } as any,
+    genre: { _id: 'genre-pop', id: 'genre-pop', name: 'Pop' } as any,
+    duration: 176,
     playCount: 28400,
-    coverImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
-    audioUrl: '',
+    coverImage: 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/38/e4/6d/38e46daf-d479-996a-118f-0357082b1941/26UMGIM72467.rgb.jpg/600x600bb.jpg',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
   },
   {
-    _id: 'demo-3',
-    title: 'Velvet Rain',
-    artist: { _id: 'art-3', name: 'Lianne La Havas' } as any,
-    album: 'Blood Sessions' as any,
-    genre: { _id: 'gen-3', name: 'Neo-Soul' } as any,
-    duration: 272,
+    _id: '022e8f1e-47a1-4d55-aaab-2d823aba833f',
+    title: 'ILoveUIHateU',
+    artist: { _id: 'artist-playboi-carti', id: 'artist-playboi-carti', name: 'Playboi Carti' } as any,
+    album: { _id: 'album-whole-lotta-red', id: 'album-whole-lotta-red', title: 'Whole Lotta Red' } as any,
+    genre: { _id: 'genre-hip-hop', id: 'genre-hip-hop', name: 'Hip-Hop' } as any,
+    duration: 135,
     playCount: 19820,
-    coverImage: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80',
-    audioUrl: '',
+    coverImage: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/ba/1e/05/ba1e058e-5637-e53c-563c-f5b9a1a6c344/20UM1IM18331.rgb.jpg/600x600bb.jpg',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
   },
   {
-    _id: 'demo-4',
-    title: 'Solar Flare',
-    artist: { _id: 'art-4', name: 'Bonobo' } as any,
-    album: 'Migration' as any,
-    genre: { _id: 'gen-4', name: 'Downtempo' } as any,
-    duration: 310,
+    _id: '061517d7-0630-427d-b499-a7347f2dda28',
+    title: 'the ends',
+    artist: { _id: 'artist-travis-scott', id: 'artist-travis-scott', name: 'Travis Scott' } as any,
+    album: { _id: 'album-birds-in-the-trap', id: 'album-birds-in-the-trap', title: 'Birds In The Trap Sing McKnight' } as any,
+    genre: { _id: 'genre-hip-hop', id: 'genre-hip-hop', name: 'Hip-Hop' } as any,
+    duration: 201,
     playCount: 42100,
-    coverImage: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80',
-    audioUrl: '',
+    coverImage: 'https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/50/f7/a3/50f7a39d-3bd5-28e9-0264-532f08b5b810/886446074726.jpg/600x600bb.jpg',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
   },
   {
-    _id: 'demo-5',
-    title: 'Subconscious Flow',
-    artist: { _id: 'art-5', name: 'Jon Hopkins' } as any,
-    album: 'Singularity' as any,
-    genre: { _id: 'gen-5', name: 'IDM' } as any,
-    duration: 342,
+    _id: '87c51bba-bf1f-4163-a1c7-240ed84cc128',
+    title: '2024',
+    artist: { _id: 'artist-playboi-carti', id: 'artist-playboi-carti', name: 'Playboi Carti' } as any,
+    album: { _id: 'album-music-sorry-4-da-wait', id: 'album-music-sorry-4-da-wait', title: 'MUSIC - SORRY 4 DA WAIT' } as any,
+    genre: { _id: 'genre-hip-hop', id: 'genre-hip-hop', name: 'Hip-Hop' } as any,
+    duration: 209,
     playCount: 16750,
-    coverImage: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80',
-    audioUrl: '',
+    coverImage: 'https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/fe/fc/f3/fefcf31a-4a86-9cc7-8e8e-9b777e6c6a40/25UMGIM46212.rgb.jpg/600x600bb.jpg',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
   },
   {
-    _id: 'demo-6',
-    title: 'Aura Bloom',
-    artist: { _id: 'art-6', name: 'Maribou State' } as any,
-    album: 'Kingdoms In Colour' as any,
-    genre: { _id: 'gen-6', name: 'Chillhop' } as any,
-    duration: 226,
+    _id: 'ba02ce9f-92ff-48d9-bef2-5de1be6d5c3d',
+    title: 'COCAINE NOSE',
+    artist: { _id: 'artist-playboi-carti', id: 'artist-playboi-carti', name: 'Playboi Carti' } as any,
+    album: { _id: 'album-music-sorry-4-da-wait', id: 'album-music-sorry-4-da-wait', title: 'MUSIC - SORRY 4 DA WAIT' } as any,
+    genre: { _id: 'genre-hip-hop', id: 'genre-hip-hop', name: 'Hip-Hop' } as any,
+    duration: 151,
     playCount: 31050,
-    coverImage: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600&auto=format&fit=crop&q=80',
-    audioUrl: '',
+    coverImage: 'https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/fe/fc/f3/fefcf31a-4a86-9cc7-8e8e-9b777e6c6a40/25UMGIM46212.rgb.jpg/600x600bb.jpg',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
   },
 ];
 
@@ -583,7 +583,7 @@ export const LandingPage: React.FC = () => {
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                 className="font-display text-3xl sm:text-4xl lg:text-5xl text-text-primary leading-tight mt-3 font-normal"
               >
-                Your sound right now leans <span className="italic text-accent">Melodic Ambient</span>, anchored in <span className="italic text-gold">Neo-Soul</span>.
+                Your sound right now leans <span className="italic text-accent">Melodic Trap</span>, anchored in <span className="italic text-gold">Hip-Hop & Pop</span>.
               </motion.h1>
 
               <p className="text-sm sm:text-base text-text-secondary mt-4 max-w-xl mx-auto leading-relaxed">
@@ -658,14 +658,14 @@ export const LandingPage: React.FC = () => {
                     Glimpse: Subconscious Music DNA
                   </p>
                   <h2 className="font-display text-2xl sm:text-3xl text-text-primary mt-2">
-                    Archetype: <span className="italic text-accent">The Melodic Architect</span>
+                    Archetype: <span className="italic text-accent">The Rhythmic Innovator</span>
                   </h2>
                   <p className="text-sm text-text-secondary mt-2 leading-relaxed">
-                    HarmonyAI computes your acoustic profile across 12 psychological dimensions. Notice how your high valence and structural instrumentalness balance your rhythm stability.
+                    HarmonyAI computes your acoustic profile across 12 psychological dimensions. Notice how your high energy and rhythmic cadence balance dynamic vocal presence.
                   </p>
 
                   <div className="flex flex-wrap items-center gap-2 mt-4">
-                    {['Melodic Ambient', 'Neo-Soul', 'Chillhop', 'Lo-Fi Jazz'].map((genre) => (
+                    {['Hip-Hop', 'Pop', 'Trap', 'Electronic'].map((genre) => (
                       <span
                         key={genre}
                         className="text-xs font-medium px-2.5 py-1 rounded-[var(--radius-pill)] bg-surface-2 text-text-secondary border border-border-subtle"
@@ -821,10 +821,10 @@ export const LandingPage: React.FC = () => {
                 Your taste is changing
               </h2>
               <p className="font-display text-lg sm:text-xl text-text-primary leading-relaxed mt-2 max-w-2xl">
-                "Over the past 30 days, your listening shifted +34% toward Ambient Electronic and Downbeat, with diminishing acoustic weight and rising rhythmic resonance."
+                "Over the past 30 days, your listening shifted +34% toward Hip-Hop and Melodic Trap, with rising rhythmic resonance and dynamic energy."
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-4">
-                {['Neo-Soul (+18%)', 'Ambient Electronic (+34%)', 'Chillhop (+12%)'].map((tag) => (
+                {['Hip-Hop (+34%)', 'Pop (+18%)', 'Electronic (+12%)'].map((tag) => (
                   <span
                     key={tag}
                     className="text-xs font-medium px-2.5 py-1 rounded-[var(--radius-pill)] bg-gold-wash text-gold"

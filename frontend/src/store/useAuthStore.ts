@@ -14,6 +14,7 @@ interface AuthResponseData {
   success: boolean;
   data: {
     user: User;
+    token?: string;
   };
 }
 
@@ -43,9 +44,6 @@ interface AuthState {
   clearError: () => void;
 }
 
-// The session token lives only in an httpOnly cookie the browser manages —
-// there is nothing for this store to read synchronously on init, so auth
-// state starts unknown and is resolved by fetchCurrentUser() on app mount.
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
@@ -69,7 +67,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return false;
     }
 
-    const { user } = response.data.data;
+    const { user, token } = response.data.data;
+    if (token) {
+      localStorage.setItem('harmonyai_token', token);
+    }
 
     set({
       user,
@@ -97,7 +98,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return false;
     }
 
-    const { user } = response.data.data;
+    const { user, token } = response.data.data;
+    if (token) {
+      localStorage.setItem('harmonyai_token', token);
+    }
 
     set({
       user,
@@ -110,9 +114,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    // Clears the httpOnly cookie server-side — client JS has no way to read
-    // or remove it itself, so this request is the only thing that can
-    // actually end the session before its 7-day expiry.
+    localStorage.removeItem('harmonyai_token');
     await apiClient('/auth/logout', { method: 'POST' });
     set({
       user: null,
@@ -128,6 +130,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const response = await apiClient<UserProfileResponseData>('/users/me');
 
     if (response.error || !response.data?.data) {
+      localStorage.removeItem('harmonyai_token');
       set({
         user: null,
         isAuthenticated: false,

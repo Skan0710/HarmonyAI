@@ -11,16 +11,15 @@ export const apiClient = async <T = unknown>(
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
   const url = `${API_CONFIG.baseURL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('harmonyai_token') : null;
 
   try {
     const response = await fetch(url, {
       ...options,
-      // The session lives in an httpOnly cookie the browser attaches
-      // automatically; there is no token in JS to put in an Authorization
-      // header any more.
       credentials: 'include',
       headers: {
         ...API_CONFIG.headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
     });
@@ -28,6 +27,10 @@ export const apiClient = async <T = unknown>(
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
+      if (response.status === 401 && typeof window !== 'undefined' && endpoint === '/users/me') {
+        localStorage.removeItem('harmonyai_token');
+      }
+
       let errorMessage = data?.message || `Request failed with status ${response.status}`;
       if (response.status === 401) {
         errorMessage = data?.message || 'Authentication session expired. Please sign in again.';

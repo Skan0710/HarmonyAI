@@ -37,7 +37,7 @@ export const register = controllerWrapper(async (req: Request, res: Response) =>
   res.status(201).json({
     success: true,
     message: 'User registered successfully',
-    data: { user: result.user },
+    data: { user: result.user, token: result.token },
   });
 });
 
@@ -62,7 +62,7 @@ export const login = controllerWrapper(async (req: Request, res: Response) => {
   res.status(200).json({
     success: true,
     message: 'Login successful',
-    data: { user: result.user },
+    data: { user: result.user, token: result.token },
   });
 });
 

@@ -40,11 +40,23 @@ import { usePreferenceStore } from './store/usePreferenceStore';
 import { GoogleAnalytics } from './components/GoogleAnalytics';
 
 function App() {
-  const { fetchCurrentUser, isAuthenticated } = useAuthStore();
+  const { fetchCurrentUser, isAuthenticated, isInitializing } = useAuthStore();
   const { fetchLikedSongs } = useLikedSongsStore();
   const { fetchPreferences } = usePreferenceStore();
 
   useEffect(() => {
+    // Extract token if redirected from OAuth provider
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      if (token) {
+        localStorage.setItem('harmonyai_token', token);
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('token');
+        window.history.replaceState({}, document.title, newUrl.pathname + (newUrl.search ? newUrl.search : ''));
+      }
+    }
+
     fetchCurrentUser();
   }, [fetchCurrentUser]);
 
@@ -66,6 +78,10 @@ function App() {
           element={
             isAuthenticated ? (
               <MainLayout />
+            ) : isInitializing ? (
+              <div className="flex items-center justify-center min-h-screen bg-surface-0 text-text-tertiary">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+              </div>
             ) : (
               <LandingPage />
             )
