@@ -5,7 +5,8 @@ import { API_CONFIG } from '../config/api';
 // can render and redirect back with a code) — it can't go through the
 // fetch-based apiClient like the rest of the app's requests.
 const startOAuth = (provider: 'google' | 'discord') => {
-  window.location.href = `${API_CONFIG.baseURL}/auth/${provider}`;
+  const returnTo = typeof window !== 'undefined' ? encodeURIComponent(window.location.origin) : '';
+  window.location.href = `${API_CONFIG.baseURL}/auth/${provider}${returnTo ? `?return_to=${returnTo}` : ''}`;
 };
 
 const GoogleIcon: React.FC = () => (

@@ -28,7 +28,11 @@ const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
 
 // --- Security Headers ---
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
 // --- Force HTTPS in production ---
 // Most hosts (Render, Railway, Heroku, etc.) terminate TLS at a proxy in
@@ -42,21 +46,40 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // --- CORS Configuration ---
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
-  : ['http://localhost:3000', 'http://localhost:5173'];
+const defaultOrigins = [
+  'https://harmony-ai-phi.vercel.app',
+  'https://harmonyai.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
+
+const envOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',')
+      .map((o) => o.trim().replace(/^["']|["']$/g, '').replace(/\/+$/, ''))
+      .filter(Boolean)
+  : [];
+
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || !isProduction) {
+      const cleanOrigin = origin.replace(/\/+$/, '');
+      if (
+        allowedOrigins.includes(cleanOrigin) ||
+        cleanOrigin.endsWith('.vercel.app') ||
+        !isProduction
+      ) {
         return callback(null, true);
       }
-      return callback(new Error('Not allowed by CORS'));
+      console.warn(`[CORS] Rejected origin: ${origin}`);
+      return callback(null, false);
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   })
 );
 

@@ -130,7 +130,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const response = await apiClient<UserProfileResponseData>('/users/me');
 
     if (response.error || !response.data?.data) {
-      localStorage.removeItem('harmonyai_token');
+      if (response.status === 401) {
+        localStorage.removeItem('harmonyai_token');
+      }
       set({
         user: null,
         isAuthenticated: false,
