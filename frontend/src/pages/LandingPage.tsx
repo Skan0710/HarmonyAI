@@ -298,8 +298,8 @@ export const LandingPage: React.FC = () => {
 
         <Wordmark className="text-lg shrink-0" />
 
-        {/* Global Search Bar */}
-        <div ref={searchContainerRef} className="relative flex-1 max-w-lg mx-auto">
+        {/* Global Search Bar - Responsive */}
+        <div ref={searchContainerRef} className="hidden sm:block relative flex-1 max-w-lg mx-auto">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -338,17 +338,28 @@ export const LandingPage: React.FC = () => {
           )}
         </div>
 
+        {/* Mobile Search Trigger Icon */}
+        <button
+          onClick={() => setIsAuthModalOpen(true)}
+          className="sm:hidden p-2 text-text-secondary hover:text-text-primary ml-auto cursor-pointer"
+          aria-label="Search songs and artists"
+          title="Search"
+        >
+          <Search size={18} strokeWidth={1.75} />
+        </button>
+
         {/* Guest Auth Options on Top */}
-        <div className="flex items-center gap-2.5 text-sm shrink-0">
+        <div className="flex items-center gap-2 text-sm shrink-0">
           <button
             onClick={() => navigate('/login')}
-            className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+            className="px-2.5 sm:px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
           >
             Log In
           </button>
           <Button
             size="sm"
             onClick={() => navigate('/register')}
+            className="text-xs px-3 py-1.5"
           >
             Register
           </Button>
@@ -1003,7 +1014,7 @@ export const LandingPage: React.FC = () => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 12 }}
               transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-full max-w-md bg-surface-1 border border-border-default rounded-[var(--radius-lg)] p-6 sm:p-7 shadow-2xl z-10 space-y-5 text-left"
+              className="relative w-full max-w-md bg-surface-1 border border-border-default rounded-[var(--radius-lg)] p-5 sm:p-7 shadow-2xl z-10 space-y-4 sm:space-y-5 text-left max-h-[88dvh] overflow-y-auto"
             >
               {/* Close Button */}
               <button

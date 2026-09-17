@@ -138,7 +138,7 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
         }}
         aria-label="Play next"
         title={playedNext ? 'Playing next' : 'Play next'}
-        className={`p-2 rounded-[var(--radius-sm)] transition-all cursor-pointer shrink-0 ${
+        className={`hidden sm:block p-2 rounded-[var(--radius-sm)] transition-all cursor-pointer shrink-0 ${
           playedNext
             ? 'opacity-100 text-success'
             : 'text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-3'
@@ -154,7 +154,11 @@ export const SongRow: React.FC<SongRowProps> = ({ song, index, onPlay }) => {
         }}
         aria-label={isLiked ? 'Unlike song' : 'Like song'}
         title={isLiked ? 'Unlike song' : 'Like song'}
-        className="p-2 text-text-tertiary hover:text-accent opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity cursor-pointer shrink-0 hover:bg-surface-3 rounded-[var(--radius-sm)]"
+        className={`p-2 text-text-tertiary hover:text-accent transition-opacity cursor-pointer shrink-0 hover:bg-surface-3 rounded-[var(--radius-sm)] ${
+          isLiked
+            ? 'opacity-100'
+            : 'opacity-60 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100'
+        }`}
       >
         <Heart
           size={17}

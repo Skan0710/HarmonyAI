@@ -298,7 +298,7 @@ export const SearchPage: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 mt-4">
+          <div className="flex items-center gap-1.5 mt-4 overflow-x-auto pb-1 scrollbar-none flex-nowrap -mx-1 px-1">
             {MODE_TABS.map((tab) => (
               <button
                 key={tab.id}

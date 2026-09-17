@@ -110,7 +110,7 @@ export const QueueDrawer: React.FC = () => {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed top-0 right-0 bottom-0 z-[var(--z-drawer)] w-full sm:w-96 bg-surface-1 border-l border-border-subtle shadow-[var(--shadow-lg)] flex flex-col"
+            className="fixed top-0 right-0 bottom-0 z-[var(--z-drawer)] w-full sm:w-96 bg-surface-1 border-l border-border-subtle shadow-[var(--shadow-lg)] flex flex-col pb-safe"
           >
             <div className="p-5 border-b border-border-subtle flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">

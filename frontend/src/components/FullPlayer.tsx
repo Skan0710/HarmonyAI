@@ -204,7 +204,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
               <div className="absolute inset-0 bg-surface-0/75" />
             </div>
 
-            <div className="relative h-full flex flex-col px-6 sm:px-10 py-6">
+            <div className="relative h-full flex flex-col px-4 sm:px-10 py-4 sm:py-6">
               <div className="flex items-center justify-between shrink-0">
                 <button
                   onClick={handleClose}
@@ -219,7 +219,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                 <div className="w-9 h-9" aria-hidden="true" />
               </div>
 
-              <div className="flex-1 flex flex-col items-center justify-center min-h-0 gap-6 max-w-md mx-auto w-full">
+              <div className="flex-1 flex flex-col items-center justify-center min-h-0 gap-3.5 sm:gap-6 max-w-md mx-auto w-full py-1">
                 {/* Song / Video View Mode Toggle Pill */}
                 <div className="flex items-center p-1 bg-surface-2/90 backdrop-blur rounded-full border border-border-subtle shrink-0">
                   <button
@@ -261,7 +261,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ isOpen, onClose }) => {
                     className="w-full max-w-[min(88vw,380px)] sm:max-w-md aspect-video rounded-[var(--radius-lg)] overflow-hidden bg-black shadow-[var(--shadow-lg)] shrink"
                   />
                 ) : (
-                  <div className="w-full max-w-[min(70vw,320px)] sm:max-w-sm aspect-square rounded-[var(--radius-lg)] overflow-hidden shadow-[var(--shadow-lg)] shrink">
+                  <div className="w-full max-w-[min(65vw,270px)] sm:max-w-sm max-h-[35vh] sm:max-h-none aspect-square rounded-[var(--radius-lg)] overflow-hidden shadow-[var(--shadow-lg)] shrink">
                     <img
                       src={cover}
                       alt={currentSong.title}
