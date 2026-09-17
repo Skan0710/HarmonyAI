@@ -17,7 +17,6 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import { usePlayer } from '../hooks/usePlayer';
-import { useAuth } from '../hooks/useAuth';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useLikedSongsStore } from '../store/useLikedSongsStore';
 import { useContextMenuStore } from '../store/useContextMenuStore';
@@ -43,7 +42,6 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   const [scrubTime, setScrubTime] = useState<number | null>(null);
 
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
   const mediaMode = usePlayerStore((state) => state.mediaMode);
   const isFullPlayerOpen = usePlayerStore((state) => state.isFullPlayerOpen);
   const videoSlotRect = usePlayerStore((state) => state.videoSlotRect);
@@ -456,9 +454,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   return (
     <>
       <div
-        className={`fixed left-0 right-0 z-[var(--z-player)] transition-[bottom] duration-200 ${
-          isAuthenticated ? 'bottom-16 md:bottom-0' : 'bottom-0'
-        } bg-surface-1/95 border-t border-border-subtle backdrop-blur-xl px-3 py-2 sm:px-5 sm:py-3 shadow-[0_-4px_24px_rgba(0,0,0,0.5)]`}
+        className="fixed bottom-0 left-0 right-0 z-[var(--z-player)] bg-surface-1/95 border-t border-border-subtle backdrop-blur-xl px-3 py-2 sm:px-5 sm:py-3 shadow-[0_-4px_24px_rgba(0,0,0,0.5)]"
       >
       {usingNativeAudio && currentSong.audioUrl && (
         <audio
