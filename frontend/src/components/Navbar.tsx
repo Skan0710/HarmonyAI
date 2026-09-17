@@ -158,7 +158,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
           <div className="flex items-center gap-3">
             <Link
               to="/profile"
-              className="hidden sm:flex items-center gap-2 px-2 py-1 -mx-2 -my-1 rounded-[var(--radius-pill)] hover:bg-surface-2 transition-colors cursor-pointer"
+              className="flex items-center gap-2 p-1 sm:px-2 sm:py-1 rounded-[var(--radius-pill)] hover:bg-surface-2 transition-colors cursor-pointer"
               title="View profile"
             >
               <div className="w-7 h-7 rounded-full overflow-hidden bg-accent-wash text-accent text-xs font-semibold flex items-center justify-center border border-border-subtle shrink-0">
@@ -175,17 +175,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                   getInitials(user.name)
                 )}
               </div>
-              <span className="text-text-secondary font-medium text-xs">{user.name}</span>
+              <span className="hidden md:inline text-text-secondary font-medium text-xs truncate max-w-[100px]">{user.name}</span>
             </Link>
             <button
               type="button"
               onClick={() => setIsConfirmLogoutOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-pill)] bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30 hover:border-danger/50 text-xs font-semibold transition-all duration-150 cursor-pointer shadow-sm active:scale-[0.98]"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-[var(--radius-pill)] bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30 hover:border-danger/50 text-xs font-semibold transition-all duration-150 cursor-pointer shadow-sm active:scale-[0.98]"
               title="Log Out"
               aria-label="Log Out"
             >
               <LogOut size={13} strokeWidth={2.2} />
-              <span>Log Out</span>
+              <span className="hidden sm:inline">Log Out</span>
             </button>
           </div>
         ) : (

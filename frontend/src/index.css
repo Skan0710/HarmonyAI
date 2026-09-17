@@ -124,3 +124,14 @@ h1, h2, h3 {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Mobile touch & safe-area optimizations */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

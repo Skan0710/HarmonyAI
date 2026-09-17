@@ -8,6 +8,7 @@ import { FullPlayer } from './FullPlayer';
 import { AmbientBackground } from './ui/AmbientBackground';
 import { CommandPalette } from './CommandPalette';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
+import { MobileBottomNav } from './MobileBottomNav';
 
 import { usePlayerStore } from '../store/usePlayerStore';
 
@@ -22,11 +23,12 @@ export const MainLayout: React.FC = () => {
       <Navbar onMenuClick={() => setMobileNavOpen(true)} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-        <main className="flex-1 overflow-y-auto pb-28">
+        <main className="flex-1 overflow-y-auto pb-36 sm:pb-28">
           <Outlet />
         </main>
       </div>
       <MiniPlayer onExpand={() => setFullPlayerOpen(true)} />
+      <MobileBottomNav onOpenMenu={() => setMobileNavOpen(true)} />
       <QueueDrawer />
       <FullPlayer isOpen={isFullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
       <CommandPalette />
