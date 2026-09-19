@@ -549,15 +549,6 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
           >
             <SkipForward size={16} fill="currentColor" strokeWidth={1.75} />
           </button>
-
-          <button
-            onClick={stop}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-text-tertiary hover:text-danger cursor-pointer ml-0.5"
-            aria-label="Close player"
-            title="Close player"
-          >
-            <X size={15} />
-          </button>
         </div>
       </div>
 
@@ -617,10 +608,6 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
             title="More actions"
           >
             <MoreHorizontal size={16} strokeWidth={1.75} />
-          </button>
-
-          <button onClick={stop} className="sm:hidden w-7 h-7 shrink-0 flex items-center justify-center text-text-tertiary hover:text-text-primary" aria-label="Close Player">
-            <X size={16} />
           </button>
         </div>
 

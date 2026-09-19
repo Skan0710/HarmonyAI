@@ -2,19 +2,10 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
-import { MiniPlayer } from './MiniPlayer';
-import { QueueDrawer } from './QueueDrawer';
-import { FullPlayer } from './FullPlayer';
 import { AmbientBackground } from './ui/AmbientBackground';
-import { CommandPalette } from './CommandPalette';
-import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
-
-import { usePlayerStore } from '../store/usePlayerStore';
 
 export const MainLayout: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const isFullPlayerOpen = usePlayerStore((state) => state.isFullPlayerOpen);
-  const setFullPlayerOpen = usePlayerStore((state) => state.setFullPlayerOpen);
 
   return (
     <div className="flex flex-col h-screen text-text-primary">
@@ -26,11 +17,6 @@ export const MainLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
-      <MiniPlayer onExpand={() => setFullPlayerOpen(true)} />
-      <QueueDrawer />
-      <FullPlayer isOpen={isFullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
-      <CommandPalette />
-      <KeyboardShortcutsModal />
     </div>
   );
 };

@@ -39,10 +39,19 @@ import { useLikedSongsStore } from './store/useLikedSongsStore';
 import { usePreferenceStore } from './store/usePreferenceStore';
 import { GoogleAnalytics } from './components/GoogleAnalytics';
 
+import { MiniPlayer } from './components/MiniPlayer';
+import { QueueDrawer } from './components/QueueDrawer';
+import { FullPlayer } from './components/FullPlayer';
+import { CommandPalette } from './components/CommandPalette';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { usePlayerStore } from './store/usePlayerStore';
+
 function App() {
   const { fetchCurrentUser, isAuthenticated, isInitializing } = useAuthStore();
   const { fetchLikedSongs } = useLikedSongsStore();
   const { fetchPreferences } = usePreferenceStore();
+  const isFullPlayerOpen = usePlayerStore((state) => state.isFullPlayerOpen);
+  const setFullPlayerOpen = usePlayerStore((state) => state.setFullPlayerOpen);
 
   useEffect(() => {
     // Extract token if redirected from OAuth provider
@@ -72,23 +81,21 @@ function App() {
     <BrowserRouter>
       <GoogleAnalytics />
       <Routes>
-        {/* Root Route: LandingPage for unauthenticated visitors (Demo User mode), HomePage for logged-in users */}
-        <Route
-          path="/"
-          element={
-            isAuthenticated ? (
-              <MainLayout />
-            ) : isInitializing ? (
-              <div className="flex items-center justify-center min-h-screen bg-surface-0 text-text-tertiary">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
-              </div>
-            ) : (
-              <LandingPage />
-            )
-          }
-        >
-          {isAuthenticated && <Route index element={<HomePage />} />}
-        </Route>
+        {/* Unauthenticated Landing / Demo Route for visitors */}
+        {!isAuthenticated && (
+          <Route
+            path="/"
+            element={
+              isInitializing ? (
+                <div className="flex items-center justify-center min-h-screen bg-surface-0 text-text-tertiary">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+                </div>
+              ) : (
+                <LandingPage />
+              )
+            }
+          />
+        )}
 
         {/* Public Routes */}
         <Route path="/landing" element={<LandingPage />} />
@@ -98,9 +105,10 @@ function App() {
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FaqPage />} />
 
-        {/* Protected Routes with Nested Layout */}
+        {/* Protected Routes with Unified Nested Layout */}
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
+            <Route index element={<HomePage />} />
             <Route path="/home" element={<HomePage />} />
             <Route path="/discover" element={<DiscoverPage />} />
             <Route path="/music-dna" element={<MusicDnaPage />} />
@@ -132,6 +140,11 @@ function App() {
             unknown URL should see a real 404, not get redirected to /login. */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <MiniPlayer onExpand={() => setFullPlayerOpen(true)} />
+      <QueueDrawer />
+      <FullPlayer isOpen={isFullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
+      <CommandPalette />
+      <KeyboardShortcutsModal />
       <ToastContainer />
       <SongContextMenu />
     </BrowserRouter>
